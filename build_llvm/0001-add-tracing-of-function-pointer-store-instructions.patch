@@ -1,0 +1,148 @@
+From 530a3d7abe27f5213790bc38549e5c44f77714b7 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Wed, 18 Mar 2026 01:31:18 +0800
+Subject: [PATCH] add tracing of function pointer store instructions
+
+---
+ .../llvm/Transforms/Utils/Instrumentation.h   |  1 +
+ .../Instrumentation/SanitizerCoverage.cpp     | 42 +++++++++++++++++++
+ 2 files changed, 43 insertions(+)
+
+diff --git a/llvm/include/llvm/Transforms/Utils/Instrumentation.h b/llvm/include/llvm/Transforms/Utils/Instrumentation.h
+index 93ab8c693..e7fa0110a 100644
+--- a/llvm/include/llvm/Transforms/Utils/Instrumentation.h
++++ b/llvm/include/llvm/Transforms/Utils/Instrumentation.h
+@@ -162,6 +162,7 @@ struct SanitizerCoverageOptions {
+   bool StackDepth = false;
+   bool TraceLoads = false;
+   bool TraceStores = false;
++  bool TraceFunctionPointerStores = false;
+   bool CollectControlFlow = false;
+   bool GatedCallbacks = false;
+   int StackDepthCallbackMin = 0;
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index d72d216e0..934191520 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -61,6 +61,7 @@ const char SanCovStore2[] = "__sanitizer_cov_store2";
+ const char SanCovStore4[] = "__sanitizer_cov_store4";
+ const char SanCovStore8[] = "__sanitizer_cov_store8";
+ const char SanCovStore16[] = "__sanitizer_cov_store16";
++const char SanCovStoreFunPointer = "__sanitizer_cov_store_fun_pointer"
+ const char SanCovTraceDiv4[] = "__sanitizer_cov_trace_div4";
+ const char SanCovTraceDiv8[] = "__sanitizer_cov_trace_div8";
+ const char SanCovTraceGep[] = "__sanitizer_cov_trace_gep";
+@@ -145,6 +146,10 @@ static cl::opt<bool> ClStoreTracing("sanitizer-coverage-trace-stores",
+                                     cl::desc("Tracing of store instructions"),
+                                     cl::Hidden);
+ 
++static cl::opt<bool> ClFunPointerStoreTracing("sanitizer-coverage-trace-function-pointer-stores",
++                                    cl::desc("Tracing of store instructions of function pointers"),
++                                    cl::Hidden);
++
+ static cl::opt<bool> ClGEPTracing("sanitizer-coverage-trace-geps",
+                                   cl::desc("Tracing of GEP instructions"),
+                                   cl::Hidden);
+@@ -218,6 +223,7 @@ SanitizerCoverageOptions OverrideFromCL(SanitizerCoverageOptions Options) {
+                                            ClStackDepthCallbackMin.getValue());
+   Options.TraceLoads |= ClLoadTracing;
+   Options.TraceStores |= ClStoreTracing;
++  Options.TraceFunctionPointerStores |= ClFunPointerStoreTracing;
+   Options.GatedCallbacks |= ClGatedCallbacks;
+   if (!Options.TracePCGuard && !Options.TracePC &&
+       !Options.Inline8bitCounters && !Options.StackDepth &&
+@@ -256,6 +262,7 @@ private:
+                          ArrayRef<GetElementPtrInst *> GepTraceTargets);
+   void InjectTraceForLoadsAndStores(Function &F, ArrayRef<LoadInst *> Loads,
+                                     ArrayRef<StoreInst *> Stores);
++  void InjectTraceForFunctionPointerStores(Function &F, ArrayRef<StoreInst *> InterestingStores);
+   void InjectTraceForSwitch(Function &F,
+                             ArrayRef<Instruction *> SwitchTraceTargets,
+                             Value *&FunctionGateCmp);
+@@ -293,6 +300,7 @@ private:
+   std::array<FunctionCallee, 5> SanCovLoadFunction;
+   std::array<FunctionCallee, 5> SanCovStoreFunction;
+   std::array<FunctionCallee, 2> SanCovTraceDivFunction;
++  FunctionCallee SanCovStoreFPointerFunction;
+   FunctionCallee SanCovTraceGepFunction;
+   FunctionCallee SanCovTraceSwitchFunction;
+   GlobalVariable *SanCovLowestStack;
+@@ -485,6 +493,8 @@ bool ModuleSanitizerCoverage::instrumentModule() {
+   SanCovStoreFunction[3] = M.getOrInsertFunction(SanCovStore8, VoidTy, PtrTy);
+   SanCovStoreFunction[4] = M.getOrInsertFunction(SanCovStore16, VoidTy, PtrTy);
+ 
++  SanCovStoreFPointerFunction = M.getOrInsertFunction(SanCovStoreFunPointer, VoidTy, PtrTy, IntptrTy);
++
+   {
+     AttributeList AL;
+     AL = AL.addParamAttribute(*C, 0, Attribute::ZExt);
+@@ -653,6 +663,15 @@ static bool IsInterestingCmp(ICmpInst *CMP, const DominatorTree &DT,
+   return true;
+ }
+ 
++// Only keeps stores where the stored value is a pointer to a function
++static bool isInterestingStore(StoreInst *Store){
++  Type *StoredType = Store->getPointerOperandType();
++  if (PointerType *PtrType = dyn_cast<PointerType>(StoredType))
++    if (isa<FunctionType>(PtrType->getElementType()))
++      return true;
++  return false;
++}
++
+ void ModuleSanitizerCoverage::instrumentFunction(Function &F) {
+   if (F.empty())
+     return;
+@@ -699,6 +718,7 @@ void ModuleSanitizerCoverage::instrumentFunction(Function &F) {
+   SmallVector<GetElementPtrInst *, 8> GepTraceTargets;
+   SmallVector<LoadInst *, 8> Loads;
+   SmallVector<StoreInst *, 8> Stores;
++  SmallVector<StoreInst *, 8> FunctionPointerStores;
+ 
+   const DominatorTree &DT = DTCallback(F);
+   const PostDominatorTree &PDT = PDTCallback(F);
+@@ -734,6 +754,10 @@ void ModuleSanitizerCoverage::instrumentFunction(Function &F) {
+       if (Options.TraceStores)
+         if (StoreInst *SI = dyn_cast<StoreInst>(&Inst))
+           Stores.push_back(SI);
++      if (Options.TraceFunctionPointerStores)
++        if (StoreInst *SI = dyn_cast<StoreInst>(&Inst))
++          if (IsInterestingStore(SI))
++            FunctionPointerStores.push_back(SI);
+       if (Options.StackDepth)
+         if (isa<InvokeInst>(Inst) ||
+             (isa<CallInst>(Inst) && !isa<IntrinsicInst>(Inst)))
+@@ -752,6 +776,7 @@ void ModuleSanitizerCoverage::instrumentFunction(Function &F) {
+   InjectTraceForDiv(F, DivTraceTargets);
+   InjectTraceForGep(F, GepTraceTargets);
+   InjectTraceForLoadsAndStores(F, Loads, Stores);
++  InjectTraceForFunctionPointerStores(F, FunctionPointerStores);
+ }
+ 
+ GlobalVariable *ModuleSanitizerCoverage::CreateFunctionLocalArrayInSection(
+@@ -997,6 +1022,23 @@ void ModuleSanitizerCoverage::InjectTraceForLoadsAndStores(
+   }
+ }
+ 
++// On every store to a function pointer variable call we call a run-time
++// function __sanitizer_cov_store_fun_pointer* with two parameters:
++//   - address of te variable,
++//   - stored function pointer
++void ModuleSanitizerCoverage::InjectTraceForFunctionPointerStores(
++    Function &, ArrayRef<StoreInst *> Stores) {
++
++  for (StoreInst *SI : Stores) {
++      InstrumentationIRBuilder IRB(SI);
++      Value *StorePtr = SI->getPointerOperand();
++      Value *FunctionPtr = SI->getValueOperand();
++      // It is unclear to me if the pointer cast is necessary.
++      // The value operand should already be a pointer to a func.
++      IRB.CreateCall(SanCovStoreFPointerFunction, StorePtr, IRB.CreatePointerCast(FunctionPtr,IntptrTy));
++    }
++}
++
+ void ModuleSanitizerCoverage::InjectTraceForCmp(
+     Function &F, ArrayRef<Instruction *> CmpTraceTargets,
+     Value *&FunctionGateCmp) {
+-- 
+2.43.0
+
