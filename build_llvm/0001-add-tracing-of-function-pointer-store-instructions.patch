@@ -1,13 +1,3 @@
-From 530a3d7abe27f5213790bc38549e5c44f77714b7 Mon Sep 17 00:00:00 2001
-From: Daniel Wappner <dwappner@dc.uba.ar>
-Date: Wed, 18 Mar 2026 01:31:18 +0800
-Subject: [PATCH] add tracing of function pointer store instructions
-
----
- .../llvm/Transforms/Utils/Instrumentation.h   |  1 +
- .../Instrumentation/SanitizerCoverage.cpp     | 42 +++++++++++++++++++
- 2 files changed, 43 insertions(+)
-
 diff --git a/llvm/include/llvm/Transforms/Utils/Instrumentation.h b/llvm/include/llvm/Transforms/Utils/Instrumentation.h
 index 93ab8c693..e7fa0110a 100644
 --- a/llvm/include/llvm/Transforms/Utils/Instrumentation.h
@@ -21,14 +11,14 @@ index 93ab8c693..e7fa0110a 100644
    bool GatedCallbacks = false;
    int StackDepthCallbackMin = 0;
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index d72d216e0..934191520 100644
+index d72d216e0..53490187d 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -61,6 +61,7 @@ const char SanCovStore2[] = "__sanitizer_cov_store2";
  const char SanCovStore4[] = "__sanitizer_cov_store4";
  const char SanCovStore8[] = "__sanitizer_cov_store8";
  const char SanCovStore16[] = "__sanitizer_cov_store16";
-+const char SanCovStoreFunPointer = "__sanitizer_cov_store_fun_pointer"
++const char SanCovStoreFunPointer[] = "__sanitizer_cov_store_fun_pointer";
  const char SanCovTraceDiv4[] = "__sanitizer_cov_trace_div4";
  const char SanCovTraceDiv8[] = "__sanitizer_cov_trace_div8";
  const char SanCovTraceGep[] = "__sanitizer_cov_trace_gep";
@@ -76,15 +66,31 @@ index d72d216e0..934191520 100644
    {
      AttributeList AL;
      AL = AL.addParamAttribute(*C, 0, Attribute::ZExt);
-@@ -653,6 +663,15 @@ static bool IsInterestingCmp(ICmpInst *CMP, const DominatorTree &DT,
+@@ -653,6 +663,31 @@ static bool IsInterestingCmp(ICmpInst *CMP, const DominatorTree &DT,
    return true;
  }
  
-+// Only keeps stores where the stored value is a pointer to a function
-+static bool isInterestingStore(StoreInst *Store){
-+  Type *StoredType = Store->getPointerOperandType();
-+  if (PointerType *PtrType = dyn_cast<PointerType>(StoredType))
-+    if (isa<FunctionType>(PtrType->getElementType()))
++/**
++/ Returns true only where the stored value is a pointer to a function.
++/ The stored value can be a statically known function, or it can come
++/ from somewhere like the field of a struct in allocated memory.
++/
++/ Looking at the Type of the stored Value by doing something like
++/  Store->getValueOperand()->stripPointerCasts()->getType()
++/  will fail to identify dynamic functions as a FunctionType because
++/  LLVM's FunctionType refers to statically known global functions,
++/  which the dynamic function by definition cannot be.
++/
++/ This is why we try to use debug information on the stored variable's
++/ supposed type instead.
++/
++/ TO DO: actually attempt the version that "doesn't work"
++**/
++static bool IsInterestingStore(StoreInst *Store){
++
++  Value *StoreAddr = Store->getPointerOperand();
++
++  if () //To DO: use debug information
 +      return true;
 +  return false;
 +}
@@ -92,7 +98,7 @@ index d72d216e0..934191520 100644
  void ModuleSanitizerCoverage::instrumentFunction(Function &F) {
    if (F.empty())
      return;
-@@ -699,6 +718,7 @@ void ModuleSanitizerCoverage::instrumentFunction(Function &F) {
+@@ -699,6 +734,7 @@ void ModuleSanitizerCoverage::instrumentFunction(Function &F) {
    SmallVector<GetElementPtrInst *, 8> GepTraceTargets;
    SmallVector<LoadInst *, 8> Loads;
    SmallVector<StoreInst *, 8> Stores;
@@ -100,7 +106,7 @@ index d72d216e0..934191520 100644
  
    const DominatorTree &DT = DTCallback(F);
    const PostDominatorTree &PDT = PDTCallback(F);
-@@ -734,6 +754,10 @@ void ModuleSanitizerCoverage::instrumentFunction(Function &F) {
+@@ -734,6 +770,10 @@ void ModuleSanitizerCoverage::instrumentFunction(Function &F) {
        if (Options.TraceStores)
          if (StoreInst *SI = dyn_cast<StoreInst>(&Inst))
            Stores.push_back(SI);
@@ -111,7 +117,7 @@ index d72d216e0..934191520 100644
        if (Options.StackDepth)
          if (isa<InvokeInst>(Inst) ||
              (isa<CallInst>(Inst) && !isa<IntrinsicInst>(Inst)))
-@@ -752,6 +776,7 @@ void ModuleSanitizerCoverage::instrumentFunction(Function &F) {
+@@ -752,6 +792,7 @@ void ModuleSanitizerCoverage::instrumentFunction(Function &F) {
    InjectTraceForDiv(F, DivTraceTargets);
    InjectTraceForGep(F, GepTraceTargets);
    InjectTraceForLoadsAndStores(F, Loads, Stores);
@@ -119,7 +125,7 @@ index d72d216e0..934191520 100644
  }
  
  GlobalVariable *ModuleSanitizerCoverage::CreateFunctionLocalArrayInSection(
-@@ -997,6 +1022,23 @@ void ModuleSanitizerCoverage::InjectTraceForLoadsAndStores(
+@@ -997,6 +1038,25 @@ void ModuleSanitizerCoverage::InjectTraceForLoadsAndStores(
    }
  }
  
@@ -134,15 +140,14 @@ index d72d216e0..934191520 100644
 +      InstrumentationIRBuilder IRB(SI);
 +      Value *StorePtr = SI->getPointerOperand();
 +      Value *FunctionPtr = SI->getValueOperand();
-+      // It is unclear to me if the pointer cast is necessary.
++
++      // It is unclear to me if it would be necessary to cast the
++      // FunctionPtr to IntptrTy as InjectCoverageForIndirectCalls does.
 +      // The value operand should already be a pointer to a func.
-+      IRB.CreateCall(SanCovStoreFPointerFunction, StorePtr, IRB.CreatePointerCast(FunctionPtr,IntptrTy));
++      IRB.CreateCall(SanCovStoreFPointerFunction, {StorePtr, FunctionPtr});
 +    }
 +}
 +
  void ModuleSanitizerCoverage::InjectTraceForCmp(
      Function &F, ArrayRef<Instruction *> CmpTraceTargets,
      Value *&FunctionGateCmp) {
--- 
-2.43.0
-
