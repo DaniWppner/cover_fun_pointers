@@ -1,0 +1,270 @@
+From 098167a2624f825a8ecd2480e8527d2a265890c6 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Tue, 31 Mar 2026 15:46:05 -0300
+Subject: [PATCH] identify function pointer values and pass the pointer
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 232 +++++++++++++++++-
+ 1 file changed, 222 insertions(+), 10 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index b630fed705c9..e77f0a9eb83e 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -981,18 +981,212 @@ void ModuleSanitizerCoverage::InjectTraceForLoadsAndStores(
+ /
+ / TO DO: actually attempt the version that "doesn't work"
+ **/
+-static bool IsInterestingStore(StoreInst *Store){
++static bool IsInterestingStore(StoreInst *Store) {
+ 
+   Value *StoreAddr = Store->getPointerOperand();
+ 
+-  if () //To DO: use debug information
+-      return true;
++  if () // To DO: use debug information
++    return true;
++  if () // To DO: use debug information
++    return true;
+   return false;
+ }
+ 
++typedef std::vector<Type *> Types;
++typedef std::vector<int> Offsets;
++typedef std::vector<std::pair<Types, Offsets>> vectorTypesOffsets;
++typedef std::pair<bool, vectorTypesOffsets> retType;
++
++static retType HandleTypeRecursive(Type *Ty);
++static retType RecursivelyHandlePointerType(PointerType *Ty) {
++  Type *OrigType = Ty->getPointerElementType();
++  return HandleTypeRecursive(OrigType);
++}
++
++static retType RecursivelyHandleStructType(StructType *OriginalStruct) {
++  unsigned numElements = OriginalStruct->getNumElements();
++  bool any = false;
++  vectorTypesOffsets all_vector_res = {};
++  for (unsigned i = 0; i < numElements; i++) {
++    Type *ElemType = OriginalStruct->getElementType(i);
++    retType res_Pos = HandleTypeRecursive(ElemType);
++    any = any || res_Pos.first;
++    vectorTypesOffsets this_types_offsets = res_Pos.second;
++    if (any) {
++      if (this_types_offsets.size() == 0) {
++        this_types_offsets.push_back(std::make_pair(Types{}, Offsets{}));
++      }
++      for (int j = 0; j < this_types_offsets.size(); j++) {
++        Types this_types_j = this_types_offsets[j].first;
++        Offsets this_offsets_j = this_types_offsets[j].second;
++        this_types_j.insert(this_types_j.begin(), OriginalStruct);
++        this_offsets_j.insert(this_offsets_j.begin(), i);
++        this_types_offsets[j] = std::make_pair(this_types_j, this_offsets_j);
++      }
++      all_vector_res.insert(all_vector_res.end(), this_types_offsets.begin(),
++                            this_types_offsets.end());
++    }
++  }
++  return std::make_pair(any, all_vector_res);
++}
++
++/*
++Returns:
++  - bool: whether the type can be stripped to a function pointer with some
++offsets
++  - vector: pairs of struct types and offset chains used to access each function
++pointer.
++*/
++static retType HandleTypeRecursive(Type *Ty) {
++  if (!(Ty->isPointerTy() || Ty->isStructTy())) {
++    bool result;
++    if (Ty->isFunctionTy()) {
++      result = true;
++    } else {
++      result = false;
++    }
++    return std::make_pair(result, vectorTypesOffsets{});
++  }
++  if (Ty->isPointerTy())
++    return RecursivelyHandlePointerType(dyn_cast<PointerType>(Ty));
++  else if (StructType *OriginalStruct = dyn_cast<StructType>(Ty))
++    return RecursivelyHandleStructType(OriginalStruct);
++  else {
++    // TODO: handle more types
++    assert(false && "Unexpected type during function pointer analysis.\n");
++  }
++}
++
++/*
++Returns all intermediate values that appear while stripping pointer casts.
++*/
++static std::vector<Value *> GetAllValuesThatWouldBeStripped(Value *V) {
++  SmallPtrSet<const Value *, 8> Visited;
++  std::vector<Value *> res;
++  bool ciclicalTypeDetected = false;
++  Visited.insert(V);
++  res.push_back(V);
++  while (!ciclicalTypeDetected) {
++
++    /*
++    There are four cases we are interested in
++      1. GEPOperator means the pointer can be used to access the same address as
++    a different type
++      2. BitCast Instruction is by definition a type change without modifying
++    the data
++      3. AddressSpaceCast Instruction moves the pointer to a different address
++    space, and can redefine the pointer type
++      4. CallBase Instruction can be interpreted as the Value being of the
++    function return type
++    */
++    if (GEPOperator *GEP = dyn_cast<GEPOperator>(V)) {
++      if (!GEP->hasAllZeroIndices())
++        // In this case a different memory address is accessed
++        // so we cannot handle it as just a type cast
++        return res;
++      // retrieve the "base" pointer
++      V = GEP->getPointerOperand();
++    } else if (Operator::getOpcode(V) == Instruction::BitCast) {
++      // first operand is the original type
++      Value *NewV = cast<Operator>(V)->getOperand(0);
++      if (!NewV->getType()->isPointerTy()) {
++        res.push_back(NewV);
++        return res;
++      }
++      V = NewV;
++    } else if (Operator::getOpcode(V) == Instruction::AddrSpaceCast) {
++      // first operand is the original pointer type
++      V = cast<Operator>(V)->getOperand(0);
++    } else if (CallBase *Call = dyn_cast<CallBase>(V)) {
++      if (Value *RV = Call->getReturnedArgOperand()) {
++        V = RV;
++      } else {
++        return res;
++      }
++    } else {
++      // There are no other types we want to handle, this is the end.
++      return res;
++    }
++
++    assert(V->getType()->isPointerTy() && "Unexpected operand type!");
++    res.push_back(V);
++    ciclicalTypeDetected = !(Visited.insert(V).second);
++  }
++  return res;
++}
++
++static retType
++getOffsetChainFromAllValues(std::vector<Value *> possibleStoredValues) {
++  int any = 0;
++  std::vector<retType> res = {};
++  std::vector<int> positiveResultIdxs = {};
++
++  for (int i = 0; i < possibleStoredValues.size(); i++) {
++    Type *StoredType = possibleStoredValues[i]->getType();
++    retType partial_res = HandleTypeRecursive(StoredType);
++
++    if (partial_res.first) {
++      any += 1;
++      positiveResultIdxs.push_back(i);
++    }
++    res.push_back(partial_res);
++  }
++
++  // TO DO: not have this weakness
++  assert(any <= 1 && "We cannot handle more than one intermeidate value "
++                     "reaching a function pointer");
++  if (any > 1) {
++    // assume positiveResultIdxs.size() == 1.
++    return std::make_pair(true, res[positiveResultIdxs[0]].second);
++  } else {
++    return std::make_pair(false, vectorTypesOffsets{});
++    ;
++  }
++}
++
++static Value *getFunctionPointerUsingOffsetChain(
++    Value *V, Offsets offsetChain, Types typeChain,
++    InstrumentationIRBuilder Builder, DebugLoc loc);
++
++static Value *gFPUOC_Struct(Value *V, Offsets offsetChain, Types typeChain,
++                            InstrumentationIRBuilder Builder) {
++  V = V->stripPointerCastsAndAliases();
++
++  int offset = offsetChain[0];
++  Type *structType = typeChain[0];
++
++  ArrayRef<Value *> arrayParam = {
++      ConstantInt::get(Type::getInt32Ty(V->getContext()), 0),
++      ConstantInt::get(Type::getInt32Ty(V->getContext()), offset)};
++
++  unsigned AddrSpace = V->getType()->getPointerAddressSpace();
++  PointerType *StructPtrTy = PointerType::get(structType, AddrSpace);
++  Value *Cast = Builder.CreatePointerCast(V, StructPtrTy);
++
++  Value *GEP = Builder.CreateInBoundsGEP(structType, Cast, arrayParam);
++
++  Offsets remaining_offsets =
++      Offsets(offsetChain.begin() + 1, offsetChain.end());
++  Types remaining_types = Types(typeChain.begin() + 1, typeChain.end());
++  return getFunctionPointerUsingOffsetChain(GEP, remaining_offsets,
++                                            remaining_types, Builder);
++}
++
++static Value *
++getFunctionPointerUsingOffsetChain(Value *V, Offsets offsetChain,
++                                   Types typeChain,
++                                   InstrumentationIRBuilder Builder) {
++  Type *Ty = V->getType();
++  if (offsetChain.size() == 0) {
++    return V;
++  } else {
++    return gFPUOC_Struct(V, offsetChain, typeChain, Builder);
++  }
++}
++
+ // On every store to a function pointer variable call we call a run-time
+ // function __sanitizer_cov_store_fun_pointer* with two parameters:
+-//   - address of te variable,
++//   - address of the variable,
+ //   - stored function pointer
+ void ModuleSanitizerCoverage::InjectTraceForFunctionPointerStores(
+     Function &, ArrayRef<StoreInst *> Stores) {
+@@ -1000,12 +1194,30 @@ void ModuleSanitizerCoverage::InjectTraceForFunctionPointerStores(
+   for (StoreInst *SI : Stores) {
+     InstrumentationIRBuilder IRB(SI);
+     Value *StorePtr = SI->getPointerOperand();
+-    Value *FunctionPtr = SI->getValueOperand();
+-
+-    // It is unclear to me if it would be necessary to cast the
+-    // FunctionPtr to IntptrTy as InjectCoverageForIndirectCalls does.
+-    // The value operand should already be a pointer to a func.
+-    IRB.CreateCall(SanCovStoreFPointerFunction, {StorePtr, FunctionPtr});
++    Value *StoredValue = SI->getValueOperand();
++
++    // We consider all types this stored value had in the past.
++    std::vector<Value *> StoredCastIntermediates =
++        GetAllValuesThatWouldBeStripped(StoredValue);
++    retType offsetChainRes =
++        getOffsetChainFromAllValues(StoredCastIntermediates);
++
++    // This means there is a function pointer somewhere
++    if (offsetChainRes.first) {
++      for (int i = 0 : i < offsetChainRes.second.size(), i++) {
++        // (typeChain, offsetChain) are a chain of StructType and
++        // indexes used to reach a function pointer from StoredValue
++        Types typeChain = offsetChainRes.second[i].first;
++        Offsets offsetChain = offsetChainRes.second[i].second;
++
++        Value *FunctionPtr = getFunctionPointerUsingOffsetChain(
++            StoredValue, offsetChain, typeChain, IRB);
++
++        // It is unclear to me if it would be necessary to cast the
++        // FunctionPtr to IntptrTy as InjectCoverageForIndirectCalls does.
++        IRB.CreateCall(SanCovStoreFPointerFunction, {StorePtr, FunctionPtr});
++      }
++    }
+   }
+ }
+ 
+-- 
+2.43.0
+
