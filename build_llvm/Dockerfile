@@ -14,5 +14,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates gnupg \
             build-essential cmake make python3 zlib1g wget subversion unzip git \
             # ninja-build is a faster alternative to make for cmake projects
-            ninja-build && \
+            ninja-build \
+            # these libraries are needed to build the compile_rt for different architectures 
+            gcc-multilib g++-multilib && \
     rm -rf /var/lib/apt/lists/*

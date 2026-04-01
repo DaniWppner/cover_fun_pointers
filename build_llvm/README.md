@@ -12,7 +12,8 @@ Inside the docker container:
 cmake -S llvm -B build -G "Ninja" \
   -DCMAKE_BUILD_TYPE=Release \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
+  -DLLVM_ENABLE_RUNTIMES="compiler-rt" \
   -DLLVM_TARGETS_TO_BUILD=Native
-
+  
 ninja -C build
 ```
