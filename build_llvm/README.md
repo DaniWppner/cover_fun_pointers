@@ -20,9 +20,10 @@ ninja -C build
 
 ## Test new clang on sample DynamicStructs.c
 
-After building, and having the appropiate c libraries for linking:
+After building, and having the appropiate c libraries for linking (probably inside one of the containers in this repo):
 ```
 clang -g -O0 -fsanitize-coverage=trace-function-pointer-stores DynamicStructs.c -o DynamicStructs.o
 ```
+Make sure that `clang` refers to the custom installation.
 
 This should produce a binary where you can check that on runtime the callback receives a pointer to the dynamically chosen function.

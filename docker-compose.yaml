@@ -11,3 +11,15 @@ services:
     command: /bin/bash
     tty: true
     stdin_open: true
+  
+  compile_kernel:
+    build:
+      context: .
+      dockerfile: ./build_kernel/Dockerfile
+    volumes:
+      - ./build_llvm/llvm-project:/home/custom_llvm
+      - ./build_kernel:/home/build_kernel
+      - /path/to/linux:/home/linux  
+    command: /bin/bash
+    tty: true
+    stdin_open: true
