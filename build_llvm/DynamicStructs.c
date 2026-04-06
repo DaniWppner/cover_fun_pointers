@@ -83,7 +83,7 @@ struct FunctionDescGeneric *getRandomStructOneOrTwo() {
 }
 
 void __sanitizer_cov_store_fun_pointer(unsigned storeAddr, unsigned storePosition){
-    printf("storeAddr: %d storePosition:%d", storeAddr, storePosition);
+    printf("storeAddr: %d storePosition: %d\n", storeAddr, storePosition);
 }
 
 int main(void) {
