@@ -1,0 +1,166 @@
+From 6c1201bc2baac003c80836b46a4ace0628ad562f Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Mon, 6 Apr 2026 14:20:12 -0300
+Subject: [PATCH 3/3] remove debug info statements
+
+---
+ llvm/include/llvm/IR/IRBuilder.h              |  4 --
+ llvm/lib/IR/Type.cpp                          |  4 --
+ .../Instrumentation/SanitizerCoverage.cpp     | 44 +++++--------------
+ 3 files changed, 12 insertions(+), 40 deletions(-)
+
+diff --git a/llvm/include/llvm/IR/IRBuilder.h b/llvm/include/llvm/IR/IRBuilder.h
+index c869b198825a..a1789759960d 100644
+--- a/llvm/include/llvm/IR/IRBuilder.h
++++ b/llvm/include/llvm/IR/IRBuilder.h
+@@ -1743,10 +1743,6 @@ public:
+                            const Twine &Name = "") {
+     if (auto *V = Folder.FoldGEP(Ty, Ptr, IdxList, /*IsInBounds=*/true))
+       return V;
+-    errs() << "CreateInBoundsGEP: " << *Ty << ", " << *Ptr << ", IdxList = (size " << IdxList.size() << ")[";
+-    for (Value *Idx : IdxList)
+-      errs() << ", " << *Idx;
+-    errs() << "]\n";
+     return Insert(GetElementPtrInst::CreateInBounds(Ty, Ptr, IdxList), Name);
+   }
+ 
+diff --git a/llvm/lib/IR/Type.cpp b/llvm/lib/IR/Type.cpp
+index 268023e14a03..85b658c8a52f 100644
+--- a/llvm/lib/IR/Type.cpp
++++ b/llvm/lib/IR/Type.cpp
+@@ -602,7 +602,6 @@ bool StructType::isLayoutIdentical(StructType *Other) const {
+ 
+ Type *StructType::getTypeAtIndex(const Value *V) const {
+   unsigned Idx = (unsigned)cast<Constant>(V)->getUniqueInteger().getZExtValue();
+-
+   assert(indexValid(Idx) && "Invalid structure index!");
+   return getElementType(Idx);
+ }
+@@ -610,7 +609,6 @@ Type *StructType::getTypeAtIndex(const Value *V) const {
+ bool StructType::indexValid(const Value *V) const {
+   // Structure indexes require (vectors of) 32-bit integer constants.  In the
+   // vector case all of the indices must be equal.
+-  errs() << "StructType::indexValid: this = " << *this << ", V = " << *V;
+   if (!V->getType()->isIntOrIntVectorTy(32))
+     return false;
+   if (isa<ScalableVectorType>(V->getType()))
+@@ -619,8 +617,6 @@ bool StructType::indexValid(const Value *V) const {
+   if (C && V->getType()->isVectorTy())
+     C = C->getSplatValue();
+   const ConstantInt *CU = dyn_cast_or_null<ConstantInt>(C);
+-  errs() << ", CU = " << *CU << ", NumElements = " << getNumElements() << "\n";
+-
+   return CU && CU->getZExtValue() < getNumElements();
+ }
+ 
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index e38451e916cd..f7552f8c2cf5 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -971,6 +971,7 @@ typedef std::vector<int> Offsets;
+ typedef std::vector<std::pair<Types, Offsets>> vectorTypesOffsets;
+ typedef std::pair<bool, vectorTypesOffsets> retType;
+ 
++// Unused, for debugging purposes
+ static void showTypeAndOffsetChain(Types typeChain, Offsets offsetChain) {
+   errs() << "{\n";
+   for (unsigned j = 0; j < typeChain.size(); j++) {
+@@ -980,6 +981,16 @@ static void showTypeAndOffsetChain(Types typeChain, Offsets offsetChain) {
+   errs() << "}\n";
+ }
+ 
++// Unused, for debugging purposes
++static void ShowTypesOffsets(vectorTypesOffsets typesOffsets) {
++  errs() << "(size " << typesOffsets.size() << ") \n{\n";
++  for (unsigned i = 0; i < typesOffsets.size(); i++) {
++    showTypeAndOffsetChain(typesOffsets[i].first, typesOffsets[i].second);
++  }
++  errs() << "}\n";
++}
++
++// Unused, for debugging purposes
+ template <typename T>
+ static void ShowPointerVector(std::vector<T *> genericVector) {
+   errs() << "(size " << genericVector.size() << ") \n{\n";
+@@ -989,6 +1000,7 @@ static void ShowPointerVector(std::vector<T *> genericVector) {
+   errs() << "}\n";
+ }
+ 
++// Unused, for debugging purposes
+ template <typename T>
+ static void ShowElementVector(std::vector<T> genericVector) {
+   errs() << "(size " << genericVector.size() << ") \n{\n";
+@@ -998,13 +1010,6 @@ static void ShowElementVector(std::vector<T> genericVector) {
+   errs() << "}\n";
+ }
+ 
+-static void ShowTypesOffsets(vectorTypesOffsets typesOffsets) {
+-  errs() << "(size " << typesOffsets.size() << ") \n{\n";
+-  for (unsigned i = 0; i < typesOffsets.size(); i++) {
+-    showTypeAndOffsetChain(typesOffsets[i].first, typesOffsets[i].second);
+-  }
+-  errs() << "}\n";
+-}
+ 
+ static retType HandleTypeRecursive(Type *Ty);
+ static retType RecursivelyHandlePointerType(PointerType *Ty) {
+@@ -1161,17 +1166,8 @@ static Value *getFunctionPointerUsingOffsetChain(Value *V, Offsets offsetChain,
+ static Value *gFPUOC_Struct(Value *V, Offsets offsetChain, Types typeChain,
+                             IRBuilder<> &Builder) {
+ 
+-  errs() << "CALLED gFPUOC_STRUCT WITH VALUE BEFORE STRIP: " << *V << "\n";
+-
+   V = V->stripPointerCastsAndAliases();
+ 
+-  errs() << "VALUE AFTER STRIP: " << *V << "\n";
+-  errs() << "OFFSET CHAIN: ";
+-  ShowElementVector(offsetChain);
+-  errs() << " TYPE CHAIN: ";
+-  ShowPointerVector(typeChain);
+-  errs() << "\n";
+-
+   int offset = offsetChain[0];
+   Type *structType = typeChain[0];
+ 
+@@ -1179,8 +1175,6 @@ static Value *gFPUOC_Struct(Value *V, Offsets offsetChain, Types typeChain,
+ 
+   PointerType *StructPtrTy = PointerType::get(structType, AddrSpace);
+   Value *Cast = Builder.CreatePointerCast(V, StructPtrTy);
+-  errs() << "GEP WITH STRUCT TYPE " << *structType << " AND offset " << offset
+-         << " ON VALUE " << *Cast << "\n";
+ 
+   Value *GEP = Builder.CreateInBoundsGEP(
+       structType, Cast,
+@@ -1212,17 +1206,8 @@ static Value *getFunctionPointerUsingOffsetChain(Value *V, Offsets offsetChain,
+ void ModuleSanitizerCoverage::InjectTraceForFunctionPointerStores(
+     Function &, ArrayRef<StoreInst *> Stores) {
+ 
+-  errs() << "--- CALLED ON NEW BASIC BLOCK ---\n";
+ 
+   for (StoreInst *SI : Stores) {
+-    DebugLoc DL = SI->getDebugLoc();
+-    std::string lineno;
+-    if (DL.get())
+-      lineno = std::to_string(DL.getLine());
+-    else
+-      lineno = "unknown";
+-    errs() << "[LINE " << lineno << "] CURRENTLY ON INSTRUCTION " << *SI
+-           << "\n";
+     IRBuilder<> IRB(SI);
+     Value *StorePtr = SI->getPointerOperand();
+     Value *StoredValue = SI->getValueOperand();
+@@ -1236,11 +1221,6 @@ void ModuleSanitizerCoverage::InjectTraceForFunctionPointerStores(
+ 
+     // This means there is a function pointer somewhere
+     if (offsetChainRes.first) {
+-      errs() << "INSTRUCTION " << *SI
+-             << " REACHES A FUNCTION POINTER. OFFSET CHAIN: ";
+-      ShowTypesOffsets(offsetChainRes.second);
+-      errs() << "\n";
+-
+       for (unsigned i = 0; i < offsetChainRes.second.size(); i++) {
+         // (typeChain, offsetChain) are a chain of StructType and
+         // indexes used to reach a function pointer from StoredValue
+-- 
+2.43.0
+
