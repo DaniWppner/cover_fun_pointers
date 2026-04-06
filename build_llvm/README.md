@@ -17,3 +17,10 @@ cmake -S llvm -B build -G "Ninja" \
   
 ninja -C build
 ```
+
+## Test new clang on sample DynamicStructs.c
+
+After building, and having the appropiate c libraries for linking:
+```
+clang -g -O0 -fsanitize-coverage=trace-function-pointer-stores DynamicStructs.c -o DynamicStructs.o
+```

@@ -1,0 +1,104 @@
+From 82c1d2a490ea6e27104c1d044f937a2ab1861054 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Mon, 6 Apr 2026 10:15:20 -0300
+Subject: [PATCH] some debug information of unknown bug
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 35 +++++++++++++------
+ 1 file changed, 24 insertions(+), 11 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index bdae620f97a4..57558f191ee1 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -983,7 +983,7 @@ static void showTypeAndOffsetChain(Types typeChain, Offsets offsetChain)
+ }
+ 
+ template <typename T>
+-static void ShowVector(std::vector<T*> genericVector)
++static void ShowPointerVector(std::vector<T*> genericVector)
+ {
+     errs() << "(size " << genericVector.size() << ") \n{\n";
+     for (unsigned i = 0; i < genericVector.size(); i++)
+@@ -993,6 +993,17 @@ static void ShowVector(std::vector<T*> genericVector)
+     errs() << "}\n";
+ }
+ 
++template <typename T>
++static void ShowElementVector(std::vector<T> genericVector)
++{
++    errs() << "(size " << genericVector.size() << ") \n{\n";
++    for (unsigned i = 0; i < genericVector.size(); i++)
++    {
++        errs() << genericVector[i] << "\n";
++    }
++    errs() << "}\n";
++}
++
+ static void ShowTypesOffsets(vectorTypesOffsets typesOffsets)
+ {
+     errs() << "(size " <<  typesOffsets.size() << ") \n{\n";
+@@ -1134,12 +1145,6 @@ getOffsetChainFromAllValues(std::vector<Value *> possibleStoredValues) {
+     Type *StoredType = possibleStoredValues[i]->getType();
+     retType partial_res = HandleTypeRecursive(StoredType);
+ 
+-    errs() << "*** VALUE " << *possibleStoredValues[i] << " OF TYPE " << *StoredType << " OBTAINED RESULT: " << partial_res.first << "\n";
+-    errs() << "\t HAS POINTER: " << partial_res.first << "\n";
+-    errs() << "\t OFFSET CHAINS: \n";
+-    ShowTypesOffsets(partial_res.second);
+-    errs() << "***\n";
+-
+     if (partial_res.first) {
+       any += 1;
+       positiveResultIdxs.push_back(i);
+@@ -1164,8 +1169,16 @@ static Value *getFunctionPointerUsingOffsetChain(
+ 
+ static Value *gFPUOC_Struct(Value *V, Offsets offsetChain, Types typeChain,
+                             IRBuilder<>  &Builder) {
++
++  errs() << "CALLED gFPUOC_STRUCT WITH VALUE BEFORE STRIP: " << *V << "\n";
++
+   V = V->stripPointerCastsAndAliases();
+ 
++  errs() << "VALUE AFTER STRIP: " << *V << "\n";
++  errs() << "OFFSET CHAIN: "; ShowElementVector(offsetChain);
++  errs() << " TYPE CHAIN: "; ShowPointerVector(typeChain);
++  errs() << "\n";
++
+   int offset = offsetChain[0];
+   Type *structType = typeChain[0];
+ 
+@@ -1174,9 +1187,11 @@ static Value *gFPUOC_Struct(Value *V, Offsets offsetChain, Types typeChain,
+       ConstantInt::get(Type::getInt32Ty(V->getContext()), offset)};
+ 
+   unsigned AddrSpace = V->getType()->getPointerAddressSpace();
++
+   PointerType *StructPtrTy = PointerType::get(structType, AddrSpace);
+   Value *Cast = Builder.CreatePointerCast(V, StructPtrTy);
+-
++  errs() << "GEP WITH STRUCT TYPE " << *structType << " AND Params " << offset
++         << " ON VALUE " << *Cast << "\n";
+   Value *GEP = Builder.CreateInBoundsGEP(structType, Cast, arrayParam);
+ 
+   Offsets remaining_offsets =
+@@ -1190,6 +1205,7 @@ static Value *
+ getFunctionPointerUsingOffsetChain(Value *V, Offsets offsetChain,
+                                    Types typeChain,
+                                    IRBuilder<>  &Builder) {
++
+   if (offsetChain.size() == 0) {
+     return V;
+   } else {
+@@ -1223,9 +1239,6 @@ void ModuleSanitizerCoverage::InjectTraceForFunctionPointerStores(
+     std::vector<Value *> StoredCastIntermediates =
+         GetAllValuesThatWouldBeStripped(StoredValue);
+ 
+-    errs() << "OBTAINED INTERMEDIATE VALUES: \n";
+-    ShowVector(StoredCastIntermediates);
+-
+     retType offsetChainRes =
+         getOffsetChainFromAllValues(StoredCastIntermediates);
+ 
+-- 
+2.43.0
+
