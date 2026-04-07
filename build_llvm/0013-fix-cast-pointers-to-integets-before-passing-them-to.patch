@@ -1,0 +1,36 @@
+From bf657dbee8f6a6ec4a36e1b165cd6945775df6ca Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Tue, 7 Apr 2026 15:38:06 -0300
+Subject: [PATCH] fix: cast pointers to integets before passing them to the
+ callback
+
+---
+ llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index dd6d3ec99069..0b3a029c703c 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1212,7 +1212,6 @@ static Value *getFunctionPointerUsingOffsetChain(Value *V, Offsets offsetChain,
+              MiscPointeeType->getPointerElementType()->isFunctionTy() &&
+              MiscPointeeType->getPointerElementType() == DesiredFType);
+ 
+-
+       // Address space hardcoded to 0 here because that's where function
+       // pointers usually live.
+       Type *FPointerType = PointerType::get(DesiredFType, 0);
+@@ -1262,7 +1261,9 @@ void ModuleSanitizerCoverage::InjectTraceForFunctionPointerStores(
+             "function");
+         // It is unclear to me if it would be necessary to cast the
+         // FunctionPtr to IntptrTy as InjectCoverageForIndirectCalls does.
+-        IRB.CreateCall(SanCovStoreFPointerFunction, {StorePtr, FunctionPtr});
++        IRB.CreateCall(SanCovStoreFPointerFunction,
++                       {IRB.CreatePointerCast(StorePtr, IntptrTy),
++                        IRB.CreatePointerCast(FunctionPtr, IntptrTy)});
+       }
+     }
+   }
+-- 
+2.43.0
+
