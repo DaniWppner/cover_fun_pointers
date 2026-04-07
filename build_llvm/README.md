@@ -10,9 +10,11 @@ Inside the docker container:
 
 ```bash
 cmake -S llvm -B build -G "Ninja" \
-  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
   -DLLVM_ENABLE_RUNTIMES="compiler-rt" \
+  -DLLVM_ENABLE_ASSERTIONS=ON \
+  -DLLVM_USE_LINKER=lld-14 \
   -DLLVM_TARGETS_TO_BUILD=Native
   
 ninja -C build

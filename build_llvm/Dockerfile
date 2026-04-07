@@ -15,6 +15,12 @@ RUN apt-get update && \
             build-essential cmake make python3 zlib1g wget subversion unzip git \
             # ninja-build is a faster alternative to make for cmake projects
             ninja-build \
+            # Install Clang and LLD version 14 specifically
+            clang-14 lld-14 \
             # these libraries are needed to build the compile_rt for different architectures 
             gcc-multilib g++-multilib && \
     rm -rf /var/lib/apt/lists/*
+
+# Set Clang 14 as the default compilers for the container environment
+ENV CC=clang-14
+ENV CXX=clang++-14

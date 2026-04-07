@@ -1,0 +1,102 @@
+From d2f0042936433c41e00bd049504a8a92858774b0 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Tue, 7 Apr 2026 14:33:30 -0300
+Subject: [PATCH] fix case where a function is assigned without reference like
+ in
+ https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/crypto/asymmetric_keys/asymmetric_type.c#n308
+
+---
+ .../Transforms/Instrumentation/CMakeLists.txt |  2 +
+ .../Instrumentation/SanitizerCoverage.cpp     | 45 ++++++++++++++-----
+ 2 files changed, 36 insertions(+), 11 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/CMakeLists.txt b/llvm/lib/Transforms/Instrumentation/CMakeLists.txt
+index 3b29c3df6429..5e499d888d06 100644
+--- a/llvm/lib/Transforms/Instrumentation/CMakeLists.txt
++++ b/llvm/lib/Transforms/Instrumentation/CMakeLists.txt
+@@ -33,3 +33,5 @@ add_llvm_component_library(LLVMInstrumentation
+   TransformUtils
+   ProfileData
+   )
++
++set_source_files_properties(SanitizerCoverage.cpp PROPERTIES COMPILE_FLAGS "-g -O0")
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 8aae36a262fa..dd6d3ec99069 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -40,6 +40,7 @@
+ #include "llvm/Transforms/Instrumentation.h"
+ #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+ #include "llvm/Transforms/Utils/ModuleUtils.h"
++#include <cassert>
+ 
+ using namespace llvm;
+ 
+@@ -1027,7 +1028,8 @@ static retType RecursivelyHandleStructType(StructType *OriginalStruct) {
+     vectorTypesOffsets this_types_offsets = res_Pos.second;
+     if (any) {
+       if (this_types_offsets.size() == 0) {
+-        assert(false && "If a contained type can be stripped to a function pointer the offset list should not be empty anymore");
++        assert(false && "If a contained type can be stripped to a function "
++                        "pointer the offset list should not be empty anymore");
+         // this_types_offsets.push_back(std::make_pair(Types{}, Offsets{}));
+       }
+       for (unsigned j = 0; j < this_types_offsets.size(); j++) {
+@@ -1192,14 +1194,31 @@ static Value *getFunctionPointerUsingOffsetChain(Value *V, Offsets offsetChain,
+                                                  IRBuilder<> &Builder) {
+ 
+   if (offsetChain.size() == 1) {
+-    // We've recursively accessed structs and got to a pointer to the function
+-    // pointer. We just need to load it now.
+-
+-    Type *FType = typeChain[0];
+-    // Address space hardcoded to 0 here because that's where function pointers usually live.
+-    Type *FPointerType = PointerType::get(FType, 0);
+-    Value *FPointer = Builder.CreateLoad(FPointerType, V);
+-    return FPointer;
++
++    // We've recursively accessed structs and got to either the function
++    // pointer itself or a pointer to the function pointer.
++    assert(V->getType()->isPointerTy());
++    Type *DesiredFType = typeChain[0];
++    Type *MiscPointeeType = V->getType()->getPointerElementType();
++
++    if (MiscPointeeType->isFunctionTy()) {
++      // We are already at the function pointer which we were looking for.
++      assert(MiscPointeeType == DesiredFType);
++      return V;
++    } else {
++      // We have a pointer to a pointer to function.
++      // To retrieve the function pointer we just need to load once.
++      assert(MiscPointeeType->isPointerTy() &&
++             MiscPointeeType->getPointerElementType()->isFunctionTy() &&
++             MiscPointeeType->getPointerElementType() == DesiredFType);
++
++
++      // Address space hardcoded to 0 here because that's where function
++      // pointers usually live.
++      Type *FPointerType = PointerType::get(DesiredFType, 0);
++      Value *FPointer = Builder.CreateLoad(FPointerType, V);
++      return FPointer;
++    }
+   } else {
+     return gFPUOC_Struct(V, offsetChain, typeChain, Builder);
+   }
+@@ -1235,8 +1254,12 @@ void ModuleSanitizerCoverage::InjectTraceForFunctionPointerStores(
+         Value *FunctionPtr = getFunctionPointerUsingOffsetChain(
+             StoredValue, offsetChain, typeChain, IRB);
+ 
+-        assert(FunctionPtr->getType()->isPointerTy() && "The value retrieved from the offset chain is not a pointer");
+-        assert(FunctionPtr->getType()->getPointerElementType()->isFunctionTy() && "The pointer retrieved from the offset chain doesn't point to a function");
++        assert(FunctionPtr->getType()->isPointerTy() &&
++               "The value retrieved from the offset chain is not a pointer");
++        assert(
++            FunctionPtr->getType()->getPointerElementType()->isFunctionTy() &&
++            "The pointer retrieved from the offset chain doesn't point to a "
++            "function");
+         // It is unclear to me if it would be necessary to cast the
+         // FunctionPtr to IntptrTy as InjectCoverageForIndirectCalls does.
+         IRB.CreateCall(SanCovStoreFPointerFunction, {StorePtr, FunctionPtr});
+-- 
+2.43.0
+
