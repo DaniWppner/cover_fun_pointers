@@ -1,0 +1,91 @@
+From db49e792141a6b0c78391dffd2619efa7b2dd71e Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Tue, 7 Apr 2026 18:34:57 -0300
+Subject: [PATCH] fix: handle cyclical struct types correctly
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 35 +++++++++++++------
+ 1 file changed, 25 insertions(+), 10 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 0b3a029c703c..654353f09b07 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1011,24 +1011,31 @@ static void ShowElementVector(std::vector<T> genericVector) {
+   errs() << "}\n";
+ }
+ 
+-static retType HandleTypeRecursive(Type *Ty);
+-static retType RecursivelyHandlePointerType(PointerType *Ty) {
++static retType HandleTypeRecursiveImpl(Type *Ty, Types &Visited);
++static retType RecursivelyHandlePointerType(PointerType *Ty, Types &Visited) {
+   Type *OrigType = Ty->getPointerElementType();
+-  return HandleTypeRecursive(OrigType);
++  return HandleTypeRecursiveImpl(OrigType, Visited);
+ }
+ 
+-static retType RecursivelyHandleStructType(StructType *OriginalStruct) {
++static retType RecursivelyHandleStructType(StructType *OriginalStruct,
++                                           Types &Visited) {
+   unsigned numElements = OriginalStruct->getNumElements();
+   bool any = false;
+   vectorTypesOffsets all_vector_res = {};
+   for (unsigned i = 0; i < numElements; i++) {
+     Type *ElemType = OriginalStruct->getElementType(i);
+-    retType res_Pos = HandleTypeRecursive(ElemType);
++
++    if (std::find(Visited.begin(), Visited.end(), ElemType) != Visited.end()) {
++      // We have a cyclical data structure
++      continue;
++    }
++
++    retType res_Pos = HandleTypeRecursiveImpl(ElemType, Visited);
+     any = any || res_Pos.first;
+     vectorTypesOffsets this_types_offsets = res_Pos.second;
+-    if (any) {
++    if (res_Pos.first) {
+       if (this_types_offsets.size() == 0) {
+-        assert(false && "If a contained type can be stripped to a function "
++        assert(false && "If the contained type can be stripped to a function "
+                         "pointer the offset list should not be empty anymore");
+         // this_types_offsets.push_back(std::make_pair(Types{}, Offsets{}));
+       }
+@@ -1053,7 +1060,10 @@ offsets
+   - vector: pairs of struct types and offset chains used to access each function
+ pointer.
+ */
+-static retType HandleTypeRecursive(Type *Ty) {
++static retType HandleTypeRecursiveImpl(Type *Ty, Types &Visited) {
++
++  Visited.push_back(Ty);
++
+   if (!(Ty->isPointerTy() || Ty->isStructTy())) {
+     if (Ty->isFunctionTy()) {
+       return std::make_pair(
+@@ -1063,9 +1073,9 @@ static retType HandleTypeRecursive(Type *Ty) {
+     }
+   }
+   if (Ty->isPointerTy())
+-    return RecursivelyHandlePointerType(dyn_cast<PointerType>(Ty));
++    return RecursivelyHandlePointerType(dyn_cast<PointerType>(Ty), Visited);
+   else if (StructType *OriginalStruct = dyn_cast<StructType>(Ty))
+-    return RecursivelyHandleStructType(OriginalStruct);
++    return RecursivelyHandleStructType(OriginalStruct, Visited);
+   else {
+     // TODO: handle more types
+     assert(false && "Unexpected type during function pointer analysis.\n");
+@@ -1074,6 +1084,11 @@ static retType HandleTypeRecursive(Type *Ty) {
+   }
+ }
+ 
++static retType HandleTypeRecursive(Type *Ty) {
++  Types Visited = {};
++  return HandleTypeRecursiveImpl(Ty, Visited);
++}
++
+ /*
+ Returns all intermediate values that appear while stripping pointer casts.
+ */
+-- 
+2.43.0
+
