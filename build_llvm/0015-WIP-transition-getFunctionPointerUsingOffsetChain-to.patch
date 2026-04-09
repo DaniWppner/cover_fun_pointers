@@ -1,0 +1,85 @@
+From 968c5a54223d384631eeca1600eb5675431278c9 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Thu, 9 Apr 2026 10:19:42 -0300
+Subject: [PATCH] (WIP) transition getFunctionPointerUsingOffsetChain towards
+ LOADing every value it comes accross every time we get a new struct field
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 40 +++++++++++++++----
+ 1 file changed, 33 insertions(+), 7 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 654353f09b07..5fb76861ada8 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1183,13 +1183,24 @@ static Value *gFPUOC_Struct(Value *V, Offsets offsetChain, Types typeChain,
+                             IRBuilder<> &Builder) {
+ 
+   V = V->stripPointerCastsAndAliases();
+-
++  /*
++   * Since here we assume that V is a struct of type typeChain[0]
++   * that we need to access at offsetChain[0], it is also OK
++   * to assume that typeChain[1] exists and that it refers to
++   * the type of the element at V after indexing with offsetChain[0].
++   */
+   int offset = offsetChain[0];
+   Type *structType = typeChain[0];
++  Type *containedType = typeChain[1];
+ 
+   unsigned AddrSpace = V->getType()->getPointerAddressSpace();
+ 
+   PointerType *StructPtrTy = PointerType::get(structType, AddrSpace);
++
++  // FIXME: This cast should not be necessary besides the first ever Value
++  // in the nested struct chain. Move it outside this function.
++  // We would prefer crashing if while traversing the struct chain we
++  // get a pointer to an unexpected type instead of casting it.
+   Value *Cast = Builder.CreatePointerCast(V, StructPtrTy);
+ 
+   Value *GEP = Builder.CreateInBoundsGEP(
+@@ -1197,11 +1208,13 @@ static Value *gFPUOC_Struct(Value *V, Offsets offsetChain, Types typeChain,
+       {ConstantInt::get(Type::getInt32Ty(V->getContext()), 0),
+        ConstantInt::get(Type::getInt32Ty(V->getContext()), offset)});
+ 
+-  Offsets remaining_offsets =
++  Value *ContainedValue = Builder.CreateLoad(containedType, GEP);
++
++  Offsets RemainingOffsets =
+       Offsets(offsetChain.begin() + 1, offsetChain.end());
+-  Types remaining_types = Types(typeChain.begin() + 1, typeChain.end());
+-  return getFunctionPointerUsingOffsetChain(GEP, remaining_offsets,
+-                                            remaining_types, Builder);
++  Types RemainingTypes = Types(typeChain.begin() + 1, typeChain.end());
++  return getFunctionPointerUsingOffsetChain(ContainedValue, RemainingOffsets,
++                                            RemainingTypes, Builder);
+ }
+ 
+ static Value *getFunctionPointerUsingOffsetChain(Value *V, Offsets offsetChain,
+@@ -1210,8 +1223,21 @@ static Value *getFunctionPointerUsingOffsetChain(Value *V, Offsets offsetChain,
+ 
+   if (offsetChain.size() == 1) {
+ 
+-    // We've recursively accessed structs and got to either the function
+-    // pointer itself or a pointer to the function pointer.
++    /*
++     * We've recursively accessed structs and got to an element of exactly the
++     * type that appears last in in the type chain. This can technically be an
++     * Nth-pointer to a function for any number of N. A single pointer would
++     * mean a regular pointer to a function. A double pointer would probably
++     * represent an array of function pointers, like in
++     * https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/linux/module.h#n574
++     * I have no clue what a third pointer would be. It sounds weird.
++     */
++
++    // TO DO:
++    // Get what we should do here straight.
++    // ¿Return V straight? ¿Get the LOADed value if it's not a pointer?
++    // ¿Should we slightly modify what handleTypeRecursiveImpl returns on the
++    // base case? ¿What are we going to do if we get a second or triple pointer?
+     assert(V->getType()->isPointerTy());
+     Type *DesiredFType = typeChain[0];
+     Type *MiscPointeeType = V->getType()->getPointerElementType();
+-- 
+2.43.0
+
