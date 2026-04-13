@@ -1,0 +1,1 @@
+This (WIP) patchset expands clang with the new "-fsanitize-coverage-trace-function-pointer-stores" flag
