@@ -1,0 +1,120 @@
+From f4bf4365c20435f4041beb8dbd9a5c05f2fa2f24 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Tue, 14 Apr 2026 16:28:21 -0300
+Subject: [PATCH] output instrumented info as json
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 69 +++++++++++++++----
+ 1 file changed, 56 insertions(+), 13 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 8217da8cbe19..26cd186bb548 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -36,6 +36,7 @@
+ #include "llvm/Support/Casting.h"
+ #include "llvm/Support/CommandLine.h"
+ #include "llvm/Support/Debug.h"
++#include "llvm/Support/JSON.h"
+ #include "llvm/Support/SpecialCaseList.h"
+ #include "llvm/Support/VirtualFileSystem.h"
+ #include "llvm/Support/raw_ostream.h"
+@@ -989,6 +990,36 @@ static void ShowElementVector(std::vector<T> genericVector) {
+   errs() << "}\n";
+ }
+ 
++static void putTypesIntoJson(SmallVector<Type *> &FuncPointerArgTypes,
++                             json::Object &RootJson) {
++  json::Array FunctionPointerParameters;
++  for (Type *T : FuncPointerArgTypes) {
++    std::string TypeStr;
++    raw_string_ostream RSO(TypeStr);
++    T->print(RSO);
++    FunctionPointerParameters.push_back(RSO.str());
++  }
++  RootJson["functionPointerParameters"] = std::move(FunctionPointerParameters);
++}
++
++static void putStoreInstIntoJson(StoreInst *SI,
++                                 json::Array &storeInstInfoArray) {
++  json::Object StoreJson;
++  std::string StoreInstStr;
++  raw_string_ostream RSOInst(StoreInstStr);
++  SI->print(RSOInst);
++  StoreJson["storeInst"] = RSOInst.str();
++  StoreJson["lineNumber"] = SI->getDebugLoc().getLine();
++  storeInstInfoArray.push_back(std::move(StoreJson));
++}
++
++static void fillJsonWithFunctionInfo(Function &F, json::Object &DebugDump) {
++  DebugDump["Function"] = F.getName().str();
++  json::Object SourceLocation;
++  SourceLocation["fileName"] = F.getSubprogram()->getFilename();
++  SourceLocation["lineNumber"] = F.getSubprogram()->getScopeLine();
++  DebugDump["sourceLocation"] = std::move(SourceLocation);
++}
+ // On every store to a function pointer variable call we call a run-time
+ // function __sanitizer_cov_store_fun_pointer* with two parameters:
+ //   - address of the variable,
+@@ -996,21 +1027,21 @@ static void ShowElementVector(std::vector<T> genericVector) {
+ void ModuleSanitizerCoverage::InjectTraceForNakedFunctionPointerStores(
+     Function &F, ArrayRef<StoreInst *> Stores) {
+ 
+-  std::vector<Type *> function_pointer_arg_types = {};
++  SmallVector<Type *> FuncPointerArgTypes = {};
+   FunctionType *FType = F.getFunctionType();
+   for (Type *ParamType : FType->params()) {
+     if (ParamType->isPointerTy() &&
+         ParamType->getPointerElementType()->isFunctionTy()) {
+-      function_pointer_arg_types.push_back(ParamType);
++      FuncPointerArgTypes.push_back(ParamType);
+     }
+   }
+-  if (!function_pointer_arg_types.empty()) {
+-    errs() << "Function " << F.getName() << " has function pointer parameters ";
+-    ShowPointerVector(function_pointer_arg_types);
+-    errs() << "In " << F.getName() << " at " << F.getSubprogram()->getFilename()
+-           << ":" << F.getSubprogram()->getScopeLine() << "\n";
+-  }
+ 
++  json::Object DebugDump;
++  fillJsonWithFunctionInfo(F, DebugDump);
++  putTypesIntoJson(FuncPointerArgTypes, DebugDump);
++  json::Array storeInstInfoArray;
++
++  unsigned instrumented_count = 0;
+   for (StoreInst *SI : Stores) {
+     IRBuilder<> IRB(SI);
+     IRB.SetCurrentDebugLocation(SI->getDebugLoc());
+@@ -1018,11 +1049,23 @@ void ModuleSanitizerCoverage::InjectTraceForNakedFunctionPointerStores(
+     Value *StoredValue = SI->getValueOperand();
+ 
+     if (StoredValue->getType()->isPointerTy())
+-      IRB.CreateCall(SanCovStoreFPointerFunction,
+-                     {
+-                         IRB.CreatePointerCast(StorePtr, IntptrTy),
+-                         IRB.CreatePointerCast(StoredValue, IntptrTy),
+-                     });
++      if (StoredValue->getType()->getPointerElementType()->isFunctionTy()) {
++        instrumented_count++;
++        IRB.CreateCall(SanCovStoreFPointerFunction,
++                       {
++                           IRB.CreatePointerCast(StorePtr, IntptrTy),
++                           IRB.CreatePointerCast(StoredValue, IntptrTy),
++                       });
++
++        // Only warn about stores that don't map to source code.
++        if (SI->getDebugLoc())
++          putStoreInstIntoJson(SI, storeInstInfoArray);
++      }
++  }
++  DebugDump["InstrumentedStores"] = std::move(storeInstInfoArray);
++  if (instrumented_count || FuncPointerArgTypes.size()) {
++    json::Value FinalJson = std::move(DebugDump);
++    errs() << llvm::formatv("{0:2}", FinalJson) << ",\n";
+   }
+ }
+ 
+-- 
+2.43.0
+
