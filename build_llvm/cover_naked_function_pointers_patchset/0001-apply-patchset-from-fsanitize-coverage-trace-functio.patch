@@ -1,0 +1,609 @@
+From d7021bebd7310ef83a09395588235e5c63197646 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Tue, 14 Apr 2026 13:18:44 -0300
+Subject: [PATCH 1/3] apply patchset from
+ -fsanitize-coverage-trace-function-pointer-stores
+
+---
+ clang/include/clang/Basic/CodeGenOptions.def  |   1 +
+ clang/include/clang/Basic/CodeGenOptions.h    |   2 +-
+ clang/include/clang/Driver/Options.td         |   4 +
+ clang/lib/CodeGen/BackendUtil.cpp             |   1 +
+ clang/lib/Driver/SanitizerArgs.cpp            |   9 +-
+ .../include/llvm/Transforms/Instrumentation.h |   1 +
+ .../Instrumentation/SanitizerCoverage.cpp     | 344 ++++++++++++++++--
+ 7 files changed, 332 insertions(+), 30 deletions(-)
+
+diff --git a/clang/include/clang/Basic/CodeGenOptions.def b/clang/include/clang/Basic/CodeGenOptions.def
+index 0da875525c0c..e9cc12ae7136 100644
+--- a/clang/include/clang/Basic/CodeGenOptions.def
++++ b/clang/include/clang/Basic/CodeGenOptions.def
+@@ -273,6 +273,7 @@ CODEGENOPT(SanitizeCoverageNoPrune, 1, 0) ///< Disable coverage pruning.
+ CODEGENOPT(SanitizeCoverageStackDepth, 1, 0) ///< Enable max stack depth tracing
+ CODEGENOPT(SanitizeCoverageTraceLoads, 1, 0) ///< Enable tracing of loads.
+ CODEGENOPT(SanitizeCoverageTraceStores, 1, 0) ///< Enable tracing of stores.
++CODEGENOPT(SanitizeCoverageTraceFunctionPointerStores, 1, 0) ///< Enable tracing of function pointer stores.
+ CODEGENOPT(SanitizeStats     , 1, 0) ///< Collect statistics for sanitizers.
+ CODEGENOPT(SimplifyLibCalls  , 1, 1) ///< Set when -fbuiltin is enabled.
+ CODEGENOPT(SoftFloat         , 1, 0) ///< -soft-float.
+diff --git a/clang/include/clang/Basic/CodeGenOptions.h b/clang/include/clang/Basic/CodeGenOptions.h
+index 128ca2f5df3c..ee315d925920 100644
+--- a/clang/include/clang/Basic/CodeGenOptions.h
++++ b/clang/include/clang/Basic/CodeGenOptions.h
+@@ -477,7 +477,7 @@ public:
+   bool hasSanitizeCoverage() const {
+     return SanitizeCoverageType || SanitizeCoverageIndirectCalls ||
+            SanitizeCoverageTraceCmp || SanitizeCoverageTraceLoads ||
+-           SanitizeCoverageTraceStores;
++           SanitizeCoverageTraceStores || SanitizeCoverageTraceFunctionPointerStores;
+   }
+ };
+ 
+diff --git a/clang/include/clang/Driver/Options.td b/clang/include/clang/Driver/Options.td
+index e0d215840714..53cba935488e 100644
+--- a/clang/include/clang/Driver/Options.td
++++ b/clang/include/clang/Driver/Options.td
+@@ -5217,6 +5217,10 @@ def fsanitize_coverage_trace_stores
+     : Flag<["-"], "fsanitize-coverage-trace-stores">,
+       HelpText<"Enable tracing of stores">,
+       MarshallingInfoFlag<CodeGenOpts<"SanitizeCoverageTraceStores">>;
++def fsanitize_coverage_trace_function_pointer_stores
++    : Flag<["-"], "fsanitize-coverage-trace-function-pointer-stores">,
++      HelpText<"Enable tracing of function pointer stores">,
++      MarshallingInfoFlag<CodeGenOpts<"SanitizeCoverageTraceFunctionPointerStores">>;
+ def fpatchable_function_entry_offset_EQ
+     : Joined<["-"], "fpatchable-function-entry-offset=">, MetaVarName<"<M>">,
+       HelpText<"Generate M NOPs before function entry">,
+diff --git a/clang/lib/CodeGen/BackendUtil.cpp b/clang/lib/CodeGen/BackendUtil.cpp
+index a4d330c0ba93..8d05ceacae35 100644
+--- a/clang/lib/CodeGen/BackendUtil.cpp
++++ b/clang/lib/CodeGen/BackendUtil.cpp
+@@ -255,6 +255,7 @@ getSancovOptsFromCGOpts(const CodeGenOptions &CGOpts) {
+   Opts.StackDepth = CGOpts.SanitizeCoverageStackDepth;
+   Opts.TraceLoads = CGOpts.SanitizeCoverageTraceLoads;
+   Opts.TraceStores = CGOpts.SanitizeCoverageTraceStores;
++  Opts.TraceFunctionPointerStores = CGOpts.SanitizeCoverageTraceFunctionPointerStores;
+   return Opts;
+ }
+ 
+diff --git a/clang/lib/Driver/SanitizerArgs.cpp b/clang/lib/Driver/SanitizerArgs.cpp
+index 403fac76f060..69427c218456 100644
+--- a/clang/lib/Driver/SanitizerArgs.cpp
++++ b/clang/lib/Driver/SanitizerArgs.cpp
+@@ -94,6 +94,7 @@ enum CoverageFeature {
+   CoverageInlineBoolFlag = 1 << 15,
+   CoverageTraceLoads = 1 << 16,
+   CoverageTraceStores = 1 << 17,
++  CoverageTraceFunctionPointerStores = 1 << 18,
+ };
+ 
+ /// Parse a -fsanitize= or -fno-sanitize= argument's values, diagnosing any
+@@ -758,7 +759,7 @@ SanitizerArgs::SanitizerArgs(const ToolChain &TC,
+   int InsertionPointTypes = CoverageFunc | CoverageBB | CoverageEdge;
+   int InstrumentationTypes = CoverageTracePC | CoverageTracePCGuard |
+                              CoverageInline8bitCounters | CoverageTraceLoads |
+-                             CoverageTraceStores | CoverageInlineBoolFlag;
++                             CoverageTraceStores | CoverageTraceFunctionPointerStores | CoverageInlineBoolFlag;
+   if ((CoverageFeatures & InsertionPointTypes) &&
+       !(CoverageFeatures & InstrumentationTypes) && DiagnoseErrors) {
+     D.Diag(clang::diag::warn_drv_deprecated_arg)
+@@ -770,7 +771,7 @@ SanitizerArgs::SanitizerArgs(const ToolChain &TC,
+   if (!(CoverageFeatures & InsertionPointTypes)) {
+     if (CoverageFeatures &
+         (CoverageTracePC | CoverageTracePCGuard | CoverageInline8bitCounters |
+-         CoverageInlineBoolFlag))
++         CoverageInlineBoolFlag | CoverageTraceFunctionPointerStores))
+       CoverageFeatures |= CoverageEdge;
+ 
+     if (CoverageFeatures & CoverageStackDepth)
+@@ -1043,7 +1044,8 @@ void SanitizerArgs::addArgs(const ToolChain &TC, const llvm::opt::ArgList &Args,
+       std::make_pair(CoverageNoPrune, "-fsanitize-coverage-no-prune"),
+       std::make_pair(CoverageStackDepth, "-fsanitize-coverage-stack-depth"),
+       std::make_pair(CoverageTraceLoads, "-fsanitize-coverage-trace-loads"),
+-      std::make_pair(CoverageTraceStores, "-fsanitize-coverage-trace-stores")};
++      std::make_pair(CoverageTraceStores, "-fsanitize-coverage-trace-stores"),
++      std::make_pair(CoverageTraceFunctionPointerStores, "-fsanitize-coverage-trace-function-pointer-stores")};
+   for (auto F : CoverageFlags) {
+     if (CoverageFeatures & F.first)
+       CmdArgs.push_back(F.second);
+@@ -1289,6 +1291,7 @@ int parseCoverageFeatures(const Driver &D, const llvm::opt::Arg *A,
+                 .Case("stack-depth", CoverageStackDepth)
+                 .Case("trace-loads", CoverageTraceLoads)
+                 .Case("trace-stores", CoverageTraceStores)
++                .Case("trace-function-pointer-stores", CoverageTraceFunctionPointerStores)
+                 .Default(0);
+     if (F == 0 && DiagnoseErrors)
+       D.Diag(clang::diag::err_drv_unsupported_option_argument)
+diff --git a/llvm/include/llvm/Transforms/Instrumentation.h b/llvm/include/llvm/Transforms/Instrumentation.h
+index a288a3972c3d..224626533768 100644
+--- a/llvm/include/llvm/Transforms/Instrumentation.h
++++ b/llvm/include/llvm/Transforms/Instrumentation.h
+@@ -171,6 +171,7 @@ struct SanitizerCoverageOptions {
+   bool StackDepth = false;
+   bool TraceLoads = false;
+   bool TraceStores = false;
++  bool TraceFunctionPointerStores = false;
+ 
+   SanitizerCoverageOptions() = default;
+ };
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index d3b60c7add34..15921c3c06ac 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -65,6 +65,7 @@ const char SanCovStore2[] = "__sanitizer_cov_store2";
+ const char SanCovStore4[] = "__sanitizer_cov_store4";
+ const char SanCovStore8[] = "__sanitizer_cov_store8";
+ const char SanCovStore16[] = "__sanitizer_cov_store16";
++const char SanCovStoreFunPointer[] = "__sanitizer_cov_store_fun_pointer";
+ const char SanCovTraceDiv4[] = "__sanitizer_cov_trace_div4";
+ const char SanCovTraceDiv8[] = "__sanitizer_cov_trace_div8";
+ const char SanCovTraceGep[] = "__sanitizer_cov_trace_gep";
+@@ -140,6 +141,10 @@ static cl::opt<bool> ClStoreTracing("sanitizer-coverage-trace-stores",
+                                     cl::desc("Tracing of store instructions"),
+                                     cl::Hidden, cl::init(false));
+ 
++static cl::opt<bool> ClFunPointerStoreTracing(
++    "sanitizer-coverage-trace-function-pointer-stores",
++    cl::desc("Tracing of store instructions of function pointers"), cl::Hidden);
++
+ static cl::opt<bool> ClGEPTracing("sanitizer-coverage-trace-geps",
+                                   cl::desc("Tracing of GEP instructions"),
+                                   cl::Hidden, cl::init(false));
+@@ -195,6 +200,7 @@ SanitizerCoverageOptions OverrideFromCL(SanitizerCoverageOptions Options) {
+   Options.StackDepth |= ClStackDepth;
+   Options.TraceLoads |= ClLoadTracing;
+   Options.TraceStores |= ClStoreTracing;
++  Options.TraceFunctionPointerStores |= ClFunPointerStoreTracing;
+   if (!Options.TracePCGuard && !Options.TracePC &&
+       !Options.Inline8bitCounters && !Options.StackDepth &&
+       !Options.InlineBoolFlag && !Options.TraceLoads && !Options.TraceStores)
+@@ -229,6 +235,9 @@ private:
+                          ArrayRef<GetElementPtrInst *> GepTraceTargets);
+   void InjectTraceForLoadsAndStores(Function &F, ArrayRef<LoadInst *> Loads,
+                                     ArrayRef<StoreInst *> Stores);
++  void
++  InjectTraceForFunctionPointerStores(Function &F,
++                                      ArrayRef<StoreInst *> InterestingStores);
+   void InjectTraceForSwitch(Function &F,
+                             ArrayRef<Instruction *> SwitchTraceTargets);
+   bool InjectCoverage(Function &F, ArrayRef<BasicBlock *> AllBlocks,
+@@ -261,6 +270,7 @@ private:
+   std::array<FunctionCallee, 5> SanCovLoadFunction;
+   std::array<FunctionCallee, 5> SanCovStoreFunction;
+   std::array<FunctionCallee, 2> SanCovTraceDivFunction;
++  FunctionCallee SanCovStoreFPointerFunction;
+   FunctionCallee SanCovTraceGepFunction;
+   FunctionCallee SanCovTraceSwitchFunction;
+   GlobalVariable *SanCovLowestStack;
+@@ -273,10 +283,10 @@ private:
+   LLVMContext *C;
+   const DataLayout *DL;
+ 
+-  GlobalVariable *FunctionGuardArray;  // for trace-pc-guard.
+-  GlobalVariable *Function8bitCounterArray;  // for inline-8bit-counters.
+-  GlobalVariable *FunctionBoolArray;         // for inline-bool-flag.
+-  GlobalVariable *FunctionPCsArray;  // for pc-table.
++  GlobalVariable *FunctionGuardArray;       // for trace-pc-guard.
++  GlobalVariable *Function8bitCounterArray; // for inline-8bit-counters.
++  GlobalVariable *FunctionBoolArray;        // for inline-bool-flag.
++  GlobalVariable *FunctionPCsArray;         // for pc-table.
+   SmallVector<GlobalValue *, 20> GlobalsToAppendToUsed;
+   SmallVector<GlobalValue *, 20> GlobalsToAppendToCompilerUsed;
+ 
+@@ -360,13 +370,11 @@ ModuleSanitizerCoverage::CreateSecStartEnd(Module &M, const char *Section,
+   GlobalValue::LinkageTypes Linkage = TargetTriple.isOSBinFormatCOFF()
+                                           ? GlobalVariable::ExternalLinkage
+                                           : GlobalVariable::ExternalWeakLinkage;
+-  GlobalVariable *SecStart =
+-      new GlobalVariable(M, Ty, false, Linkage, nullptr,
+-                         getSectionStart(Section));
++  GlobalVariable *SecStart = new GlobalVariable(M, Ty, false, Linkage, nullptr,
++                                                getSectionStart(Section));
+   SecStart->setVisibility(GlobalValue::HiddenVisibility);
+-  GlobalVariable *SecEnd =
+-      new GlobalVariable(M, Ty, false, Linkage, nullptr,
+-                         getSectionEnd(Section));
++  GlobalVariable *SecEnd = new GlobalVariable(M, Ty, false, Linkage, nullptr,
++                                              getSectionEnd(Section));
+   SecEnd->setVisibility(GlobalValue::HiddenVisibility);
+   IRBuilder<> IRB(M.getContext());
+   if (!TargetTriple.isOSBinFormatCOFF())
+@@ -501,6 +509,9 @@ bool ModuleSanitizerCoverage::instrumentModule(
+   SanCovStoreFunction[4] =
+       M.getOrInsertFunction(SanCovStore16, VoidTy, Int128PtrTy);
+ 
++  SanCovStoreFPointerFunction =
++      M.getOrInsertFunction(SanCovStoreFunPointer, VoidTy, IntptrTy, IntptrTy);
++
+   {
+     AttributeList AL;
+     AL = AL.addParamAttribute(*C, 0, Attribute::ZExt);
+@@ -608,11 +619,10 @@ static bool shouldInstrumentBlock(const Function &F, const BasicBlock *BB,
+ 
+   // Do not instrument full dominators, or full post-dominators with multiple
+   // predecessors.
+-  return !isFullDominator(BB, DT)
+-    && !(isFullPostDominator(BB, PDT) && !BB->getSinglePredecessor());
++  return !isFullDominator(BB, DT) &&
++         !(isFullPostDominator(BB, PDT) && !BB->getSinglePredecessor());
+ }
+ 
+-
+ // Returns true iff From->To is a backedge.
+ // A twist here is that we treat From->To as a backedge if
+ //   * To dominates From or
+@@ -674,7 +684,8 @@ void ModuleSanitizerCoverage::instrumentFunction(
+   if (F.hasFnAttribute(Attribute::NoSanitizeCoverage))
+     return;
+   if (Options.CoverageType >= SanitizerCoverageOptions::SCK_Edge)
+-    SplitAllCriticalEdges(F, CriticalEdgeSplittingOptions().setIgnoreUnreachableDests());
++    SplitAllCriticalEdges(
++        F, CriticalEdgeSplittingOptions().setIgnoreUnreachableDests());
+   SmallVector<Instruction *, 8> IndirCalls;
+   SmallVector<BasicBlock *, 16> BlocksToInstrument;
+   SmallVector<Instruction *, 8> CmpTraceTargets;
+@@ -718,6 +729,9 @@ void ModuleSanitizerCoverage::instrumentFunction(
+       if (Options.TraceStores)
+         if (StoreInst *SI = dyn_cast<StoreInst>(&Inst))
+           Stores.push_back(SI);
++      if (Options.TraceFunctionPointerStores)
++        if (StoreInst *SI = dyn_cast<StoreInst>(&Inst))
++          Stores.push_back(SI);
+       if (Options.StackDepth)
+         if (isa<InvokeInst>(Inst) ||
+             (isa<CallInst>(Inst) && !isa<IntrinsicInst>(Inst)))
+@@ -732,6 +746,7 @@ void ModuleSanitizerCoverage::instrumentFunction(
+   InjectTraceForDiv(F, DivTraceTargets);
+   InjectTraceForGep(F, GepTraceTargets);
+   InjectTraceForLoadsAndStores(F, Loads, Stores);
++  InjectTraceForFunctionPointerStores(F, Stores);
+ }
+ 
+ GlobalVariable *ModuleSanitizerCoverage::CreateFunctionLocalArrayInSection(
+@@ -813,7 +828,8 @@ void ModuleSanitizerCoverage::CreateFunctionLocalArrays(
+ bool ModuleSanitizerCoverage::InjectCoverage(Function &F,
+                                              ArrayRef<BasicBlock *> AllBlocks,
+                                              bool IsLeafFunc) {
+-  if (AllBlocks.empty()) return false;
++  if (AllBlocks.empty())
++    return false;
+   CreateFunctionLocalArrays(F, AllBlocks);
+   for (size_t i = 0, N = AllBlocks.size(); i < N; i++)
+     InjectCoverageAtBlock(F, *AllBlocks[i], i, IsLeafFunc);
+@@ -891,13 +907,14 @@ void ModuleSanitizerCoverage::InjectTraceForDiv(
+   for (auto BO : DivTraceTargets) {
+     IRBuilder<> IRB(BO);
+     Value *A1 = BO->getOperand(1);
+-    if (isa<ConstantInt>(A1)) continue;
++    if (isa<ConstantInt>(A1))
++      continue;
+     if (!A1->getType()->isIntegerTy())
+       continue;
+     uint64_t TypeSize = DL->getTypeStoreSizeInBits(A1->getType());
+-    int CallbackIdx = TypeSize == 32 ? 0 :
+-        TypeSize == 64 ? 1 : -1;
+-    if (CallbackIdx < 0) continue;
++    int CallbackIdx = TypeSize == 32 ? 0 : TypeSize == 64 ? 1 : -1;
++    if (CallbackIdx < 0)
++      continue;
+     auto Ty = Type::getIntNTy(*C, TypeSize);
+     IRB.CreateCall(SanCovTraceDivFunction[CallbackIdx],
+                    {IRB.CreateIntCast(A1, Ty, true)});
+@@ -948,6 +965,278 @@ void ModuleSanitizerCoverage::InjectTraceForLoadsAndStores(
+   }
+ }
+ 
++typedef std::vector<Type *> Types;
++typedef std::vector<int> Offsets;
++typedef std::vector<std::pair<Types, Offsets>> vectorTypesOffsets;
++typedef std::pair<bool, vectorTypesOffsets> retType;
++
++// Unused, for debugging purposes
++static void showTypeAndOffsetChain(Types typeChain, Offsets offsetChain) {
++  errs() << "{\n";
++  for (unsigned j = 0; j < typeChain.size(); j++) {
++    errs() << std::string('\t', j) << "Type: " << *typeChain[j]
++           << " Offset: " << offsetChain[j] << "\n";
++  }
++  errs() << "}\n";
++}
++
++// Unused, for debugging purposes
++static void ShowTypesOffsets(vectorTypesOffsets typesOffsets) {
++  errs() << "(size " << typesOffsets.size() << ") \n{\n";
++  for (unsigned i = 0; i < typesOffsets.size(); i++) {
++    showTypeAndOffsetChain(typesOffsets[i].first, typesOffsets[i].second);
++  }
++  errs() << "}\n";
++}
++
++// Unused, for debugging purposes
++template <typename T>
++static void ShowPointerVector(std::vector<T *> genericVector) {
++  errs() << "(size " << genericVector.size() << ") \n{\n";
++  for (unsigned i = 0; i < genericVector.size(); i++) {
++    errs() << *genericVector[i] << "\n";
++  }
++  errs() << "}\n";
++}
++
++// Unused, for debugging purposes
++template <typename T>
++static void ShowElementVector(std::vector<T> genericVector) {
++  errs() << "(size " << genericVector.size() << ") \n{\n";
++  for (unsigned i = 0; i < genericVector.size(); i++) {
++    errs() << genericVector[i] << "\n";
++  }
++  errs() << "}\n";
++}
++
++
++static retType HandleTypeRecursive(Type *Ty);
++static retType RecursivelyHandlePointerType(PointerType *Ty) {
++  Type *OrigType = Ty->getPointerElementType();
++  return HandleTypeRecursive(OrigType);
++}
++
++static retType RecursivelyHandleStructType(StructType *OriginalStruct) {
++  unsigned numElements = OriginalStruct->getNumElements();
++  bool any = false;
++  vectorTypesOffsets all_vector_res = {};
++  for (unsigned i = 0; i < numElements; i++) {
++    Type *ElemType = OriginalStruct->getElementType(i);
++    retType res_Pos = HandleTypeRecursive(ElemType);
++    any = any || res_Pos.first;
++    vectorTypesOffsets this_types_offsets = res_Pos.second;
++    if (any) {
++      if (this_types_offsets.size() == 0) {
++        this_types_offsets.push_back(std::make_pair(Types{}, Offsets{}));
++      }
++      for (unsigned j = 0; j < this_types_offsets.size(); j++) {
++        Types this_types_j = this_types_offsets[j].first;
++        Offsets this_offsets_j = this_types_offsets[j].second;
++        this_types_j.insert(this_types_j.begin(), OriginalStruct);
++        this_offsets_j.insert(this_offsets_j.begin(), i);
++        this_types_offsets[j] = std::make_pair(this_types_j, this_offsets_j);
++      }
++      all_vector_res.insert(all_vector_res.end(), this_types_offsets.begin(),
++                            this_types_offsets.end());
++    }
++  }
++  return std::make_pair(any, all_vector_res);
++}
++
++/*
++Returns:
++  - bool: whether the type can be stripped to a function pointer with some
++offsets
++  - vector: pairs of struct types and offset chains used to access each function
++pointer.
++*/
++static retType HandleTypeRecursive(Type *Ty) {
++  if (!(Ty->isPointerTy() || Ty->isStructTy())) {
++    bool result;
++    if (Ty->isFunctionTy()) {
++      result = true;
++    } else {
++      result = false;
++    }
++    return std::make_pair(result, vectorTypesOffsets{});
++  }
++  if (Ty->isPointerTy())
++    return RecursivelyHandlePointerType(dyn_cast<PointerType>(Ty));
++  else if (StructType *OriginalStruct = dyn_cast<StructType>(Ty))
++    return RecursivelyHandleStructType(OriginalStruct);
++  else {
++    // TODO: handle more types
++    assert(false && "Unexpected type during function pointer analysis.\n");
++    // unreachable, but makes the compiler complain less
++    return std::make_pair(false, vectorTypesOffsets{});
++  }
++}
++
++/*
++Returns all intermediate values that appear while stripping pointer casts.
++*/
++static std::vector<Value *> GetAllValuesThatWouldBeStripped(Value *V) {
++  SmallPtrSet<const Value *, 8> Visited;
++  std::vector<Value *> res;
++  bool ciclicalTypeDetected = false;
++  Visited.insert(V);
++  res.push_back(V);
++  while (!ciclicalTypeDetected) {
++
++    /*
++    There are four cases we are interested in
++      1. GEPOperator means the pointer can be used to access the same address as
++    a different type
++      2. BitCast Instruction is by definition a type change without modifying
++    the data
++      3. AddressSpaceCast Instruction moves the pointer to a different address
++    space, and can redefine the pointer type
++      4. CallBase Instruction can be interpreted as the Value being of the
++    function return type
++    */
++    if (GEPOperator *GEP = dyn_cast<GEPOperator>(V)) {
++      if (!GEP->hasAllZeroIndices())
++        // In this case a different memory address is accessed
++        // so we cannot handle it as just a type cast
++        return res;
++      // retrieve the "base" pointer
++      V = GEP->getPointerOperand();
++    } else if (Operator::getOpcode(V) == Instruction::BitCast) {
++      // first operand is the original type
++      Value *NewV = cast<Operator>(V)->getOperand(0);
++      if (!NewV->getType()->isPointerTy()) {
++        res.push_back(NewV);
++        return res;
++      }
++      V = NewV;
++    } else if (Operator::getOpcode(V) == Instruction::AddrSpaceCast) {
++      // first operand is the original pointer type
++      V = cast<Operator>(V)->getOperand(0);
++    } else if (CallBase *Call = dyn_cast<CallBase>(V)) {
++      if (Value *RV = Call->getReturnedArgOperand()) {
++        V = RV;
++      } else {
++        return res;
++      }
++    } else {
++      // There are no other types we want to handle, this is the end.
++      return res;
++    }
++
++    assert(V->getType()->isPointerTy() && "Unexpected operand type!");
++    res.push_back(V);
++    ciclicalTypeDetected = !(Visited.insert(V).second);
++  }
++  return res;
++}
++
++static retType
++getOffsetChainFromAllValues(std::vector<Value *> possibleStoredValues) {
++  int any = 0;
++  std::vector<retType> res = {};
++  std::vector<int> positiveResultIdxs = {};
++
++  for (unsigned i = 0; i < possibleStoredValues.size(); i++) {
++    Type *StoredType = possibleStoredValues[i]->getType();
++    retType partial_res = HandleTypeRecursive(StoredType);
++
++    if (partial_res.first) {
++      any += 1;
++      positiveResultIdxs.push_back(i);
++    }
++    res.push_back(partial_res);
++  }
++
++  // TO DO: not have this weakness
++  assert(any <= 1 && "We cannot handle more than one intermeidate value "
++                     "reaching a function pointer");
++  if (any > 0) {
++    // assume positiveResultIdxs.size() == 1.
++    return std::make_pair(true, res[positiveResultIdxs[0]].second);
++  } else {
++    return std::make_pair(false, vectorTypesOffsets{});
++  }
++}
++
++static Value *getFunctionPointerUsingOffsetChain(Value *V, Offsets offsetChain,
++                                                 Types typeChain,
++                                                 IRBuilder<> &Builder);
++
++static Value *gFPUOC_Struct(Value *V, Offsets offsetChain, Types typeChain,
++                            IRBuilder<> &Builder) {
++
++  V = V->stripPointerCastsAndAliases();
++
++  int offset = offsetChain[0];
++  Type *structType = typeChain[0];
++
++  unsigned AddrSpace = V->getType()->getPointerAddressSpace();
++
++  PointerType *StructPtrTy = PointerType::get(structType, AddrSpace);
++  Value *Cast = Builder.CreatePointerCast(V, StructPtrTy);
++
++  Value *GEP = Builder.CreateInBoundsGEP(
++      structType, Cast,
++      {ConstantInt::get(Type::getInt32Ty(V->getContext()), 0),
++       ConstantInt::get(Type::getInt32Ty(V->getContext()), offset)});
++
++  Offsets remaining_offsets =
++      Offsets(offsetChain.begin() + 1, offsetChain.end());
++  Types remaining_types = Types(typeChain.begin() + 1, typeChain.end());
++  return getFunctionPointerUsingOffsetChain(GEP, remaining_offsets,
++                                            remaining_types, Builder);
++}
++
++static Value *getFunctionPointerUsingOffsetChain(Value *V, Offsets offsetChain,
++                                                 Types typeChain,
++                                                 IRBuilder<> &Builder) {
++
++  if (offsetChain.size() == 0) {
++    return V;
++  } else {
++    return gFPUOC_Struct(V, offsetChain, typeChain, Builder);
++  }
++}
++
++// On every store to a function pointer variable call we call a run-time
++// function __sanitizer_cov_store_fun_pointer* with two parameters:
++//   - address of the variable,
++//   - stored function pointer
++void ModuleSanitizerCoverage::InjectTraceForFunctionPointerStores(
++    Function &, ArrayRef<StoreInst *> Stores) {
++
++
++  for (StoreInst *SI : Stores) {
++    IRBuilder<> IRB(SI);
++    Value *StorePtr = SI->getPointerOperand();
++    Value *StoredValue = SI->getValueOperand();
++
++    // We consider all types this stored value had in the past.
++    std::vector<Value *> StoredCastIntermediates =
++        GetAllValuesThatWouldBeStripped(StoredValue);
++
++    retType offsetChainRes =
++        getOffsetChainFromAllValues(StoredCastIntermediates);
++
++    // This means there is a function pointer somewhere
++    if (offsetChainRes.first) {
++      for (unsigned i = 0; i < offsetChainRes.second.size(); i++) {
++        // (typeChain, offsetChain) are a chain of StructType and
++        // indexes used to reach a function pointer from StoredValue
++        Types typeChain = offsetChainRes.second[i].first;
++        Offsets offsetChain = offsetChainRes.second[i].second;
++
++        Value *FunctionPtr = getFunctionPointerUsingOffsetChain(
++            StoredValue, offsetChain, typeChain, IRB);
++
++        // It is unclear to me if it would be necessary to cast the
++        // FunctionPtr to IntptrTy as InjectCoverageForIndirectCalls does.
++        IRB.CreateCall(SanCovStoreFPointerFunction, {StorePtr, FunctionPtr});
++      }
++    }
++  }
++}
++
+ void ModuleSanitizerCoverage::InjectTraceForCmp(
+     Function &, ArrayRef<Instruction *> CmpTraceTargets) {
+   for (auto I : CmpTraceTargets) {
+@@ -958,17 +1247,20 @@ void ModuleSanitizerCoverage::InjectTraceForCmp(
+       if (!A0->getType()->isIntegerTy())
+         continue;
+       uint64_t TypeSize = DL->getTypeStoreSizeInBits(A0->getType());
+-      int CallbackIdx = TypeSize == 8 ? 0 :
+-                        TypeSize == 16 ? 1 :
+-                        TypeSize == 32 ? 2 :
+-                        TypeSize == 64 ? 3 : -1;
+-      if (CallbackIdx < 0) continue;
++      int CallbackIdx = TypeSize == 8    ? 0
++                        : TypeSize == 16 ? 1
++                        : TypeSize == 32 ? 2
++                        : TypeSize == 64 ? 3
++                                         : -1;
++      if (CallbackIdx < 0)
++        continue;
+       // __sanitizer_cov_trace_cmp((type_size << 32) | predicate, A0, A1);
+       auto CallbackFunc = SanCovTraceCmpFunction[CallbackIdx];
+       bool FirstIsConst = isa<ConstantInt>(A0);
+       bool SecondIsConst = isa<ConstantInt>(A1);
+       // If both are const, then we don't need such a comparison.
+-      if (FirstIsConst && SecondIsConst) continue;
++      if (FirstIsConst && SecondIsConst)
++        continue;
+       // If only one is const, then make it the first callback argument.
+       if (FirstIsConst || SecondIsConst) {
+         CallbackFunc = SanCovTraceConstCmpFunction[CallbackIdx];
+@@ -978,7 +1270,7 @@ void ModuleSanitizerCoverage::InjectTraceForCmp(
+ 
+       auto Ty = Type::getIntNTy(*C, TypeSize);
+       IRB.CreateCall(CallbackFunc, {IRB.CreateIntCast(A0, Ty, true),
+-              IRB.CreateIntCast(A1, Ty, true)});
++                                    IRB.CreateIntCast(A1, Ty, true)});
+     }
+   }
+ }
+-- 
+2.43.0
+
