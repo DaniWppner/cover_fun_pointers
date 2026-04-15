@@ -6,7 +6,7 @@ git clone --branch llvmorg-14.0.6 --depth 1 https://github.com/llvm/llvm-project
 
 ## Apply patchset
 
-Before compiling LLVM, make sure to apply the appropiate git patches, like the ones in `./cover_function_pointers_patchset`
+Before compiling LLVM, make sure to apply the appropiate git patches, like the ones in `./cover_function_pointers_patchset` or `./cover_naked_function_pointers_patchset`
 
 ## Compile LLVM
 
