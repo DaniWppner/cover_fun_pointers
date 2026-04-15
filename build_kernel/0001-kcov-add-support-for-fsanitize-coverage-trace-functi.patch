@@ -1,4 +1,4 @@
-From 6071672d96031946fb79686b887d5a5f14ac4765 Mon Sep 17 00:00:00 2001
+From e0df2f2727cf5dcbf1e3b98ebcd4b9d240bced02 Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Mon, 6 Apr 2026 18:21:08 -0300
 Subject: [PATCH] kcov: add support for
@@ -11,15 +11,15 @@ Subject: [PATCH] kcov: add support for
  3 files changed, 53 insertions(+), 5 deletions(-)
 
 diff --git a/include/linux/kcov.h b/include/linux/kcov.h
-index 75a2fb8b16c3..133209fd3e78 100644
+index 75a2fb8b16c3..bb7dc18b6f07 100644
 --- a/include/linux/kcov.h
 +++ b/include/linux/kcov.h
 @@ -25,6 +25,9 @@ enum kcov_mode {
  	KCOV_MODE_REMOTE = 4,
  };
  
-+#define KCOV_ENTRY_TYPE_FUN_POINTER = 0xdeadbeefffffffff
-+#define KCOV_ENTRY_TYPE_PC = 0xdeadbeeffffffffe
++#define KCOV_ENTRY_TYPE_FUN_POINTER 0xdeadbeefffffffff
++#define KCOV_ENTRY_TYPE_PC 0xdeadbeeffffffffe
 +
  #define KCOV_IN_CTXSW	(1 << 30)
  
