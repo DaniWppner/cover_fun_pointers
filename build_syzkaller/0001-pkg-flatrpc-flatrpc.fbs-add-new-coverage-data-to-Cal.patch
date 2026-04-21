@@ -1,0 +1,32 @@
+From fe24ea2a241e270fa43dd05c7c7aee3fc6cf542d Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Fri, 17 Apr 2026 17:36:33 -0300
+Subject: [PATCH 1/6] pkg/flatrpc/flatrpc.fbs: add new coverage data to
+ CallInfoRaw
+
+---
+ pkg/flatrpc/flatrpc.fbs | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/pkg/flatrpc/flatrpc.fbs b/pkg/flatrpc/flatrpc.fbs
+index b8542bf9e..e98d051c2 100644
+--- a/pkg/flatrpc/flatrpc.fbs
++++ b/pkg/flatrpc/flatrpc.fbs
+@@ -229,6 +229,14 @@ table CallInfoRaw {
+ 	cover			:[uint64];
+ 	// Comparison operands.
+ 	comps			:[ComparisonRaw];
++	// Store Instructions where the stored value is a function pointer.
++	funcStores		:[StoreFunPointerRaw]:
++}
++
++struct StoreFunPointerRaw {
++	pc			:uint64;
++	storeAddr	:uint64;
++	storeValue  :uint64;
+ }
+ 
+ struct ComparisonRaw {
+-- 
+2.43.0
+

@@ -1,0 +1,78 @@
+From d1eb104d943ef7832e171cc791d0e29d80b57df7 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Tue, 21 Apr 2026 14:54:27 -0300
+Subject: [PATCH] pkg/fuzzer, pkg/signal, pkg/flatrpc: add logging of function
+ pointer stores feedback
+
+---
+ pkg/flatrpc/helpers.go |  1 +
+ pkg/fuzzer/fuzzer.go   |  3 +++
+ pkg/signal/signal.go   | 19 +++++++++++++++++++
+ 3 files changed, 23 insertions(+)
+
+diff --git a/pkg/flatrpc/helpers.go b/pkg/flatrpc/helpers.go
+index 57626d1be..5115503ff 100644
+--- a/pkg/flatrpc/helpers.go
++++ b/pkg/flatrpc/helpers.go
+@@ -37,6 +37,7 @@ type CorpusTriaged = CorpusTriagedRawT
+ type ExecutingMessage = ExecutingMessageRawT
+ type CallInfo = CallInfoRawT
+ type Comparison = ComparisonRawT
++type FuncPointerStore = StoreFunPointerRawT
+ type ExecOpts = ExecOptsRawT
+ type ProgInfo = ProgInfoRawT
+ type ExecResult = ExecResultRawT
+diff --git a/pkg/fuzzer/fuzzer.go b/pkg/fuzzer/fuzzer.go
+index 641de30c8..3cbe047b9 100644
+--- a/pkg/fuzzer/fuzzer.go
++++ b/pkg/fuzzer/fuzzer.go
+@@ -232,6 +232,9 @@ func (fuzzer *Fuzzer) triageProgCall(p *prog.Prog, info *flatrpc.CallInfo, call
+ 	}
+ 	prio := signalPrio(p, info, call)
+ 	newMaxSignal := fuzzer.Cover.addRawMaxSignal(info.Signal, prio)
++	fuzzer.Logf(3, "[prog-%p] stored function pointers in call #%d [%s]: %s",
++		p, call, p.CallName(call), signal.StorePreview(info.FuncStores))
++
+ 	if newMaxSignal.Empty() {
+ 		return
+ 	}
+diff --git a/pkg/signal/signal.go b/pkg/signal/signal.go
+index 9f9aeb5d9..c69c26382 100644
+--- a/pkg/signal/signal.go
++++ b/pkg/signal/signal.go
+@@ -7,6 +7,8 @@ package signal
+ import (
+ 	"fmt"
+ 	"strings"
++
++	"github.com/google/syzkaller/pkg/flatrpc"
+ )
+ 
+ type (
+@@ -33,6 +35,23 @@ func (s Signal) Copy() Signal {
+ 	return c
+ }
+ 
++func StorePreview(raw []*flatrpc.FuncPointerStore) string {
++	if len(raw) > 0 {
++		var sb strings.Builder
++		sb.WriteByte('[')
++		for i, entry := range raw {
++			if i > 0 {
++				sb.WriteString(", ")
++			}
++			fmt.Fprintf(&sb, "{PC: 0x%x, StoreAddr: 0x%x, StoredValue: 0x%x}",
++				entry.Pc, entry.StoreAddr, entry.StoreValue)
++		}
++		sb.WriteByte(']')
++		return sb.String()
++	}
++	return ""
++}
++
+ func RawPreview(raw []uint64) string {
+ 	if len(raw) > 0 {
+ 		var sb strings.Builder
+-- 
+2.43.0
+
