@@ -1,0 +1,12 @@
+# Ignore all build artifact directories
+build/
+
+# Ignore the Docker Compose configuration file
+# (IMPORTANT: must be added manually if it received relevant changes)
+docker-compose.yaml
+
+# Ignore the specific LLVM project source tree if cloned inside build_llvm
+build_llvm/llvm-project/
+
+# Ignore the large QEMU debug image suggested by one of the READMEs
+build_syzkaller/syz-executor-test/QEMU-debug-image/
