@@ -10,3 +10,9 @@ build_llvm/llvm-project/
 
 # Ignore the large QEMU debug image suggested by one of the READMEs
 build_syzkaller/syz-executor-test/QEMU-debug-image/
+
+#Ignore syzkaller workdir files
+**/corpus.db
+**/crashes/
+**/instance-*/
+**/instance-lock
