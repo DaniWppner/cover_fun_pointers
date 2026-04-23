@@ -1,0 +1,12 @@
+## This is a snippet of the interesting parts of the output produced by
+## simple_kcov_test.c while ran on a QEMU VM per by the README
+
+[FUN PTR]
+	PC: 0xffffffff813dae5e
+	Destination: 0xffff888119f7feb0
+	FunctionPointer: 0xffffffff813dda40
+
+[FUN PTR]
+	PC: 0xffffffff81428973
+	Destination: 0xffff888108e28550
+	FunctionPointer: 0xffffffff81430480
