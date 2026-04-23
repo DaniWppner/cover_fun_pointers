@@ -56,7 +56,7 @@ ssh \
 -o StrictHostKeyChecking=no \
 -o ConnectTimeout=10 \
 -i /home/dwappner/Desktop/syzkaller/qemu-img/bullseye.id_rsa \
--v root@localhost \
+-v root@localhost
 ```
 
 Then you may interactively

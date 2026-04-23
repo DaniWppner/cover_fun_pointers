@@ -1,0 +1,26 @@
+From 2f26d9373e3b66a96951dc390493bb275fdd87c1 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Thu, 23 Apr 2026 11:53:24 -0300
+Subject: [PATCH] pkg/signal/signal.go: format json output of covered function
+ pointers accordingly
+
+---
+ pkg/signal/signal.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/pkg/signal/signal.go b/pkg/signal/signal.go
+index c69c26382..e00a48fd0 100644
+--- a/pkg/signal/signal.go
++++ b/pkg/signal/signal.go
+@@ -43,7 +43,7 @@ func StorePreview(raw []*flatrpc.FuncPointerStore) string {
+ 			if i > 0 {
+ 				sb.WriteString(", ")
+ 			}
+-			fmt.Fprintf(&sb, "{PC: 0x%x, StoreAddr: 0x%x, StoredValue: 0x%x}",
++			fmt.Fprintf(&sb, "{\"PC\": \"0x%x\", \"StoreAddr\": \"0x%x\", \"StoredValue\": \"0x%x\"}",
+ 				entry.Pc, entry.StoreAddr, entry.StoreValue)
+ 		}
+ 		sb.WriteByte(']')
+-- 
+2.43.0
+

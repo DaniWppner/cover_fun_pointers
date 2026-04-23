@@ -20,6 +20,6 @@ Use the following command to run syzkaller and capture the QEMU commands from th
 /path/to/bin/syz-manager -config ./syzkaller_tmp_dir/syzkaller.cfg -debug -mode smoke-test 2>&1 | tee ./syzkaller_tmp_dir/smoke_test_log
 ```
 
-It will fail because syzkaller expects a different kcov format that what we are using, wich is expected. The goal is to confirm that everything else around the compiled kernel works.
+A mainline Syzkaller will fail because it expects a different kcov format that what we are using, wich is not surprising. The goal is to confirm that launching the VM, booting into the custom kernel, etc., works.
 
 Replace `/path/to/` with your actual paths as needed.
