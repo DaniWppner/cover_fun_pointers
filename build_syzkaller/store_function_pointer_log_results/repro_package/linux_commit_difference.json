@@ -1,0 +1,20 @@
+{
+    "last_ancestor": {
+        "hash": "0c3836482481200ead7b416ca80c68a29cfdaabd",
+        "message": "Linux 6.10",
+        "tag": "v6.10"
+    },
+    "difference": {
+        "distance": 2,
+        "commits": [
+            {
+                "hash": "d38955c00b7cdde395a2183efd7e6f5c322b196e",
+                "message": "kcov: rename trace-function-pointer-stores to trace-naked-function-pointer-stores"
+            },
+            {
+                "hash": "e0df2f2727cf5dcbf1e3b98ebcd4b9d240bced02",
+                "message": "kcov: add support for -fsanitize-coverage=trace-function-pointer-stores"
+            }
+        ]
+    }
+}

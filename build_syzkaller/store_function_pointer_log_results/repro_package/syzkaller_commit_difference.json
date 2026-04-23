@@ -1,0 +1,12 @@
+{
+    "last_ancestor": {
+        "hash": "13977f69865c7a6f8a74963fc17bd93fbb4e93be",
+        "message": "try stupid fix",
+        "branch": "handle_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 0,
+        "commits": []
+    }
+}

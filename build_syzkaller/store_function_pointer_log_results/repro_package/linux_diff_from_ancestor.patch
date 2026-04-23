@@ -1,0 +1,116 @@
+diff --git a/include/linux/kcov.h b/include/linux/kcov.h
+index 75a2fb8b16c3..bb7dc18b6f07 100644
+--- a/include/linux/kcov.h
++++ b/include/linux/kcov.h
+@@ -25,6 +25,9 @@ enum kcov_mode {
+ 	KCOV_MODE_REMOTE = 4,
+ };
+ 
++#define KCOV_ENTRY_TYPE_FUN_POINTER 0xdeadbeefffffffff
++#define KCOV_ENTRY_TYPE_PC 0xdeadbeeffffffffe
++
+ #define KCOV_IN_CTXSW	(1 << 30)
+ 
+ void kcov_task_init(struct task_struct *t);
+@@ -107,6 +110,7 @@ typedef unsigned long long kcov_u64;
+ #endif
+ 
+ void __sanitizer_cov_trace_pc(void);
++void __sanitizer_cov_store_fun_pointer(unsigned long storeAddr, unsigned long storedValue);
+ void __sanitizer_cov_trace_cmp1(u8 arg1, u8 arg2);
+ void __sanitizer_cov_trace_cmp2(u16 arg1, u16 arg2);
+ void __sanitizer_cov_trace_cmp4(u32 arg1, u32 arg2);
+diff --git a/kernel/kcov.c b/kernel/kcov.c
+index f0a69d402066..4b6655f67948 100644
+--- a/kernel/kcov.c
++++ b/kernel/kcov.c
+@@ -201,7 +201,7 @@ void notrace __sanitizer_cov_trace_pc(void)
+ 	struct task_struct *t;
+ 	unsigned long *area;
+ 	unsigned long ip = canonicalize_ip(_RET_IP_);
+-	unsigned long pos;
++	unsigned long orig_pos;
+ 
+ 	t = current;
+ 	if (!check_kcov_mode(KCOV_MODE_TRACE_PC, t))
+@@ -209,8 +209,8 @@ void notrace __sanitizer_cov_trace_pc(void)
+ 
+ 	area = t->kcov_area;
+ 	/* The first 64-bit word is the number of subsequent PCs. */
+-	pos = READ_ONCE(area[0]) + 1;
+-	if (likely(pos < t->kcov_size)) {
++	orig_pos = READ_ONCE(area[0]);
++	if (likely(orig_pos + 2 < t->kcov_size)) {
+ 		/* Previously we write pc before updating pos. However, some
+ 		 * early interrupt code could bypass check_kcov_mode() check
+ 		 * and invoke __sanitizer_cov_trace_pc(). If such interrupt is
+@@ -218,13 +218,56 @@ void notrace __sanitizer_cov_trace_pc(void)
+ 		 * overitten by the recursive __sanitizer_cov_trace_pc().
+ 		 * Update pos before writing pc to avoid such interleaving.
+ 		 */
+-		WRITE_ONCE(area[0], pos);
++		WRITE_ONCE(area[0], orig_pos + 2);
+ 		barrier();
+-		area[pos] = ip;
++		area[orig_pos + 1] = KCOV_ENTRY_TYPE_PC;
++		area[orig_pos + 2] = ip;
+ 	}
+ }
+ EXPORT_SYMBOL(__sanitizer_cov_trace_pc);
+ 
++/*
++ * Entry point from instrumented code.
++ * This is called once per store instruction storing data that can reach a function pointer.
++ * storeAddr is the address of the variable being stored to.
++ * storedValue is the address of the function pointer that can be reached from the stored value.
++ */
++void notrace __sanitizer_cov_store_fun_pointer(unsigned long storeAddr, unsigned long storedValue)
++{
++	// We're gonna send two different types of messages through the shared buffer.
++	// If we assume 64 bit,
++	// as mentioned in https://www.kernel.org/doc/Documentation/x86/x86_64/mm.rst,
++	// we need to keep the full 64 bits of pointer values.
++	//
++	// This means to transfer all three values in the shared buffer we need to consume
++	// three values in the buffer: IP address, storeAddr, storedValue.
++	// Additional first value "0xdeadbeefffffffff" is used to signify the type of entry.
++
++	struct task_struct *t;
++	unsigned long *area;
++	unsigned long ip = canonicalize_ip(_RET_IP_);
++	unsigned long orig_pos;
++
++	t = current;
++	// TO DO: define new kcov_mode perhaps?
++	if (!check_kcov_mode(KCOV_MODE_TRACE_PC, t))
++		return;
++
++	area = t->kcov_area;
++	/* The first 64-bit word is the number of filled entries in the buffer. */
++	orig_pos = READ_ONCE(area[0]);
++	if (likely(orig_pos + 4 < t->kcov_size)) {
++		/* see comment in __sanitizer_cov_trace_pc */
++		WRITE_ONCE(area[0], orig_pos + 4);
++		barrier();
++		area[orig_pos + 1] = KCOV_ENTRY_TYPE_FUN_POINTER;
++		area[orig_pos + 2] = ip;
++		area[orig_pos + 3] = storeAddr;
++		area[orig_pos + 4] = storedValue;
++	}
++}
++EXPORT_SYMBOL(__sanitizer_cov_store_fun_pointer);
++
+ #ifdef CONFIG_KCOV_ENABLE_COMPARISONS
+ static void notrace write_comp_data(u64 type, u64 arg1, u64 arg2, u64 ip)
+ {
+diff --git a/scripts/Makefile.kcov b/scripts/Makefile.kcov
+index 67e8cfe3474b..25da9f9a4a84 100644
+--- a/scripts/Makefile.kcov
++++ b/scripts/Makefile.kcov
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+ kcov-flags-$(CONFIG_CC_HAS_SANCOV_TRACE_PC)	+= -fsanitize-coverage=trace-pc
++kcov-flags-$(CONFIG_CC_HAS_SANCOV_TRACE_PC)	+= -fsanitize-coverage=trace-naked-function-pointer-stores
+ kcov-flags-$(CONFIG_KCOV_ENABLE_COMPARISONS)	+= -fsanitize-coverage=trace-cmp
+ kcov-flags-$(CONFIG_GCC_PLUGIN_SANCOV)		+= -fplugin=$(objtree)/scripts/gcc-plugins/sancov_plugin.so
+ 
