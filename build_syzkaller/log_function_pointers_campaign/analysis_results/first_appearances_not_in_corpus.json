@@ -1,0 +1,905 @@
+{
+    "0xffffffff83a80e1f|0x0": {
+        "count": 84098,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff83a80e8d|0x0": {
+        "count": 84098,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff83aa2610": {
+        "count": 44616,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff83a8105d|0xffffffff83aa32d0": {
+        "count": 42757,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff83a81086|0xffffffff83aa3800": {
+        "count": 42757,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff83a810cb|0xffffffff83aa4260": {
+        "count": 42757,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff83aa42d0": {
+        "count": 27885,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff82521ec0|0xffffffff82526bb0": {
+        "count": 6416,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3ebae80",
+            "call": "syz_open_dev$tty20"
+        }
+    },
+    "0xffffffff82522046|0xffffffff82526bd0": {
+        "count": 6416,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3ebae80",
+            "call": "syz_open_dev$tty20"
+        }
+    },
+    "0xffffffff82ebd19d|0xffffffff82ec3230": {
+        "count": 3006,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3ebae80",
+            "call": "syz_open_dev$tty20"
+        }
+    },
+    "0xffffffff818fe3b9|0x0": {
+        "count": 2720,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee04ed480",
+            "call": "ppoll"
+        }
+    },
+    "0xffffffff814363b5|0xffffffff8116b2b0": {
+        "count": 2635,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edd2c9680",
+            "call": "mmap"
+        }
+    },
+    "0xffffffff8203b3ca|0xffffffff8203b4e0": {
+        "count": 2611,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3e05a40",
+            "call": "syz_mount_image$ext4"
+        }
+    },
+    "0xffffffff82054dfa|0x0": {
+        "count": 2611,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3e05a40",
+            "call": "syz_mount_image$ext4"
+        }
+    },
+    "0xffffffff82054e2b|0xffffffff82055fd0": {
+        "count": 2611,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3e05a40",
+            "call": "syz_mount_image$ext4"
+        }
+    },
+    "0xffffffff820558ff|0xffffffff82053c60": {
+        "count": 2610,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3e05a40",
+            "call": "syz_mount_image$ext4"
+        }
+    },
+    "0xffffffff8219c613|0xffffffff819e1700": {
+        "count": 2282,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3e74140",
+            "call": "io_setup"
+        }
+    },
+    "0xffffffff8219c613|0xffffffff819e18d0": {
+        "count": 2282,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3e74140",
+            "call": "io_setup"
+        }
+    },
+    "0xffffffff818fd9f0|0xffffffff818f8150": {
+        "count": 2146,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee04ed480",
+            "call": "ppoll"
+        }
+    },
+    "0xffffffff82544bf2|0xffffffff82544cb0": {
+        "count": 1888,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3ebae80",
+            "call": "syz_open_dev$tty20"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff83ab0fb0": {
+        "count": 1859,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff83abcd10": {
+        "count": 1859,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff83abdef0": {
+        "count": 1859,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff83abf820": {
+        "count": 1859,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff83a8105d|0xffffffff83ac0fc0": {
+        "count": 1859,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff83a81086|0xffffffff83ac1170": {
+        "count": 1859,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3f940c0",
+            "call": "syz_genetlink_get_family_id$ethtool"
+        }
+    },
+    "0xffffffff819a9941|0xffffffff819a07d0": {
+        "count": 1318,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec432ee00",
+            "call": "write"
+        }
+    },
+    "0xffffffff846188c4|0xffffffff813dda40": {
+        "count": 1057,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee04ed480",
+            "call": "ppoll"
+        }
+    },
+    "0xffffffff8256ca74|0xffffffff82558400": {
+        "count": 1002,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3ebae80",
+            "call": "syz_open_dev$tty20"
+        }
+    },
+    "0xffffffff83a7c7d2|0xffffffff8393f870": {
+        "count": 558,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ede0ce3c0",
+            "call": "socket$nl_route"
+        }
+    },
+    "0xffffffff819a2fbc|0xffffffff819a08a0": {
+        "count": 549,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee1619000",
+            "call": "write"
+        }
+    },
+    "0xffffffff83a81bc5|0xffffffff844d5da0": {
+        "count": 455,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff81bfe992|0xffffffff81bffcf0": {
+        "count": 407,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee1619000",
+            "call": "write"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff84164c80": {
+        "count": 331,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3dee040",
+            "call": "sendmsg$NL80211_CMD_JOIN_MESH"
+        }
+    },
+    "0xffffffff83a81c3d|0xffffffff844d81a0": {
+        "count": 315,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff844d5da0": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a81bc5|0xffffffff844d6420": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff844d6420": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a81c3d|0xffffffff844d6970": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a81086|0xffffffff844d6970": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a81bc5|0xffffffff844d7670": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff844d7670": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a81bc5|0xffffffff844d7cb0": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff844d7cb0": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a81086|0xffffffff844d81a0": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a81bc5|0xffffffff844d8cb0": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff844d8cb0": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a81bc5|0xffffffff844d8f00": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff844d8f00": {
+        "count": 314,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc316400",
+            "call": "syz_genetlink_get_family_id$netlbl_unlabel"
+        }
+    },
+    "0xffffffff818fcbb0|0xffffffff8125e540": {
+        "count": 236,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eec5b6000",
+            "call": "ioctl$TCSETAW"
+        }
+    },
+    "0xffffffff8191af96|0xffffffff8202d880": {
+        "count": 221,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec41978c0",
+            "call": "syz_mount_image$msdos"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff83aa2610": {
+        "count": 196,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec402e640",
+            "call": "sendmsg$ETHTOOL_MSG_FEATURES_GET"
+        }
+    },
+    "0xffffffff81601713|0xffffffff8161e4f0": {
+        "count": 152,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3feb040",
+            "call": "perf_event_open"
+        }
+    },
+    "0xffffffff81435157|0xffffffff81607af0": {
+        "count": 152,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3feb040",
+            "call": "perf_event_open"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff844d5da0": {
+        "count": 141,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee1b26480",
+            "call": "sendmsg$NLBL_UNLABEL_C_STATICADD"
+        }
+    },
+    "0xffffffff83a81c3d|0xffffffff844dfec0": {
+        "count": 91,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc3a9300",
+            "call": "syz_genetlink_get_family_id$netlbl_calipso"
+        }
+    },
+    "0xffffffff83a6a464|0xffffffff8125e540": {
+        "count": 75,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3fcac80",
+            "call": "syz_genetlink_get_family_id$mptcp"
+        }
+    },
+    "0xffffffff83d89217|0xffffffff83d988e0": {
+        "count": 69,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec42756c0",
+            "call": "setsockopt$MRT_ADD_MFC_PROXY"
+        }
+    },
+    "0xffffffff83a81bc5|0xffffffff844df1b0": {
+        "count": 66,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc3a9300",
+            "call": "syz_genetlink_get_family_id$netlbl_calipso"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff844df1b0": {
+        "count": 66,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc3a9300",
+            "call": "syz_genetlink_get_family_id$netlbl_calipso"
+        }
+    },
+    "0xffffffff83a81bc5|0xffffffff844df610": {
+        "count": 66,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc3a9300",
+            "call": "syz_genetlink_get_family_id$netlbl_calipso"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff844df610": {
+        "count": 66,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc3a9300",
+            "call": "syz_genetlink_get_family_id$netlbl_calipso"
+        }
+    },
+    "0xffffffff83a81bc5|0xffffffff844dfa10": {
+        "count": 66,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc3a9300",
+            "call": "syz_genetlink_get_family_id$netlbl_calipso"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff844dfa10": {
+        "count": 66,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc3a9300",
+            "call": "syz_genetlink_get_family_id$netlbl_calipso"
+        }
+    },
+    "0xffffffff83a81086|0xffffffff844dfec0": {
+        "count": 66,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc3a9300",
+            "call": "syz_genetlink_get_family_id$netlbl_calipso"
+        }
+    },
+    "0xffffffff819e7a96|0xffffffff819e8280": {
+        "count": 52,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ed8b40b00",
+            "call": "io_submit"
+        }
+    },
+    "0xffffffff83f1bb7a|0xffffffff83f28bc0": {
+        "count": 44,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff82028a09|0xffffffff812bc190": {
+        "count": 26,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3d81d80",
+            "call": "syz_mount_image$iso9660"
+        }
+    },
+    "0xffffffff813cf164|0xffffffff83a2a9b0": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83913bc7|0xffffffff83913d70": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83913bf5|0xffffffff83913d70": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff813cf164|0xffffffff83cf2d80": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff813cf164|0xffffffff83cf2e60": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff813cf164|0xffffffff83e96670": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff81a989e0|0xffffffff83f7f120": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83f20f83|0xffffffff83f21910": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83f210a6|0xffffffff83f21a00": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83f21191|0xffffffff83f22790": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83f2127c|0xffffffff83f22c70": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83f21367|0xffffffff83f26540": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83913b4e|0xffffffff83ef1470": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83913b81|0xffffffff83ef1470": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83913bc7|0xffffffff83ef1470": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83913bf5|0xffffffff83ef1470": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83a26408|0xffffffff83a23040": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83a2644e|0xffffffff83a230b0": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83a230d7|0x0": {
+        "count": 22,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eed0ca880",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff84151d50": {
+        "count": 19,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ed6823840",
+            "call": "sendmsg$NL80211_CMD_SET_MESH_CONFIG"
+        }
+    },
+    "0xffffffff83fc7f9a|0xffffffff838500a0": {
+        "count": 18,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec436adc0",
+            "call": "sendmmsg$inet6"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff84141610": {
+        "count": 18,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eddb8a800",
+            "call": "sendmsg$NL80211_CMD_DEL_INTERFACE"
+        }
+    },
+    "0xffffffff813cf164|0xffffffff83cfb3b0": {
+        "count": 18,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eda05d680",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83ed6566|0xffffffff83eda990": {
+        "count": 18,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eda05d680",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83ed659b|0xffffffff83eb9110": {
+        "count": 18,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eda05d680",
+            "call": "setsockopt$MRT_ADD_VIF"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff84175700": {
+        "count": 16,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eddb8a800",
+            "call": "sendmsg$NL80211_CMD_SET_PMK"
+        }
+    },
+    "0xffffffff814363b5|0xffffffff8116bf70": {
+        "count": 14,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edcde0480",
+            "call": "seccomp$SECCOMP_SET_MODE_FILTER_LISTENER"
+        }
+    },
+    "0xffffffff83a81bc5|0xffffffff844d9cc0": {
+        "count": 9,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec422c700",
+            "call": "syz_genetlink_get_family_id$netlbl_cipso"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff844d9cc0": {
+        "count": 9,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec422c700",
+            "call": "syz_genetlink_get_family_id$netlbl_cipso"
+        }
+    },
+    "0xffffffff83a81bc5|0xffffffff844dc1e0": {
+        "count": 9,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec422c700",
+            "call": "syz_genetlink_get_family_id$netlbl_cipso"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff844dc1e0": {
+        "count": 9,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec422c700",
+            "call": "syz_genetlink_get_family_id$netlbl_cipso"
+        }
+    },
+    "0xffffffff83a81bc5|0xffffffff844dc590": {
+        "count": 9,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec422c700",
+            "call": "syz_genetlink_get_family_id$netlbl_cipso"
+        }
+    },
+    "0xffffffff83a80e48|0xffffffff844dc590": {
+        "count": 9,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec422c700",
+            "call": "syz_genetlink_get_family_id$netlbl_cipso"
+        }
+    },
+    "0xffffffff83a81c3d|0xffffffff844dddc0": {
+        "count": 9,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec422c700",
+            "call": "syz_genetlink_get_family_id$netlbl_cipso"
+        }
+    },
+    "0xffffffff83a81086|0xffffffff844dddc0": {
+        "count": 9,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec422c700",
+            "call": "syz_genetlink_get_family_id$netlbl_cipso"
+        }
+    },
+    "0xffffffff81966b08|0xffffffff81965240": {
+        "count": 7,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee59b17c0",
+            "call": "sync"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff84152060": {
+        "count": 6,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec37cab00",
+            "call": "sendmsg$NL80211_CMD_TRIGGER_SCAN"
+        }
+    },
+    "0xffffffff818e79ed|0x0": {
+        "count": 5,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee2d9e000",
+            "call": "syz_init_net_socket$nl_generic"
+        }
+    },
+    "0xffffffff83a70a17|0xffffffff83b1bdd0": {
+        "count": 5,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec6091a40",
+            "call": "sendmsg$IPCTNL_MSG_CT_GET_UNCONFIRMED"
+        }
+    },
+    "0xffffffff83a70a60|0xffffffff83b1bd20": {
+        "count": 5,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec6091a40",
+            "call": "sendmsg$IPCTNL_MSG_CT_GET_UNCONFIRMED"
+        }
+    },
+    "0xffffffff82033b14|0xffffffff82033b90": {
+        "count": 5,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edf896080",
+            "call": "ioctl$FIBMAP"
+        }
+    },
+    "0xffffffff8194649e|0xffffffff817bd270": {
+        "count": 4,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eec76c800",
+            "call": "openat$procfs"
+        }
+    },
+    "0xffffffff8194649e|0xffffffff81aa1320": {
+        "count": 4,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee34dc7c0",
+            "call": "syz_open_procfs"
+        }
+    },
+    "0xffffffff813db266|0xffffffff84618650": {
+        "count": 3,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee22c1900",
+            "call": "syz_mount_image$ext4"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff8415c410": {
+        "count": 2,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3e04080",
+            "call": "sendmsg$NL80211_CMD_CONNECT"
+        }
+    },
+    "0xffffffff814b328e|0xffffffff8128d230": {
+        "count": 2,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec3fae000",
+            "call": "syz_mount_image$ext4"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff84169f80": {
+        "count": 2,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee0695640",
+            "call": "sendmsg$NL80211_CMD_PROBE_CLIENT"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff84157ae0": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc076a40",
+            "call": "sendmsg$NL80211_CMD_START_AP"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff84156210": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee1679880",
+            "call": "sendmsg$NL80211_CMD_START_SCHED_SCAN"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff8414bdc0": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee0e5b3c0",
+            "call": "sendmsg$NL80211_CMD_GET_MPATH"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff8416de40": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edea10fc0",
+            "call": "sendmsg$NL80211_CMD_START_P2P_DEVICE"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff8416d280": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ec42c41c0",
+            "call": "sendmsg$NL80211_CMD_SET_MCAST_RATE"
+        }
+    },
+    "0xffffffff813fb531|0xffffffff813fb680": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eda8b6580",
+            "call": "timer_settime"
+        }
+    },
+    "0xffffffff819db806|0xffffffff819dbcf0": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2eda8b6580",
+            "call": "timerfd_settime"
+        }
+    },
+    "0xffffffff8194649e|0xffffffff83d34360": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edc27aa00",
+            "call": "syz_open_procfs"
+        }
+    },
+    "0xffffffff83a6e36c|0xffffffff839ada30": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee7956f40",
+            "call": "unshare"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff841715b0": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee6de7880",
+            "call": "sendmsg$NL80211_CMD_CHANNEL_SWITCH"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff8413f990": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee1babe00",
+            "call": "sendmsg$NL80211_CMD_GET_INTERFACE"
+        }
+    },
+    "0xffffffff819ca758|0xffffffff812beac0": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee0a82100",
+            "call": "read"
+        }
+    },
+    "0xffffffff8194649e|0xffffffff83a39660": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2edaca5900",
+            "call": "syz_open_procfs"
+        }
+    },
+    "0xffffffff83a85a48|0xffffffff84174300": {
+        "count": 1,
+        "first_appearance": {
+            "prog_id": "prog-0x1e2ee1baa000",
+            "call": "sendmsg$NL80211_CMD_SET_QOS_MAP"
+        }
+    }
+}

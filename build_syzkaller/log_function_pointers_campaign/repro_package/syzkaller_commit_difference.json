@@ -1,0 +1,12 @@
+{
+    "last_ancestor": {
+        "hash": "2f26d9373e3b66a96951dc390493bb275fdd87c1",
+        "message": "pkg/signal/signal.go: format json output of covered function pointers accordingly",
+        "branch": "handle_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 0,
+        "commits": []
+    }
+}
