@@ -48,13 +48,6 @@ Version 1.0 is function pointer cover gets deflaked
         [MVP] triageJob.handleCall
         [   ] corpus.Corpus.Save
 
-    * corpus.NewItemEvent:
-        [ ] corpus.NewMonitoredCorpus
-        [ ] corpus.NewFocusedCorpus
-        [ ] corpus.Corpus.Save
-        [ ] syz-manager.Manager.corpusInputHandler
-        [ ] syz-manager.Manager.MachineChecked
-
 [x] Write down all use cases of the modified type and list what they are
 
     (output: subitems of above)
