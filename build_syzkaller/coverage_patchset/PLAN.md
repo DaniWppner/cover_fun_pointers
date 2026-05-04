@@ -9,19 +9,59 @@ Possibly it involves much more changes
 
 ## PLAN
 
+### MVP
+MVP is all new function pointer cover gets registered without deflaking, and saved into the cover AND corpus.
+
+Version 1.0 is function pointer cover gets deflaked
+
 ### first
 
 [x] Add new coverage map to all places that keep track of it (corpus, fuzzer, items)
 
 [ ] Mirror all (or a minimal subset of) Merge, MergeFromRaw, etc. methods from pkg/signal for the new cover
 
-[ ] Update all constructors of the modified types to initialize (probably propagate) the new cover metric
+[ ] Update all constructors of the modified types to initialize (probably propagate) the new cover metric.
 
-[ ] Write down all use cases of the modified type and list what they are
+    * fuzzer.Cover:
+        [x] addRawMaxSignal
+           |x| fuzzer.triageProgCall
+           | | triageJob.deflake
+        [ ] CopyMaxSignal  --> won't
+        [ ] GrabSignalDelta --> won't
 
-[ ] Modify processResults to figure out of current function pointer cover is new cover
+    * fuzzer.triageCall:
+        [   ] triageJob.deflake
+        [   ] triageJob.stopDeflake
+        [   ] triageJob.minimize
+        [MVP] triageJob.handleCall
 
-[ ] Modify fuzzer.job representation of testcases to handle new cover
+    * corpus.Corpus:
+        [ ] corpus.Corpus.Save
+        [ ] corpus.Corpus.NewFocusedCorpus
+        [ ] corpus.Corpus.Minimize
+
+    * corpus.Item:
+        [ ] corpus.Corpus.Save
+        [ ] corpus.NewFocusedCorpus
+
+    * corpus.NewInput:
+        [MVP] triageJob.handleCall
+        [   ] corpus.Corpus.Save
+
+    * corpus.NewItemEvent:
+        [ ] corpus.NewMonitoredCorpus
+        [ ] corpus.NewFocusedCorpus
+        [ ] corpus.Corpus.Save
+        [ ] syz-manager.Manager.corpusInputHandler
+        [ ] syz-manager.Manager.MachineChecked
+
+[x] Write down all use cases of the modified type and list what they are
+
+    (output: subitems of above)
+
+[x] Modify processResults to figure out if current function pointer cover is new cover
+
+[x] Modify fuzzer.job representation of testcases to handle new cover
 
 [ ] Modify triage to care about new cover
 
@@ -33,7 +73,7 @@ Possibly it involves much more changes
 
 ### afterwards
 
-[ ] Figure out how corpus/prio works
+[ ] Figure out how corpus.prio works
 
 
 # Option: Modify Signal type to include new infomation
