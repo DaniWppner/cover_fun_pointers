@@ -1,0 +1,1 @@
+This patchset implements the minimum functionality for the syz-executor to report coverage back to the main fuzzer process using a kernel compiled with the [custom kcov](../../../build_llvm/) and [custom clang](../../../build_kernel/) patches
