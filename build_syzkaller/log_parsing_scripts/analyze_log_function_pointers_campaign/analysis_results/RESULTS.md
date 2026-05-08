@@ -1,9 +1,9 @@
 # Steps to recreate results.
-With the configurations present in this directory, syzkaller was ran for 72~ hours, on a ?? machine.
+These are the results of running syzkaller for 72~ hours, on a ?? machine with the configurations and results obtained in [log_function_pointers_campaing](../../../log_function_pointers_campaign/)
 
-Starting from the syz-manager log, you can run [`extract_func_stores.py`](../../log_parsing_scripts/extract_func_stores.py) and [`extract_saved_progs.py`](../../log_parsing_scripts/extract_saved_progs.py) to generate `.json` files consumed by the upcoming scripts.
+Starting from the syz-manager log, you can run [`extract_func_stores.py`](../extract_func_stores.py) and [`extract_saved_progs.py`](../extract_saved_progs.py) to generate `.json` files consumed by the upcoming scripts.
 
-If we run the analysis scripts at [`process_func_stores.py`](../../log_parsing_scripts/process_func_stores.py), we will get `.json` files similar to the ones in this directory.
+If we run the analysis scripts at [`process_func_stores.py`](../process_func_stores.py), we will get `.json` files similar to the ones in this directory.
 
 # Analysis
 
