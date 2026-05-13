@@ -33,6 +33,7 @@ import sys
 import itertools
 from termcolor import colored
 import tqdm.contrib as tcontrib
+from typing import Iterable
 
 class InvalidTriageLine(Exception):
     pass
@@ -167,7 +168,7 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
     return __create_master_regex(patterns)
 
 
-def parse_raw_triage_logs(log_text: str) -> list[dict]:
+def parse_raw_triage_logs(log_text: str) -> Iterable[dict]:
     # Regex breakdown:
     # \[(triage-[^\]]+)\] -> Captures the triage-id (e.g., triage-0x2c66bd608c80)
     # \[(prog-[^\]]+)\]   -> Captures the prog-id (e.g., prog-0x351ec85d0480)
@@ -176,7 +177,6 @@ def parse_raw_triage_logs(log_text: str) -> list[dict]:
     indentify_triage_re = re.compile(r"\[(triage-[^\]]+)\] \[(prog-[^\]]+)\]: (.*)")
     triage_line_re, triage_re_map = create_triage_master_regex()
 
-    parsed_entries = []
     log_lines = log_text.strip().split("\n")
     for line_number, line in tcontrib.tenumerate(log_lines):
         match = indentify_triage_re.search(line)
@@ -215,9 +215,7 @@ def parse_raw_triage_logs(log_text: str) -> list[dict]:
 
             entry[RESULT_KEYS.PROGID] = prog_id
             entry[RESULT_KEYS.TRIAGEID] = triage_id
-
-            parsed_entries.append(entry)
-    return parsed_entries
+            yield entry
 
 
 def match_against_triage_log_line_types(
@@ -317,8 +315,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     contents = log_path.read_text()
-    extracted_json = parse_raw_triage_logs(contents)
-
     with out_path.open("w") as f:
-        f.write(json.dumps(extracted_json, indent=4))
-    print(f"Info: Wrote json ({len(extracted_json)} entries)")
+        for json_obj in parse_raw_triage_logs(contents):
+            f.write(json.dumps(json_obj, indent=None) + '\n')
