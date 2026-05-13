@@ -32,7 +32,7 @@ from enum import StrEnum
 import sys
 import itertools
 from termcolor import colored
-
+import tqdm.contrib as tcontrib
 
 class InvalidTriageLine(Exception):
     pass
@@ -91,7 +91,7 @@ def read_serializaed_prog(line_number: int, og_text: list[int]) -> list[str]:
     @params: line_number will be the first relevant line (1 in the example)
              og_text is a list of the lines in the log file
     """
-    return list(itertools.takewhile(lambda line: line != "\n", og_text[line_number:]))
+    return list(itertools.takewhile(lambda line: line != "\n", itertools.islice(og_text, line_number)))
 
 
 def __create_master_regex(
@@ -178,7 +178,7 @@ def parse_raw_triage_logs(log_text: str) -> list[dict]:
 
     parsed_entries = []
     log_lines = log_text.strip().split("\n")
-    for line_number, line in enumerate(log_lines):
+    for line_number, line in tcontrib.tenumerate(log_lines):
         match = indentify_triage_re.search(line)
         if match:
             triage_id = match.group(1)
