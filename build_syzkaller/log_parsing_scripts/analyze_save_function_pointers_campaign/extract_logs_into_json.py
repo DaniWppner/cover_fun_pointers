@@ -258,6 +258,10 @@ def match_against_triage_log_line_types(
         case LOGENTRY_KEYS.NEW_FPOINTERS:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.NEW_FPOINTERS] = match_groups[1]
+        case LOGENTRY_KEYS.STABLE_SIGNAL:
+            res[RESULT_KEYS.CALL_NAME] = match_groups[0]
+            res[RESULT_KEYS.STABLE_SIGNAL] = match_groups[1]
+            res[RESULT_KEYS.NEW_STABLE_SIGNAL] = match_groups[2]
         case LOGENTRY_KEYS.STABLE_FPOINTERS:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.STABLE_FPOINTERS] = match_groups[1]
@@ -298,6 +302,8 @@ def match_against_triage_log_line_types(
             }
         case "SKIP":
             raise TriageSkipLine
+    if res == {}:
+        raise InvalidTriageLine("Empty result even though line matches known pattern")
     return res
 
 
