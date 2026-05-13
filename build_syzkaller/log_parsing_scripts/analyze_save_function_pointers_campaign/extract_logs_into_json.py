@@ -27,13 +27,14 @@ FIXME
 import re
 import json
 import argparse
-from pathlib import Path
-from enum import StrEnum
 import sys
 import itertools
-from termcolor import colored
 import tqdm.contrib as tcontrib
 from typing import Iterable
+from pathlib import Path
+from enum import StrEnum
+from termcolor import colored
+
 
 class InvalidTriageLine(Exception):
     pass
@@ -92,7 +93,18 @@ def read_serializaed_prog(line_number: int, og_text: list[int]) -> list[str]:
     @params: line_number will be the first relevant line (1 in the example)
              og_text is a list of the lines in the log file
     """
-    return list(itertools.takewhile(lambda line: line != "\n", itertools.islice(og_text, line_number)))
+    # itertools.islice takes no keyword arguments but this is like:
+    #    itertools.islice(Iterable=og_text, start=line_number, stop=None, step=None)
+    interesting_lines : Iterable[str] = itertools.islice(og_text, line_number, None, None)
+    res = []
+    for line in interesting_lines:
+        if line == '':
+            break
+        elif line.startswith("syz_mount_image$"):
+            res.append("syz_mount_image$REDACTED")
+        else:
+            res.append(line)
+    return res
 
 
 def __create_master_regex(
@@ -317,4 +329,4 @@ if __name__ == "__main__":
     contents = log_path.read_text()
     with out_path.open("w") as f:
         for json_obj in parse_raw_triage_logs(contents):
-            f.write(json.dumps(json_obj, indent=None) + '\n')
+            f.write(json.dumps(json_obj, indent=None) + "\n")
