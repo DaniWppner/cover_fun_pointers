@@ -28,16 +28,21 @@ import re
 import json
 import argparse
 from pathlib import Path
-from enum import Enum
+from enum import StrEnum
 import sys
 import itertools
+from termcolor import colored
 
 
 class InvalidTriageLine(Exception):
     pass
 
 
-class LOGENTRY_KEYS(Enum):
+class TriageSkipLine(Exception):
+    pass
+
+
+class LOGENTRY_KEYS(StrEnum):
     NEW_FPOINTERS = "new_fpointers"
     NEW_SIGNAL = "new_signal"
     STABLE_FPOINTERS = "stable_fpointers"
@@ -49,7 +54,7 @@ class LOGENTRY_KEYS(Enum):
     MINIMIZATION_SKIP = "minimization_skip"
 
 
-class RESULT_KEYS(Enum):
+class RESULT_KEYS(StrEnum):
     NEW_FPOINTERS = "new_fpointers"
     NEW_SIGNAL = "new_signal"
     STABLE_FPOINTERS = "stable_fpointers"
@@ -62,9 +67,12 @@ class RESULT_KEYS(Enum):
     MINIMIZATION_RESULT = "minimization_result"
     MINIMIZATION_RES_PROG = "result_prog"
     MINIMIZATION_RES_TYPE = "type"
+    PROGID = "prog_id"
+    TRIAGEID = "triage_id"
+    ORIGINAL_PROG = "original_prog"
 
 
-class RESULT_VALUES(Enum):
+class RESULT_VALUES(StrEnum):
     MINIMIZATION_RES_NODIFF = "signal_fpointer_equal"
     MINIMIZATION_RES_SAVE_SIGNAL = "save_signal_no_fpointer"
     MINIMIZATION_RES_SAVE_FPOINTER = "save_fpointer_no_signal"
@@ -118,7 +126,8 @@ def __create_master_regex(
 def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
     # Regex breakdown:
     # call #\d+ \[([^\]]+)\] -> Captures the call name (e.g., syz_genetlink)
-    call_pattern = r"call #\d+ \[([^\]]+)\]"
+    call_id = r"#\d+ \[([^\]]+)\]"
+    call_pattern = "call " + call_id
 
     # Some entries include information from the couple log lines following the entry itself.
     # Those are the onees where the pattern ends in something like "with program:"
@@ -134,8 +143,8 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
         + r", \|new stable stored function pointers\|=(\d+)",
         # Need to retrieve prog after this entry
         LOGENTRY_KEYS.SAVED_ITEM: r"added new input for "
-        + call_pattern
-        + " to the corpus with program:",
+        + call_id
+        + r" to the corpus with program:",
         LOGENTRY_KEYS.MINIMIZATION_REPORT_NO_DIFF: call_pattern
         + r": minimization yielded same prog for signal and stored function pointers",
         # Need to retrieve prog after this entry
@@ -144,7 +153,16 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
         # Need to retrieve prog after this entry
         LOGENTRY_KEYS.MINIMIZATION_REPORT_SAVE_SIGNAL: call_pattern
         + r": minimization yielded prog for signal different from stored function pointers. New prog \(call #\d+\):",
-        LOGENTRY_KEYS.MINIMIZATION_SKIP: r"skip minimize",
+        LOGENTRY_KEYS.MINIMIZATION_SKIP: call_pattern + r": skip minimize",
+        "SKIP": "|".join(
+            [
+                call_pattern + r": minimize started",
+                r"deflake started",
+                r"deflake complete",
+                call_pattern + r": minimization step failure",
+                call_pattern + r": minimization step \(.*\) success \(\|calls\| = \d+\)",
+            ]
+        ),
     }
     return __create_master_regex(patterns)
 
@@ -166,12 +184,38 @@ def parse_raw_triage_logs(log_text: str) -> list[dict]:
             triage_id = match.group(1)
             prog_id = match.group(2)
             triage_log_line = match.group(3)
-            entry = match_against_triage_log_line_types(
-                triage_log_line, triage_line_re, triage_re_map, line_number, log_lines
-            )
+            if triage_log_line == "":
+                # this is a hardcoded special case where the serialized prog
+                # is logged at the beginning of the triage job
+                entry = {
+                    RESULT_KEYS.ORIGINAL_PROG: read_serializaed_prog(
+                        line_number + 1, log_lines
+                    )
+                }
+            else:
+                try:
+                    entry = match_against_triage_log_line_types(
+                        triage_log_line,
+                        triage_line_re,
+                        triage_re_map,
+                        line_number,
+                        log_lines,
+                    )
+                except TriageSkipLine:
+                    continue
+                except InvalidTriageLine:
+                    print(
+                        colored(
+                            f"Invalid triage snippet in log (line {line_number}):\n{line}\n"
+                            + f"Triage snippet (len {len(triage_log_line)}):\n{triage_log_line}",
+                            "red",
+                        )
+                    )
+                    raise
 
-            entry["prog_id"] = (prog_id,)
-            entry["triage_id"] = triage_id
+            entry[RESULT_KEYS.PROGID] = prog_id
+            entry[RESULT_KEYS.TRIAGEID] = triage_id
+
             parsed_entries.append(entry)
     return parsed_entries
 
@@ -242,6 +286,8 @@ def match_against_triage_log_line_types(
                     line_number + 1, og_text
                 ),
             }
+        case "SKIP":
+            raise TriageSkipLine
     return res
 
 
