@@ -116,6 +116,16 @@ def count_cond(prog2log: dict[str, dict], condition: Callable[[dict], bool]) -> 
     return len([entry for entry in prog2log.values() if condition(entry)])
 
 
+def filter_many_cond(
+    prog2log: dict[str, dict], *conditions: Callable[[dict], bool]
+) -> int:
+    return {
+        key: val
+        for key, val in prog2log.items()
+        if all(cond(val) for cond in conditions)
+    }
+
+
 def check_easy_stats(prog2log: dict[str, dict]) -> None:
     n_duplicate_progs = count_cond(prog2log, lambda e: e[RESULT_KEYS.COUNT] > 1)
     n_saved_progs = count_cond(prog2log, lambda e: RESULT_KEYS.SAVED_PROG in e)
@@ -139,7 +149,12 @@ def has_minimization_result(minimization_result_type: str) -> Callable[[dict], b
             return False
         minimization_result: list[dict] = prog_entry[RESULT_KEYS.MINIMIZATION_RESULT]
         if type(minimization_result) != list:
-            print(colored("ERROR: type of minimization result is not list. Minimization result:", "red"))
+            print(
+                colored(
+                    "ERROR: type of minimization result is not list. Minimization result:",
+                    "red",
+                )
+            )
             print(colored(str(minimization_result), "yellow"))
             sys.exit(1)
         return any(
@@ -173,12 +188,25 @@ def check_minimization_stats(prog2log: dict[str, dict]) -> None:
         prog2log, has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_NODIFF)
     )
 
+    unique_signal_and_fpointer = filter_many_cond(
+        prog2log,
+        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER),
+        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_SIGNAL),
+    )
+
     print(f"Number of minimizations that keep both: {n_keep_both}")
     print(f"Number of minimizations that obtained an unique fpointer: {n_saved_fpointer}")
     print(f"Number of minimizations that obtained an unique signal: {n_saved_signal}")
     print(f"Number of times fpointer minimization was skipped: {n_skip_fpointer}")
     print(f"Number of times signal minimization was skipped: {n_skip_signal}")
     print(f"Number of times minimizationa as a whole was skipped {n_skip_all}")
+    both_unique_fout = Path.cwd() / "unique_fpointer_and_signal_minimization_result.json"
+    print(
+        f"Minimizations that obtained both unique signal and unique fpointer (count={len(unique_signal_and_fpointer)}):\n"
+        + f"printed at {both_unique_fout}"
+    )
+    with open(both_unique_fout, 'w') as f:
+        json.dump(unique_signal_and_fpointer, f, indent=2)
 
 
 if __name__ == "__main__":

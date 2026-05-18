@@ -112,13 +112,13 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
     patterns = {
         LOGENTRY_KEYS.NEW_SIGNAL: call_pattern + r": \|new signal\|=(\d+)",
         LOGENTRY_KEYS.NEW_FPOINTERS: call_pattern
-        + r": \|new stored function pointers\|=(\d+)",
+        + r": \|new stored function pointers\|=(\d+)(\[.*\])?",
         LOGENTRY_KEYS.STABLE_SIGNAL: call_pattern
         + r": \|stable signal\|=(\d+)"
         + r", \|new stable signal\|=(\d+)",
         LOGENTRY_KEYS.STABLE_FPOINTERS: call_pattern
         + r": \|stable stored function pointers\|=(\d+)"
-        + r", \|new stable stored function pointers\|=(\d+)",
+        + r", \|new stable stored function pointers\|=(\d+)(\[.*\])?",
         # Need to retrieve prog after this entry
         LOGENTRY_KEYS.SAVED_ITEM: r"added new input for "
         + call_id
@@ -226,6 +226,9 @@ def match_against_triage_log_line_types(
         case LOGENTRY_KEYS.NEW_FPOINTERS:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.NEW_FPOINTERS] = match_groups[1]
+            # The fpointers payload is optional, it only occurs when the count is > 0
+            if match_groups[2] is not None:
+                res[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD] = match_groups[2]
         case LOGENTRY_KEYS.STABLE_SIGNAL:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.STABLE_SIGNAL] = match_groups[1]
@@ -234,6 +237,9 @@ def match_against_triage_log_line_types(
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.STABLE_FPOINTERS] = match_groups[1]
             res[RESULT_KEYS.NEW_STABLE_FPOINTERS] = match_groups[2]
+            # The new stable fpointers payload is optional, it only occurs when the count is > 0
+            if match_groups[3] is not None:
+                res[RESULT_KEYS.STABLE_FPOINTERS_PAYLOAD] = match_groups[3]
         case LOGENTRY_KEYS.SAVED_ITEM:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.SAVED_PROG] = read_serializaed_prog(

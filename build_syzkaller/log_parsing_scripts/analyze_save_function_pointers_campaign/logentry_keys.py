@@ -3,8 +3,10 @@ from enum import StrEnum
 class LOGENTRY_KEYS(StrEnum):
     NEW_FPOINTERS = "new_fpointers"
     NEW_SIGNAL = "new_signal"
+    NEW_FPOINTERS_PAYLOAD = "new_fpointers_json"
     STABLE_FPOINTERS = "stable_fpointers"
     STABLE_SIGNAL = "stable_signal"
+    STABLE_FPOINTERS_PAYLOAD = "new_stable_fpointers_json"
     SAVED_ITEM = "saved_item"
     MINIMIZATION_REPORT_NO_DIFF = "minimization_result_equal"
     MINIMIZATION_REPORT_SAVE_FPOINTERS = "minimization_result_no_signal"
@@ -18,8 +20,10 @@ class LOGENTRY_KEYS(StrEnum):
 class RESULT_KEYS(StrEnum):
     NEW_FPOINTERS = "new_fpointers"
     NEW_SIGNAL = "new_signal"
+    NEW_FPOINTERS_PAYLOAD = "new_fpointers_json"
     STABLE_FPOINTERS = "stable_fpointers"
     NEW_STABLE_FPOINTERS = "new_stable_fpointers"
+    STABLE_FPOINTERS_PAYLOAD = "new_stable_fpointers_json"
     STABLE_SIGNAL = "stable_signal"
     NEW_STABLE_SIGNAL = "new_stable_signal"
     CALL_NAME = "call"
