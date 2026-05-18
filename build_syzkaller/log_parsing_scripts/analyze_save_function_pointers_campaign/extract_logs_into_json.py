@@ -32,9 +32,8 @@ import itertools
 import tqdm.contrib as tcontrib
 from typing import Iterable
 from pathlib import Path
-from enum import StrEnum
 from termcolor import colored
-
+from logentry_keys import LOGENTRY_KEYS, RESULT_KEYS, RESULT_VALUES
 
 class InvalidTriageLine(Exception):
     pass
@@ -44,40 +43,6 @@ class TriageSkipLine(Exception):
     pass
 
 
-class LOGENTRY_KEYS(StrEnum):
-    NEW_FPOINTERS = "new_fpointers"
-    NEW_SIGNAL = "new_signal"
-    STABLE_FPOINTERS = "stable_fpointers"
-    STABLE_SIGNAL = "stable_signal"
-    SAVED_ITEM = "saved_item"
-    MINIMIZATION_REPORT_NO_DIFF = "minimization_result_equal"
-    MINIMIZATION_REPORT_SAVE_FPOINTERS = "minimization_result_no_signal"
-    MINIMIZATION_REPORT_SAVE_SIGNAL = "minimization_result_no_fpointer"
-    MINIMIZATION_SKIP = "minimization_skip"
-
-
-class RESULT_KEYS(StrEnum):
-    NEW_FPOINTERS = "new_fpointers"
-    NEW_SIGNAL = "new_signal"
-    STABLE_FPOINTERS = "stable_fpointers"
-    NEW_STABLE_FPOINTERS = "new_stable_fpointers"
-    STABLE_SIGNAL = "stable_signal"
-    NEW_STABLE_SIGNAL = "new_stable_signal"
-    MINIMIZATION_SKIP = "minimization_skip"
-    CALL_NAME = "call"
-    SAVED_PROG = "prog_in_corpus"
-    MINIMIZATION_RESULT = "minimization_result"
-    MINIMIZATION_RES_PROG = "result_prog"
-    MINIMIZATION_RES_TYPE = "type"
-    PROGID = "prog_id"
-    TRIAGEID = "triage_id"
-    ORIGINAL_PROG = "original_prog"
-
-
-class RESULT_VALUES(StrEnum):
-    MINIMIZATION_RES_NODIFF = "signal_fpointer_equal"
-    MINIMIZATION_RES_SAVE_SIGNAL = "save_signal_no_fpointer"
-    MINIMIZATION_RES_SAVE_FPOINTER = "save_fpointer_no_signal"
 
 
 def read_serializaed_prog(line_number: int, og_text: list[int]) -> list[str]:
@@ -295,10 +260,7 @@ def match_against_triage_log_line_types(
         case LOGENTRY_KEYS.MINIMIZATION_SKIP:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.MINIMIZATION_RESULT] = {
-                RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER,
-                RESULT_KEYS.MINIMIZATION_RES_PROG: read_serializaed_prog(
-                    line_number + 1, og_text
-                ),
+                RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_SKIP,
             }
         case "SKIP":
             raise TriageSkipLine
