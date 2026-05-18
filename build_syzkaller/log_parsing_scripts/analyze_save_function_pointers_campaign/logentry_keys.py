@@ -30,6 +30,7 @@ class RESULT_KEYS(StrEnum):
     PROGID = "prog_id"
     TRIAGEID = "triage_id"
     ORIGINAL_PROG = "original_prog"
+    COUNT = "count"
 
 
 class RESULT_VALUES(StrEnum):
