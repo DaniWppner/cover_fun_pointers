@@ -131,7 +131,10 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
         # Need to retrieve prog after this entry
         LOGENTRY_KEYS.MINIMIZATION_REPORT_SAVE_SIGNAL: call_pattern
         + r": minimization yielded prog for signal different from stored function pointers. New prog \(call #\d+\):",
-        LOGENTRY_KEYS.MINIMIZATION_SKIP: call_pattern + r": skip minimize",
+        # The end-of-line anchor '$' here is crucial to be able to distinguish between these three entries
+        LOGENTRY_KEYS.MINIMIZATION_WHOLE_SKIP: call_pattern + r": skip minimize$",
+        LOGENTRY_KEYS.MINIMIZATION_SIGNAL_SKIP : call_pattern + r": skip minimize of empty new stable signal$",
+        LOGENTRY_KEYS.MINIMIZATION_FPOINTER_SKIP : call_pattern + r": skip minimize of empty new stable stored function pointers$",
         "SKIP": "|".join(
             [
                 call_pattern + r": minimize started",
@@ -257,10 +260,20 @@ def match_against_triage_log_line_types(
                     line_number + 1, og_text
                 ),
             }]
-        case LOGENTRY_KEYS.MINIMIZATION_SKIP:
+        case LOGENTRY_KEYS.MINIMIZATION_WHOLE_SKIP:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
                 RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_SKIP,
+            }]
+        case LOGENTRY_KEYS.MINIMIZATION_FPOINTER_SKIP:
+            res[RESULT_KEYS.CALL_NAME] = match_groups[0]
+            res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
+                RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_RES_FPOINTER_SKIP,
+            }]
+        case LOGENTRY_KEYS.MINIMIZATION_SIGNAL_SKIP:
+            res[RESULT_KEYS.CALL_NAME] = match_groups[0]
+            res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
+                RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP,
             }]
         case "SKIP":
             raise TriageSkipLine

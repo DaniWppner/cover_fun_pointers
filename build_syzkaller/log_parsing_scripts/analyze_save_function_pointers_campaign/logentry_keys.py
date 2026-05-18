@@ -9,7 +9,10 @@ class LOGENTRY_KEYS(StrEnum):
     MINIMIZATION_REPORT_NO_DIFF = "minimization_result_equal"
     MINIMIZATION_REPORT_SAVE_FPOINTERS = "minimization_result_no_signal"
     MINIMIZATION_REPORT_SAVE_SIGNAL = "minimization_result_no_fpointer"
-    MINIMIZATION_SKIP = "minimization_skip"
+    MINIMIZATION_WHOLE_SKIP = "minimization_skip"
+    MINIMIZATION_FPOINTER_SKIP = "minimization_skip_fpointer"
+    MINIMIZATION_SIGNAL_SKIP = "minimization_skip_signal"
+    
 
 
 class RESULT_KEYS(StrEnum):
@@ -33,4 +36,6 @@ class RESULT_VALUES(StrEnum):
     MINIMIZATION_RES_NODIFF = "signal_fpointer_equal"
     MINIMIZATION_RES_SAVE_SIGNAL = "save_signal_no_fpointer"
     MINIMIZATION_RES_SAVE_FPOINTER = "save_fpointer_no_signal"
+    MINIMIZATION_RES_FPOINTER_SKIP = "skip_fpointer"
+    MINIMIZATION_RES_SIGNAL_SKIP = "skip_signal"
     MINIMIZATION_SKIP = "minimization_skip"

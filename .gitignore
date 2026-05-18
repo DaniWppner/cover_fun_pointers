@@ -16,3 +16,8 @@ build_syzkaller/syz-executor-test/QEMU-debug-image/
 **/crashes/
 **/instance-*/
 **/instance-lock
+
+# Python ignores
+__pycache__/
+venv/
+.vscode/
