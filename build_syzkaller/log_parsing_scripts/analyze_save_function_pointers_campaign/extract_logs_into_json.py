@@ -241,9 +241,9 @@ def match_against_triage_log_line_types(
             )
         case LOGENTRY_KEYS.MINIMIZATION_REPORT_NO_DIFF:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
-            res[RESULT_KEYS.MINIMIZATION_RESULT] = {
+            res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
                 RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_RES_NODIFF
-            }
+            }]
         case LOGENTRY_KEYS.MINIMIZATION_REPORT_SAVE_FPOINTERS:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
