@@ -243,25 +243,25 @@ def match_against_triage_log_line_types(
             }
         case LOGENTRY_KEYS.MINIMIZATION_REPORT_SAVE_FPOINTERS:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
-            res[RESULT_KEYS.MINIMIZATION_RESULT] = {
+            res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
                 RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER,
                 RESULT_KEYS.MINIMIZATION_RES_PROG: read_serializaed_prog(
                     line_number + 1, og_text
                 ),
-            }
+            }]
         case LOGENTRY_KEYS.MINIMIZATION_REPORT_SAVE_SIGNAL:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
-            res[RESULT_KEYS.MINIMIZATION_RESULT] = {
+            res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
                 RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_RES_SAVE_SIGNAL,
                 RESULT_KEYS.MINIMIZATION_RES_PROG: read_serializaed_prog(
                     line_number + 1, og_text
                 ),
-            }
+            }]
         case LOGENTRY_KEYS.MINIMIZATION_SKIP:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
-            res[RESULT_KEYS.MINIMIZATION_RESULT] = {
+            res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
                 RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_SKIP,
-            }
+            }]
         case "SKIP":
             raise TriageSkipLine
     if res == {}:
