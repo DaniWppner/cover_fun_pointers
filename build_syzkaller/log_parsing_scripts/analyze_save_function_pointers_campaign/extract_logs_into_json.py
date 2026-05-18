@@ -104,7 +104,7 @@ def __create_master_regex(
 def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
     # Regex breakdown:
     # call #\d+ \[([^\]]+)\] -> Captures the call name (e.g., syz_genetlink)
-    call_id = r"#\d+ \[([^\]]+)\]"
+    call_id = r"(#\d+ \[[^\]]+\])"
     call_pattern = "call " + call_id
 
     # Some entries include information from the couple log lines following the entry itself.
