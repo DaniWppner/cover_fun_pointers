@@ -22,6 +22,17 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
     result_dict: dict[str, dict] = {}
     curr_original_prog = None
     curr_prog_id = None
+
+    # After minimizing a prog, the call_id of that prog when it is saved into the corpus
+    # will be different from the original one (since it can have a smaller index now)
+    # This should be handled better by the fuzzer when printing the logs.
+    # But alas, we have to fix it in post.
+    #
+    # The queue awaiting_corpus_entry holds all progs that have been minimized, so that they
+    # can be matched with a future "save to corpus" log entry via the <prog_id, traige_id> pair.
+    # This allows the "save to corpus" entry to be overriden as another entry into the original
+    # <prog, call> group instead of creating a lone <prog, newcall> group with just the "save" entry.
+    awaiting_corpus_entry = dict()
     with open(json_lines_file) as f:
         for line in f:
             log_entry: dict = json.loads(line)
@@ -39,6 +50,11 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
             call_id = log_entry.pop(RESULT_KEYS.CALL_NAME)
             data_key = f"{prog_id}|{call_id}"
             triage_id = log_entry.pop(RESULT_KEYS.TRIAGEID)
+
+            # before using data_key, let's check if we should update it
+            # does this break the "skip repeated traiges rule"? #FIXME
+            data_key = check_for_saved_prog(data_key, awaiting_corpus_entry, log_entry, prog_id, triage_id)            
+
             if data_key not in result_dict:
                 log_entry[RESULT_KEYS.ORIGINAL_PROG] = curr_original_prog
                 log_entry[RESULT_KEYS.COUNT] = 1
@@ -64,6 +80,14 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
             minim_key = RESULT_KEYS.MINIMIZATION_RESULT
             if minim_key in log_entry:
                 minim_entry = log_entry.pop(minim_key)
+                if minim_entry[0][RESULT_KEYS.MINIMIZATION_RES_TYPE] not in [
+                    RESULT_VALUES.MINIMIZATION_SKIP,
+                    RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP,
+                    RESULT_VALUES.MINIMIZATION_RES_FPOINTER_SKIP,
+                ]:
+                    # this means a successful minimize happened, 
+                    # let's schedule the minimized prog to entry the corpus.
+                    awaiting_corpus_entry[get_ceq_key(prog_id, triage_id)] = data_key
                 if minim_key in result_dict[data_key]:
                     if minimization_would_overwrite(result_dict[data_key], minim_entry):
                         warn_overwrite(result_dict[data_key][minim_key], minim_entry)
@@ -91,7 +115,24 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
                 warn_overwrite(result_dict[data_key], log_entry, prog_id)
                 sys.exit(1)
             result_dict[data_key].update(log_entry)
+    assert len(awaiting_corpus_entry) == 0
     return result_dict
+
+def check_for_saved_prog(data_key, awaiting_corpus_entry, log_entry, prog_id, triage_id):
+    """
+    Override data_key with the one in the queue if necessary
+    """
+    if RESULT_KEYS.SAVED_PROG in log_entry:
+        if get_ceq_key(prog_id, triage_id) in awaiting_corpus_entry:
+            data_key = awaiting_corpus_entry.pop(get_ceq_key(prog_id, triage_id))
+    return data_key
+
+def get_ceq_key(prog_id:str, triage_id:str) -> str:
+    """
+    Returns the key used in awaiting_corpus_entry for the pair
+    prog_id, triage_id
+    """
+    return f"{triage_id}|{prog_id}"
 
 
 def minimization_would_overwrite(result_entry: dict, minim_entry: dict) -> bool:
@@ -205,7 +246,7 @@ def check_minimization_stats(prog2log: dict[str, dict]) -> None:
         f"Minimizations that obtained both unique signal and unique fpointer (count={len(unique_signal_and_fpointer)}):\n"
         + f"printed at {both_unique_fout}"
     )
-    with open(both_unique_fout, 'w') as f:
+    with open(both_unique_fout, "w") as f:
         json.dump(unique_signal_and_fpointer, f, indent=2)
 
 
