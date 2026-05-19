@@ -237,17 +237,11 @@ def get_duplicate_progs(
     return prog2_count, duplicate
 
 
-def check_duplicated_progs(prog2log: dict[str, dict]) -> None:
-    prog2_count, duplicate = get_duplicate_progs(prog2log)
-    print(f"Number of unique progs saved in corpus: {len(prog2_count)}")
-    print(f"Number of progs saved more than once: {len(duplicate)}")
-
-
-def deduplicate_saved_progs(prog2log: dict[str, dict]) -> None:
+def deduplicate_saved_progs(prog2log: dict[str, dict]) -> tuple[dict, dict, int]:
     """
-    Returns two dictionaries.
-    The first one is a dictionary where each saved program in the corpus appears only once
-    The second one is the full dictionary sorted in decreasing order by the amount of repetitions of the saved program
+    The first dictionary is the subdict of the input where each saved program in the corpus appears only once
+    The second dictionary is the full input sorted in decreasing order by the amount of repetitions of the saved program
+    The returned integer is the amount of programs saved in the corpus that appeared more than once in the input
     """
     count, duplicate = get_duplicate_progs(prog2log)
     # we need this so upcoming lists are also sorted in decreasing order of repetitions
@@ -285,7 +279,13 @@ def deduplicate_saved_progs(prog2log: dict[str, dict]) -> None:
             if jobid not in sorted_by_duplicates
         }
         sorted_by_duplicates.update(diff_with_res)
-    return not_duplicate_dict, sorted_by_duplicates
+    return not_duplicate_dict, sorted_by_duplicates, len(duplicate)
+
+
+def check_duplicated_progs(prog2log: dict[str, dict]) -> None:
+    prog2_count, duplicate = get_duplicate_progs(prog2log)
+    print(f"Number of unique progs saved in corpus: {len(prog2_count)}")
+    print(f"Number of progs saved more than once: {len(duplicate)}")
 
 
 def check_saved_because_fpointer(prog2log: dict[str, dict]) -> None:
@@ -295,7 +295,7 @@ def check_saved_because_fpointer(prog2log: dict[str, dict]) -> None:
         has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP),
         has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER),
     )
-    deduplicate_interesting, saved_because_skip_signal = deduplicate_saved_progs(
+    deduplicate_interesting, saved_because_skip_signal, count_duplicate_saved_interesting_progs = deduplicate_saved_progs(
         saved_because_skip_signal
     )
 
@@ -314,6 +314,8 @@ def check_saved_because_fpointer(prog2log: dict[str, dict]) -> None:
     )
     with open(saved_deduplicate_fout, "w") as f:
         json.dump(deduplicate_interesting, f, indent=2)
+
+    print(f"Number of progs saved with fpointer and skip signal more than once: {count_duplicate_saved_interesting_progs}")
 
 
 def check_minimization_stats(prog2log: dict[str, dict]) -> None:
