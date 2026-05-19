@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from termcolor import colored
 from typing import Callable
+from collections import defaultdict
 from logentry_keys import RESULT_KEYS, RESULT_VALUES
 
 
@@ -52,15 +53,10 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
             triage_id = log_entry.pop(RESULT_KEYS.TRIAGEID)
 
             # before using data_key, let's check if we should update it
-            # does this break the "skip repeated traiges rule"? #FIXME
-            data_key = check_for_saved_prog(data_key, awaiting_corpus_entry, log_entry, prog_id, triage_id)            
+            # does this break the "skip repeated traiges rule"?
+            data_key = check_for_saved_prog(data_key, awaiting_corpus_entry, log_entry, prog_id, triage_id)
 
-            if data_key not in result_dict:
-                log_entry[RESULT_KEYS.ORIGINAL_PROG] = curr_original_prog
-                log_entry[RESULT_KEYS.COUNT] = 1
-                log_entry[RESULT_KEYS.TRIAGEID] = [triage_id]
-                result_dict[data_key] = log_entry
-                continue
+            no_new : bool = data_key in result_dict
 
             # If it is not the first occurence, we want to check that triage_id is the same
             # If it is not, that means we have identical <prog, call> pairs in different triages
@@ -68,11 +64,16 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
             # and obtained similar (flaky?) coverage to triage.
             # Let's only log the results for the first time the prog gets triaged,
             # but let's also make sure to increase the count.
-            if triage_id not in result_dict[data_key][RESULT_KEYS.TRIAGEID]:
+            #
+            # FIXME: THis breaks in the way that programs triaged multiple times due to race conditions
+            # might have the results on the second or greater iteration ignored.
+            # In particular for saved_prog, which have a different <prog, call> pair id this creates
+            # duplicate entries. 
+            if no_new and triage_id not in result_dict[data_key][RESULT_KEYS.TRIAGEID]:
                 result_dict[data_key][RESULT_KEYS.TRIAGEID].append(triage_id)
                 result_dict[data_key][RESULT_KEYS.COUNT] += 1
 
-            if result_dict[data_key][RESULT_KEYS.COUNT] > 1:
+            if no_new and result_dict[data_key][RESULT_KEYS.COUNT] > 1:
                 continue
 
             # minimization result is a list of results, so we need to merge this one
@@ -88,7 +89,7 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
                     # this means a successful minimize happened, 
                     # let's schedule the minimized prog to entry the corpus.
                     awaiting_corpus_entry[get_ceq_key(prog_id, triage_id)] = data_key
-                if minim_key in result_dict[data_key]:
+                if no_new and minim_key in result_dict[data_key]:
                     if minimization_would_overwrite(result_dict[data_key], minim_entry):
                         warn_overwrite(result_dict[data_key][minim_key], minim_entry)
                         sys.exit(1)
@@ -96,25 +97,34 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
                     # extend the existing one in result with the new one.
                     result_dict[data_key][minim_key].extend(minim_entry)
                 else:
+                    # setup log_entry so that after assignement
                     # the current entry becomes the whole list in result.
-                    result_dict[data_key][minim_key] = minim_entry
+                    log_entry[minim_key] = minim_entry
 
             # prog_in_corpus is also a list of results
             if RESULT_KEYS.SAVED_PROG in log_entry:
                 saved_prog = log_entry.pop(RESULT_KEYS.SAVED_PROG)
-                if RESULT_KEYS.SAVED_PROG in result_dict[data_key]:
+                if no_new and RESULT_KEYS.SAVED_PROG in result_dict[data_key]:
                     # add the current saved prog to the list
                     result_dict[data_key][RESULT_KEYS.SAVED_PROG].append(saved_prog)
                 else:
-                    result_dict[data_key][RESULT_KEYS.SAVED_PROG] = [saved_prog]
+                    # setup log_entry so that after assignement
+                    # the current entry becomes the whole list
+                    log_entry[RESULT_KEYS.SAVED_PROG] = [saved_prog]
 
-            # all remaining keys should appear only once
-            # per <prog_id, call> pair. Note that the ones for which
-            # this doesn't hold have been removed previously.
-            if any(key in result_dict[data_key] for key in log_entry):
-                warn_overwrite(result_dict[data_key], log_entry, prog_id)
-                sys.exit(1)
-            result_dict[data_key].update(log_entry)
+            if not no_new:
+                log_entry[RESULT_KEYS.ORIGINAL_PROG] = curr_original_prog
+                log_entry[RESULT_KEYS.COUNT] = 1
+                log_entry[RESULT_KEYS.TRIAGEID] = [triage_id]
+                result_dict[data_key] = log_entry
+            else:
+                # all remaining keys should appear only once
+                # per <prog_id, call> pair. Note that the ones for which
+                # this doesn't hold have been removed previously.
+                if any(key in result_dict[data_key] for key in log_entry):
+                    warn_overwrite(result_dict[data_key], log_entry, prog_id)
+                    sys.exit(1)
+                result_dict[data_key].update(log_entry)
     assert len(awaiting_corpus_entry) == 0
     return result_dict
 
@@ -170,7 +180,7 @@ def filter_many_cond(
 def check_easy_stats(prog2log: dict[str, dict]) -> None:
     n_duplicate_progs = count_cond(prog2log, lambda e: e[RESULT_KEYS.COUNT] > 1)
     n_saved_progs = count_cond(prog2log, lambda e: RESULT_KEYS.SAVED_PROG in e)
-    n_multiple_saved_progs = count_cond(
+    multiple_saved_progs = filter_many_cond(
         prog2log, lambda e: len(e.get(RESULT_KEYS.SAVED_PROG, [])) > 1
     )
 
@@ -179,9 +189,12 @@ def check_easy_stats(prog2log: dict[str, dict]) -> None:
     print(
         f"Number of <prog,call> triages that added an item to the corpus: {n_saved_progs}"
     )
+    multiple_corpus_fout = Path.cwd() / "multiple_saved_corpus.json"
     print(
-        f"Number of <prog,call> pairs with multiple saved progs: {n_multiple_saved_progs}"
+        f"Number of <prog,call> pairs with multiple saved progs (count={len(multiple_saved_progs)}) saved to {multiple_corpus_fout}"
     )
+    with open(multiple_corpus_fout, 'w') as f:
+        json.dump(multiple_saved_progs, f, indent=2)
 
 
 def has_minimization_result(minimization_result_type: str) -> Callable[[dict], bool]:
@@ -204,6 +217,17 @@ def has_minimization_result(minimization_result_type: str) -> Callable[[dict], b
         )
 
     return checker
+
+def check_duplicated_progs(prog2log: dict[str, dict]) -> None:
+    prog2_count = defaultdict(list)
+    for key, entry in prog2log.items():
+        for prog in entry.get(RESULT_KEYS.SAVED_PROG, []):
+            prog2_count[hash(''.join(prog))].append(key)
+
+    duplicate = {prog: keys for prog,keys in prog2_count.items() if len(keys) > 1}
+    print(f"Number of unique progs saved in corpus: {len(prog2_count)}")
+    print(f"Number of progs saved more than once: {len(duplicate)}")
+
 
 
 def check_minimization_stats(prog2log: dict[str, dict]) -> None:
@@ -281,6 +305,8 @@ if __name__ == "__main__":
 
     out_json = unify_per_prog(json_lines_path)
     check_easy_stats(out_json)
+    print("--------------------------------------------------------------------")
+    check_duplicated_progs(out_json)
     print("--------------------------------------------------------------------")
     check_minimization_stats(out_json)
     with out_path.open("w") as f:
