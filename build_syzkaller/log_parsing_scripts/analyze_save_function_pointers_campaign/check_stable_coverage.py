@@ -54,9 +54,11 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
 
             # before using data_key, let's check if we should update it
             # does this break the "skip repeated traiges rule"?
-            data_key = check_for_saved_prog(data_key, awaiting_corpus_entry, log_entry, prog_id, triage_id)
+            data_key = check_for_saved_prog(
+                data_key, awaiting_corpus_entry, log_entry, prog_id, triage_id
+            )
 
-            no_new : bool = data_key in result_dict
+            no_new: bool = data_key in result_dict
 
             # If it is not the first occurence, we want to check that triage_id is the same
             # If it is not, that means we have identical <prog, call> pairs in different triages
@@ -68,7 +70,7 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
             # FIXME: THis breaks in the way that programs triaged multiple times due to race conditions
             # might have the results on the second or greater iteration ignored.
             # In particular for saved_prog, which have a different <prog, call> pair id this creates
-            # duplicate entries. 
+            # duplicate entries.
             if no_new and triage_id not in result_dict[data_key][RESULT_KEYS.TRIAGEID]:
                 result_dict[data_key][RESULT_KEYS.TRIAGEID].append(triage_id)
                 result_dict[data_key][RESULT_KEYS.COUNT] += 1
@@ -86,7 +88,7 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
                     RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP,
                     RESULT_VALUES.MINIMIZATION_RES_FPOINTER_SKIP,
                 ]:
-                    # this means a successful minimize happened, 
+                    # this means a successful minimize happened,
                     # let's schedule the minimized prog to entry the corpus.
                     awaiting_corpus_entry[get_ceq_key(prog_id, triage_id)] = data_key
                 if no_new and minim_key in result_dict[data_key]:
@@ -128,7 +130,10 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
     assert len(awaiting_corpus_entry) == 0
     return result_dict
 
-def check_for_saved_prog(data_key, awaiting_corpus_entry, log_entry, prog_id, triage_id):
+
+def check_for_saved_prog(
+    data_key, awaiting_corpus_entry, log_entry, prog_id, triage_id
+):
     """
     Override data_key with the one in the queue if necessary
     """
@@ -137,7 +142,8 @@ def check_for_saved_prog(data_key, awaiting_corpus_entry, log_entry, prog_id, tr
             data_key = awaiting_corpus_entry.pop(get_ceq_key(prog_id, triage_id))
     return data_key
 
-def get_ceq_key(prog_id:str, triage_id:str) -> str:
+
+def get_ceq_key(prog_id: str, triage_id: str) -> str:
     """
     Returns the key used in awaiting_corpus_entry for the pair
     prog_id, triage_id
@@ -191,9 +197,9 @@ def check_easy_stats(prog2log: dict[str, dict]) -> None:
     )
     multiple_corpus_fout = Path.cwd() / "multiple_saved_corpus.json"
     print(
-        f"Number of <prog,call> pairs with multiple saved progs (count={len(multiple_saved_progs)}) saved to {multiple_corpus_fout}"
+        f"Number of <prog,call> pairs with multiple saved progs (count={len(multiple_saved_progs)}) saved to {multiple_corpus_fout.name}"
     )
-    with open(multiple_corpus_fout, 'w') as f:
+    with open(multiple_corpus_fout, "w") as f:
         json.dump(multiple_saved_progs, f, indent=2)
 
 
@@ -218,32 +224,96 @@ def has_minimization_result(minimization_result_type: str) -> Callable[[dict], b
 
     return checker
 
-def check_duplicated_progs(prog2log: dict[str, dict]) -> None:
+
+def get_duplicate_progs(
+    prog2log: dict[str, dict],
+) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     prog2_count = defaultdict(list)
     for key, entry in prog2log.items():
         for prog in entry.get(RESULT_KEYS.SAVED_PROG, []):
-            prog2_count[hash(''.join(prog))].append(key)
+            prog2_count[hash("".join(prog))].append(key)
 
-    duplicate = {prog: keys for prog,keys in prog2_count.items() if len(keys) > 1}
+    duplicate = {prog: keys for prog, keys in prog2_count.items() if len(keys) > 1}
+    return prog2_count, duplicate
+
+
+def check_duplicated_progs(prog2log: dict[str, dict]) -> None:
+    prog2_count, duplicate = get_duplicate_progs(prog2log)
     print(f"Number of unique progs saved in corpus: {len(prog2_count)}")
     print(f"Number of progs saved more than once: {len(duplicate)}")
 
+
+def deduplicate_saved_progs(prog2log: dict[str, dict]) -> None:
+    """
+    Returns two dictionaries.
+    The first one is a dictionary where each saved program in the corpus appears only once
+    The second one is the full dictionary sorted in decreasing order by the amount of repetitions of the saved program
+    """
+    count, duplicate = get_duplicate_progs(prog2log)
+    # we need this so upcoming lists are also sorted in decreasing order of repetitions
+
+    jobids_in_some_duplicate = [
+        jobid for listofjobids in duplicate.values() for jobid in listofjobids
+    ]
+    first_jobid_of_each_duplicate = [
+        listofjobids[0] for listofjobids in duplicate.values()
+    ]
+    # All elements that appear only once
+    not_duplicate_dict = {
+        key: val for key, val in prog2log.items() if key not in jobids_in_some_duplicate
+    }
+    # Update with one of the repetitions for each element that appears more than once
+    not_duplicate_dict.update(
+        (key, val)
+        for key, val in prog2log.items()
+        if key in first_jobid_of_each_duplicate
+    )
+
+    sorted_count = dict(
+        sorted(
+            count.items(),
+            key=lambda key_valueList: len(key_valueList[1]),
+            reverse=True,
+        )
+    )
+    sorted_by_duplicates = {}
+    for listofjobids in sorted_count.values():
+        sub_dict = {jobid: prog2log[jobid] for jobid in listofjobids}
+        diff_with_res = {
+            jobid: val
+            for jobid, val in sub_dict.items()
+            if jobid not in sorted_by_duplicates
+        }
+        sorted_by_duplicates.update(diff_with_res)
+    return not_duplicate_dict, sorted_by_duplicates
+
+
 def check_saved_because_fpointer(prog2log: dict[str, dict]) -> None:
+
     saved_because_skip_signal = filter_many_cond(
-        prog2log, has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP),
-        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER)
+        prog2log,
+        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP),
+        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER),
+    )
+    deduplicate_interesting, saved_because_skip_signal = deduplicate_saved_progs(
+        saved_because_skip_signal
     )
 
-    saved_despite_skip_signal = filter_many_cond(
-        prog2log, has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP),
-        lambda e: RESULT_KEYS.SAVED_PROG in e
+    saved_because_fpointer_Wduplicate_fout = (
+        Path.cwd() / "saved_because_fpointer_w_duplicates.json"
     )
-
-    saved_only_fpointer_fout = Path.cwd() / "saved_because_fpointer.json"
-    print(f"Progs saved with fpointer and skip signal (count={len(saved_because_skip_signal)}) saved to {saved_only_fpointer_fout}")
-    with open(saved_only_fpointer_fout, 'w') as f:
+    print(
+        f"Progs saved with fpointer and skip signal (count={len(saved_because_skip_signal)}) saved to {saved_because_fpointer_Wduplicate_fout.name}"
+    )
+    with open(saved_because_fpointer_Wduplicate_fout, "w") as f:
         json.dump(saved_because_skip_signal, f, indent=2)
-    print(f"Number of progs saved despite skip signal (should be the same): {len(saved_despite_skip_signal)}")
+
+    saved_deduplicate_fout = Path.cwd() / "saved_because_fpointer.json"
+    print(
+        f"After deduplication, progs saved with fpointer and skip signal (count={len(deduplicate_interesting)}) saved to {saved_deduplicate_fout.name}"
+    )
+    with open(saved_deduplicate_fout, "w") as f:
+        json.dump(deduplicate_interesting, f, indent=2)
 
 
 def check_minimization_stats(prog2log: dict[str, dict]) -> None:
@@ -276,15 +346,19 @@ def check_minimization_stats(prog2log: dict[str, dict]) -> None:
     )
 
     print(f"Number of minimizations that keep both: {n_keep_both}")
-    print(f"Number of minimizations that obtained an unique fpointer: {n_saved_fpointer}")
+    print(
+        f"Number of minimizations that obtained an unique fpointer: {n_saved_fpointer}"
+    )
     print(f"Number of minimizations that obtained an unique signal: {n_saved_signal}")
     print(f"Number of times fpointer minimization was skipped: {n_skip_fpointer}")
     print(f"Number of times signal minimization was skipped: {n_skip_signal}")
     print(f"Number of times minimizationa as a whole was skipped {n_skip_all}")
-    both_unique_fout = Path.cwd() / "unique_fpointer_and_signal_minimization_result.json"
+    both_unique_fout = (
+        Path.cwd() / "unique_fpointer_and_signal_minimization_result.json"
+    )
     print(
-        f"Minimizations that obtained both unique signal and unique fpointer (count={len(unique_signal_and_fpointer)}):\n"
-        + f"printed at {both_unique_fout}"
+        f"Minimizations that obtained both unique signal and unique fpointer (count={len(unique_signal_and_fpointer)}): "
+        + f"saved to {both_unique_fout.name}"
     )
     with open(both_unique_fout, "w") as f:
         json.dump(unique_signal_and_fpointer, f, indent=2)
