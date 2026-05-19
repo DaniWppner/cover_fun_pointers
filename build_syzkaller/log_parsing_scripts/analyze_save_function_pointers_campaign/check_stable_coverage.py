@@ -228,6 +228,22 @@ def check_duplicated_progs(prog2log: dict[str, dict]) -> None:
     print(f"Number of unique progs saved in corpus: {len(prog2_count)}")
     print(f"Number of progs saved more than once: {len(duplicate)}")
 
+def check_saved_because_fpointer(prog2log: dict[str, dict]) -> None:
+    saved_because_skip_signal = filter_many_cond(
+        prog2log, has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP),
+        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER)
+    )
+
+    saved_despite_skip_signal = filter_many_cond(
+        prog2log, has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP),
+        lambda e: RESULT_KEYS.SAVED_PROG in e
+    )
+
+    saved_only_fpointer_fout = Path.cwd() / "saved_because_fpointer.json"
+    print(f"Progs saved with fpointer and skip signal (count={len(saved_because_skip_signal)}) saved to {saved_only_fpointer_fout}")
+    with open(saved_only_fpointer_fout, 'w') as f:
+        json.dump(saved_because_skip_signal, f, indent=2)
+    print(f"Number of progs saved despite skip signal (should be the same): {len(saved_despite_skip_signal)}")
 
 
 def check_minimization_stats(prog2log: dict[str, dict]) -> None:
@@ -307,6 +323,8 @@ if __name__ == "__main__":
     check_easy_stats(out_json)
     print("--------------------------------------------------------------------")
     check_duplicated_progs(out_json)
+    print("--------------------------------------------------------------------")
+    check_saved_because_fpointer(out_json)
     print("--------------------------------------------------------------------")
     check_minimization_stats(out_json)
     with out_path.open("w") as f:
