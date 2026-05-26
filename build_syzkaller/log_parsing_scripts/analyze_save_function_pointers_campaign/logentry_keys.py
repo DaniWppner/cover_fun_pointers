@@ -14,6 +14,7 @@ class LOGENTRY_KEYS(StrEnum):
     MINIMIZATION_WHOLE_SKIP = "minimization_skip"
     MINIMIZATION_FPOINTER_SKIP = "minimization_skip_fpointer"
     MINIMIZATION_SIGNAL_SKIP = "minimization_skip_signal"
+    PC_COVER = "total_cover"
     
 
 
@@ -35,6 +36,7 @@ class RESULT_KEYS(StrEnum):
     TRIAGEID = "triage_id"
     ORIGINAL_PROG = "original_prog"
     COUNT = "count"
+    PC_COVER = "PC_COVER"
 
 
 class RESULT_VALUES(StrEnum):

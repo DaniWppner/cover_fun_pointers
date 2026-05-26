@@ -72,6 +72,12 @@ def read_serializaed_prog(line_number: int, og_text: list[int]) -> list[str]:
     return res
 
 
+def read_serialized_cover(line_number: int, og_text: list[str]) -> list[str]:
+    cover_line = og_text[line_number].strip()
+    assert cover_line.startswith("(") and cover_line.endswith(")")
+    cover_line = cover_line[1:-1]
+    return [x.strip() for x in cover_line.split(",")]
+
 def __create_master_regex(
     patterns: dict[str, str],
 ) -> tuple[re.Pattern, dict[str, list[int]]]:
@@ -135,6 +141,7 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
         LOGENTRY_KEYS.MINIMIZATION_WHOLE_SKIP: call_pattern + r": skip minimize$",
         LOGENTRY_KEYS.MINIMIZATION_SIGNAL_SKIP : call_pattern + r": skip minimize of empty new stable signal$",
         LOGENTRY_KEYS.MINIMIZATION_FPOINTER_SKIP : call_pattern + r": skip minimize of empty new stable stored function pointers$",
+        LOGENTRY_KEYS.PC_COVER: r"total cover for " + call_pattern + r":",
         "SKIP": "|".join(
             [
                 call_pattern + r": minimize started",
@@ -281,6 +288,9 @@ def match_against_triage_log_line_types(
             res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
                 RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP,
             }]
+        case LOGENTRY_KEYS.PC_COVER:
+            res[RESULT_KEYS.CALL_NAME] = match_groups[0]
+            res[RESULT_KEYS.PC_COVER] = read_serialized_cover(line_number + 1, og_text)
         case "SKIP":
             raise TriageSkipLine
     if res == {}:
