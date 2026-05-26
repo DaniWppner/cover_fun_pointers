@@ -34,6 +34,8 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
     # This allows the "save to corpus" entry to be overriden as another entry into the original
     # <prog, call> group instead of creating a lone <prog, newcall> group with just the "save" entry.
     awaiting_corpus_entry = dict()
+    awaiting_pc_cover = dict()
+    ignore_prog = set()
     with open(json_lines_file) as f:
         for line in f:
             log_entry: dict = json.loads(line)
@@ -54,8 +56,11 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
 
             # before using data_key, let's check if we should update it
             # does this break the "skip repeated traiges rule"?
-            data_key = check_for_saved_prog(
-                data_key, awaiting_corpus_entry, log_entry, prog_id, triage_id
+            data_key = override_if_awaiting(
+                data_key, awaiting_corpus_entry, log_entry, prog_id, triage_id, RESULTKEY=RESULT_KEYS.SAVED_PROG
+            )
+            data_key = override_if_awaiting(
+                data_key, awaiting_pc_cover, log_entry, prog_id, triage_id, RESULTKEY=RESULT_KEYS.PC_COVER
             )
 
             no_new: bool = data_key in result_dict
@@ -76,6 +81,20 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
                 result_dict[data_key][RESULT_KEYS.COUNT] += 1
 
             if no_new and result_dict[data_key][RESULT_KEYS.COUNT] > 1:
+                ## Before we ignore it, queue whatever we're missing just in case
+                ## So that the next one that we need to ignore gets its key updated
+                ## And so it can be ignored as well
+                if RESULT_KEYS.MINIMIZATION_RESULT in log_entry:
+                    minim_entry = log_entry.pop(RESULT_KEYS.MINIMIZATION_RESULT)
+                    if minim_entry[0][RESULT_KEYS.MINIMIZATION_RES_TYPE] not in [
+                        RESULT_VALUES.MINIMIZATION_SKIP,
+                        RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP,
+                        RESULT_VALUES.MINIMIZATION_RES_FPOINTER_SKIP,
+                    ]:
+                        # this means a successful minimize happened,
+                        # let's schedule the minimized prog to entry the corpus.                
+                        update_queues(awaiting_corpus_entry, awaiting_pc_cover, prog_id, data_key, triage_id, minim_entry)
+                ## Now, ignore this entry
                 continue
 
             # minimization result is a list of results, so we need to merge this one
@@ -89,11 +108,12 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
                     RESULT_VALUES.MINIMIZATION_RES_FPOINTER_SKIP,
                 ]:
                     # this means a successful minimize happened,
-                    # let's schedule the minimized prog to entry the corpus.
-                    awaiting_corpus_entry[get_ceq_key(prog_id, triage_id)] = data_key
+                    # let's schedule the minimized prog to entry the corpus.                
+                    update_queues(awaiting_corpus_entry, awaiting_pc_cover, prog_id, data_key, triage_id, minim_entry)
+
                 if no_new and minim_key in result_dict[data_key]:
                     if minimization_would_overwrite(result_dict[data_key], minim_entry):
-                        warn_overwrite(result_dict[data_key][minim_key], minim_entry)
+                        warn_overwrite(result_dict[data_key][minim_key], minim_entry, data_key)
                         sys.exit(1)
                     # the current entry is by default a list of one element.
                     # extend the existing one in result with the new one.
@@ -124,28 +144,42 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
                 # per <prog_id, call> pair. Note that the ones for which
                 # this doesn't hold have been removed previously.
                 if any(key in result_dict[data_key] for key in log_entry):
-                    warn_overwrite(result_dict[data_key], log_entry, prog_id)
+                    warn_overwrite(result_dict[data_key], log_entry, data_key)
                     sys.exit(1)
                 result_dict[data_key].update(log_entry)
     assert len(awaiting_corpus_entry) == 0
     return result_dict
 
+def update_queues(awaiting_corpus_entry, awaiting_pc_cover, prog_id, data_key, triage_id, minim_entry):
 
-def check_for_saved_prog(
-    data_key, awaiting_corpus_entry, log_entry, prog_id, triage_id
+        awaiting_corpus_entry[get_ceq_key(prog_id, triage_id)] = data_key
+
+                    # additionally, if the prog is entering because of pointer coverage
+                    # we need to capture the raw pc coverage
+        if minim_entry[0][RESULT_KEYS.MINIMIZATION_RES_TYPE] in [
+                        RESULT_VALUES.MINIMIZATION_RES_NODIFF,
+                        RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER
+                    ]:
+          awaiting_pc_cover[get_ceq_key(prog_id, triage_id)] = data_key
+
+
+def override_if_awaiting(
+    data_key, awaiting_queue, log_entry, prog_id, triage_id, RESULTKEY
 ):
     """
     Override data_key with the one in the queue if necessary
     """
-    if RESULT_KEYS.SAVED_PROG in log_entry:
-        if get_ceq_key(prog_id, triage_id) in awaiting_corpus_entry:
-            data_key = awaiting_corpus_entry.pop(get_ceq_key(prog_id, triage_id))
+    if RESULTKEY in log_entry:
+        if get_ceq_key(prog_id, triage_id) in awaiting_queue:
+            #og = data_key
+            data_key = awaiting_queue.pop(get_ceq_key(prog_id, triage_id))
+            #print(colored(f"INFO: Overriding data key {og} with {data_key} due to queue on key {RESULTKEY}", "cyan"))
     return data_key
 
 
 def get_ceq_key(prog_id: str, triage_id: str) -> str:
     """
-    Returns the key used in awaiting_corpus_entry for the pair
+    Returns the key used in awaiting queues for the pair
     prog_id, triage_id
     """
     return f"{triage_id}|{prog_id}"
