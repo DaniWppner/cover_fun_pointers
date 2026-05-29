@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-import json
 import argparse
+import json
+import re
+import subprocess
 import sys
-from pathlib import Path
-from termcolor import colored
-from typing import Callable
+import time
 from collections import defaultdict
+from pathlib import Path
+from typing import Callable, Iterable
+
 from logentry_keys import RESULT_KEYS, RESULT_VALUES
+from termcolor import colored
 
 
 def unify_per_prog(json_lines_file: Path) -> list[dict]:
@@ -231,6 +235,21 @@ def warn_overwrite(result_entry: dict, log_entry: dict, prog_id: str) -> None:
         + colored(json.dumps(log_entry, indent=2), "yellow")
     )
 
+def cleanup_particular_fpointer(entries: dict[str,any], key2json_entry: str) -> None:
+    '''
+    Receives a key where the value is a literal string containing json
+    Parses the string into the nested json and writes it back in dict
+    '''
+    fpointer_json = json.loads(entries[key2json_entry])
+    entries[key2json_entry] = fpointer_json
+        
+
+def cleanup_fpointer_jsons(unified_json: dict) -> None:
+    for entries in unified_json.values():
+        for key in (RESULT_KEYS.NEW_FPOINTERS_PAYLOAD, RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD):
+            if key in entries:
+                cleanup_particular_fpointer(entries, key)
+
 
 def count_cond(prog2log: dict[str, dict], condition: Callable[[dict], bool]) -> int:
     return len([entry for entry in prog2log.values() if condition(entry)])
@@ -427,6 +446,113 @@ def check_minimization_stats(prog2log: dict[str, dict]) -> None:
         json.dump(unique_signal_and_fpointer, f, indent=2)
 
 
+def process_pc_offsets(offsets: Iterable[str]) -> dict[str, list[str]]:
+    '''
+    Returns a mapping containing the function name(s) for each 
+    offset in the input, obtained using addr2line, including inlines
+    '''
+    LINUX_DIR = '/home/dwappner/Desktop/linux'
+    # hacky hack:
+    # strictly optionally capture the hex value or "(inlined by)"
+    output_pattern = re.compile(r'^(?:(0x[0-9a-fA-F]+):\s+)?(?:\(inlined by\)\s+)?(.+?)\s+at\s+(.+)$')
+    
+    res = {}
+    
+    # Pass all addresses via stdin to avoid command-line argument limits
+    p = subprocess.Popen(args=['addr2line', '-ipfCa', '-e', 'vmlinux'],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                cwd=LINUX_DIR,
+                text=True,
+                encoding='utf8')
+    stdin_data = '\n'.join(offsets)
+    stdout, _ = p.communicate(input=stdin_data)
+    response = [l.strip() for l in stdout.splitlines()]
+    
+    for line in response:
+        match = output_pattern.match(line)
+        if not match:
+            # edge case for weird StoredValue values
+            if line == "0xffffffffffffffff: ?? ??:0":
+                continue
+            print(colored("ERROR: no match wtf? addr2line line:\n", 'red'), line)
+            sys.exit(1)
+        # 0 is address, 1 is function name, 2 is file location
+        addr, fname, _ = match.groups()
+        if not addr:
+            # hacky hack: if there's no address, we matched "(inlined by)" instead
+            res[current_addr].append(fname)
+        else:
+            current_addr = addr
+            res[addr] = [fname]
+
+    if len(res) != len(offsets):
+        print(colored("ERROR: addr2line returned fewer lines than expected. ", 'red'),
+              colored(f"Sent {len(offsets)}, got {len(res)}\n", 'red'))
+        sys.exit(1)
+
+    return res
+    
+
+def check_simple_diffs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]) -> None:
+    '''
+    Print differences between stored fpointer data and executed PCs
+    '''
+    store_inst_diff = all_fpointers_stores.difference(all_pcs)
+    print(colored(f"Unique function pointer store instructions: (count={len(all_fpointers_stores)})"))
+    print(colored(f"Function pointer store instructions that don't show up in exec log: (count={len(store_inst_diff)})"))
+    print("################################################")
+    stored_value_diff = all_fpointers.difference(all_pcs)
+    print(colored(f"Unique stored function pointers: (count={len(all_fpointers)})"))
+    print(colored(f"Stored function_pointers that don't show up in exec log: (count={len(stored_value_diff)})"))
+
+def check_addr2line_diffs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]) -> None:
+    '''
+    Print info based on the addr2line of the stored fpointer data and executed PCs
+    '''
+    pc_funcs_all, pc_funcs_noinline  = extract_func_names(all_pcs)
+    storeinst_funcs_all, storeinst_funcs_noinline =  extract_func_names(all_fpointers_stores)
+    fpointer_funcs_all, fpointer_funcs_noinline = extract_func_names(all_fpointers)
+
+    store_inst_diff =  storeinst_funcs_all.difference(pc_funcs_all)
+    print(colored(f"Unique functions of fpointer stores: (count={len(storeinst_funcs_all)})"))
+    print(colored(f"Function pointer store instructions in funcions different than PCs: (count={len(store_inst_diff)}):"),
+          ) #"\n{sorted(store_inst_diff)}")
+    print("------------------------------------------------")
+        
+    print("################################################")
+    stored_value_diff = fpointer_funcs_all.difference(pc_funcs_all)
+    print(colored(f"Unique stored functions: (count={len(fpointer_funcs_all)})"))
+    print(colored(f"Stored functions that were not executed: (count={len(stored_value_diff)}):"),
+    print("################################################")
+    
+     ) # "\n{sorted(stored_value_diff)}")
+
+def extract_func_names(all_pcs):
+    pc_info = set(f for flist in process_pc_offsets(all_pcs).values() for f in flist)
+    pc_info_no_inlines = set(flist[-1] for flist in process_pc_offsets(all_pcs).values())
+    return pc_info, pc_info_no_inlines
+        
+
+def process_pc_cover_vs_fpointer(prog2log: dict[str, dict]) :
+    all_pcs = set()
+    all_fpointers_stores = set()
+    all_fpointers = set()
+    for entries in prog2log.values():
+        if RESULT_KEYS.PC_COVER in entries:
+            all_pcs.update(entries[RESULT_KEYS.PC_COVER])
+        if RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in entries:
+            all_fpointers.update(fp['StoredValue'] for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD])
+            all_fpointers_stores.update(fp['PC'] for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD])
+        if RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD in entries:
+            all_fpointers.update(fp['StoredValue'] for fp in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD])
+            all_fpointers_stores.update(fp['PC'] for fp in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD])
+    
+    check_simple_diffs(all_pcs, all_fpointers_stores, all_fpointers)
+    print(colored("################################################", "cyan"))
+    check_addr2line_diffs(all_pcs, all_fpointers_stores, all_fpointers)
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
@@ -457,12 +583,16 @@ if __name__ == "__main__":
         sys.exit(1)
 
     out_json = unify_per_prog(json_lines_path)
+    cleanup_fpointer_jsons(out_json)
+
     check_easy_stats(out_json)
-    print("--------------------------------------------------------------------")
+    print(colored("################################################", "cyan"))
     check_duplicated_progs(out_json)
-    print("--------------------------------------------------------------------")
+    print(colored("################################################", "cyan"))
     check_saved_because_fpointer(out_json)
-    print("--------------------------------------------------------------------")
+    print(colored("################################################", "cyan"))
     check_minimization_stats(out_json)
+    print(colored("################################################", "cyan"))
+    process_pc_cover_vs_fpointer(out_json)
     with out_path.open("w") as f:
         f.write(json.dumps(out_json, indent=2) + "\n")

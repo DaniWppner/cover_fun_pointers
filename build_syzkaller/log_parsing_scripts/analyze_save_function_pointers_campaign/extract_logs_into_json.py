@@ -246,7 +246,7 @@ def match_against_triage_log_line_types(
             res[RESULT_KEYS.NEW_STABLE_FPOINTERS] = match_groups[2]
             # The new stable fpointers payload is optional, it only occurs when the count is > 0
             if match_groups[3] is not None:
-                res[RESULT_KEYS.STABLE_FPOINTERS_PAYLOAD] = match_groups[3]
+                res[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD] = match_groups[3]
         case LOGENTRY_KEYS.SAVED_ITEM:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.SAVED_PROG] = read_serializaed_prog(

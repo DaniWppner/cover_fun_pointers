@@ -24,7 +24,7 @@ class RESULT_KEYS(StrEnum):
     NEW_FPOINTERS_PAYLOAD = "new_fpointers_json"
     STABLE_FPOINTERS = "stable_fpointers"
     NEW_STABLE_FPOINTERS = "new_stable_fpointers"
-    STABLE_FPOINTERS_PAYLOAD = "new_stable_fpointers_json"
+    NEW_STABLE_FPOINTERS_PAYLOAD = "new_stable_fpointers_json"
     STABLE_SIGNAL = "stable_signal"
     NEW_STABLE_SIGNAL = "new_stable_signal"
     CALL_NAME = "call"
