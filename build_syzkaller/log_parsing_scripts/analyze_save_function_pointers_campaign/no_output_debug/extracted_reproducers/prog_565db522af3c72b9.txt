@@ -1,0 +1,6 @@
+close(0xffffffffffffffff)
+lstat(0x0, &(0x7f00000000c0)={0x0, 0x0, 0x0, 0x0, <r0=>0x0})
+getresgid(&(0x7f0000000140)=<r1=>0x0, &(0x7f0000000180), &(0x7f00000001c0))
+fchownat(0xffffffffffffffff, &(0x7f0000000000)='./file0\x00', r0, r1, 0x800)
+syz_mount_image$msdos(&(0x7f0000000200), &(0x7f0000000240)='./file0\x00', 0x0, &(0x7f0000001440)={[{@fat=@nfs_stale_rw}, {@dots}, {@fat=@check_normal}, {@nodots}, {@nodots}, {@nodots}, {@dots}, {@fat=@nocase}, {@dots}]}, 0x1, 0x1cf, &(0x7f00000002c0)="$eJzs3D1rU18cB/DTh/+/tdLSSdDFgy66XGxnB4u0IAYUbQQfEG7prYbEpORmSMQhs5OvQxzdBPEN9F24FaF06uQVvdInqghqAubzWfKFL4Fz+MHlcC7c7auvntU38mQj7YTx6bEweS30w95YmA/jYSKU+uHy2qPdl3fvP7i5VKks34lxZWl1YTHGOHf+/cMXby586Jy+93bu3VTYmn+8vbP4cevM1tntz6tPa3ms5bHZ6sQ0rrVanXStkcX1Wl5PYrzdyNI8i7VmnrWP9BuN1uZmL6bN9dmZzXaW5zFt9mI968VOK3bavZg+SWvNmCRJnJ0J/I7q672iCDtFURRT/VAUxbAXxICZ/2gz/9Fm/qPt0KFuOoRP/W61Wy1/y37lRmX5Svxm/uBfu91udWK/Xyj7eLT/L8x87xdP7P8Ply6W/dfu+q3Ksf5UWP/72wcAAAAAgH9SEvedeL+fJD/qy3To/cCx+/vJcG5yYNsAAAAAfiLvPa+njUbWFgRB2A/DfjIBAAB/2sGhf9grAQAAAAAAAAAAAAAAAAAAgNE1iM+JDXuPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL/iSwAAAP//lFOHUA==")
+mkdirat(0xffffffffffffff9c, &(0x7f0000000040)='./file0\x00', 0x1c0)

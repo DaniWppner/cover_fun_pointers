@@ -1,0 +1,4 @@
+syz_create_resource$binfmt(&(0x7f0000000040)='./file1\x00')
+mknodat(0xffffffffffffff9c, &(0x7f00000000c0)='./file2\x00', 0x81c0, 0x0)
+execveat(0xffffffffffffff9c, &(0x7f0000000280)='./file2\x00', 0x0, 0x0, 0x0)
+unlinkat(0xffffffffffffff9c, &(0x7f00000003c0)='./file2\x00', 0x0)

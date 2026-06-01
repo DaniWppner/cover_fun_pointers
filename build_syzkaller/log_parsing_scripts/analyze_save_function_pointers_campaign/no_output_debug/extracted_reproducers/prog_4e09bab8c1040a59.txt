@@ -1,0 +1,2 @@
+r0 = syz_open_dev$loop(0x0, 0x0, 0x2)
+ioctl$BLKSECTGET(r0, 0x1267, &(0x7f00000000c0))
