@@ -456,6 +456,7 @@ def process_pc_offsets(offsets: Iterable[str]) -> dict[str, list[str]]:
     # strictly optionally capture the hex value or "(inlined by)"
     output_pattern = re.compile(r'^(?:(0x[0-9a-fA-F]+):\s+)?(?:\(inlined by\)\s+)?(.+?)\s+at\s+(.+)$')
     
+    offsets = set(offsets)
     res = {}
     
     # Pass all addresses via stdin to avoid command-line argument limits
@@ -474,6 +475,7 @@ def process_pc_offsets(offsets: Iterable[str]) -> dict[str, list[str]]:
         if not match:
             # edge case for weird StoredValue values
             if line == "0xffffffffffffffff: ?? ??:0":
+                offsets.remove("0xffffffffffffffff")
                 continue
             print(colored("ERROR: no match wtf? addr2line line:\n", 'red'), line)
             sys.exit(1)
@@ -494,43 +496,83 @@ def process_pc_offsets(offsets: Iterable[str]) -> dict[str, list[str]]:
     return res
     
 
-def check_simple_diffs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]) -> None:
+def check_PC_exec_funcStore_literal_diffs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]) -> None:
     '''
-    Print differences between stored fpointer data and executed PCs
+    Print differences between stored fpointer data and executed PCs using the literal stored numbers
     '''
+
+    # First question:
+    # How many of the reported instructions that store a value
+    #  do not appear in the general log of reported instructions?
+    # This should ideally be zero
     store_inst_diff = all_fpointers_stores.difference(all_pcs)
     print(colored(f"Unique function pointer store instructions: (count={len(all_fpointers_stores)})"))
     print(colored(f"Function pointer store instructions that don't show up in exec log: (count={len(store_inst_diff)})"))
     print("################################################")
+    # Second question:
+    # How many of the stored function pointers
+    #  do not appear as executed instructions in the general log?
     stored_value_diff = all_fpointers.difference(all_pcs)
     print(colored(f"Unique stored function pointers: (count={len(all_fpointers)})"))
     print(colored(f"Stored function_pointers that don't show up in exec log: (count={len(stored_value_diff)})"))
 
 def check_addr2line_diffs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]) -> None:
     '''
-    Print info based on the addr2line of the stored fpointer data and executed PCs
+    Print differences between stored fpointer data and executed PCs using the addr2line of each
     '''
     pc_funcs_all, pc_funcs_noinline  = extract_func_names(all_pcs)
     storeinst_funcs_all, storeinst_funcs_noinline =  extract_func_names(all_fpointers_stores)
     fpointer_funcs_all, fpointer_funcs_noinline = extract_func_names(all_fpointers)
 
+    # First question:
+    # How many of the reported instructions that store a value
+    #  appear in a function that is not covered by any of the 
+    #  PCs in the general log of reported instructions?    
     store_inst_diff =  storeinst_funcs_all.difference(pc_funcs_all)
+    store_inst_diff_excluding_inlines = storeinst_funcs_noinline.difference(pc_funcs_noinline) #this one should be smaller
     print(colored(f"Unique functions of fpointer stores: (count={len(storeinst_funcs_all)})"))
     print(colored(f"Function pointer store instructions in funcions different than PCs: (count={len(store_inst_diff)}):"),
-          ) #"\n{sorted(store_inst_diff)}")
+          f"\n{sorted(store_inst_diff)}")
+    print(colored(f"Function pointer store instructions in funcions different than PCs (ignoring inlines): (count={len(store_inst_diff_excluding_inlines)}):"),
+          f"\n{sorted(store_inst_diff_excluding_inlines)}")    
     print("------------------------------------------------")
         
     print("################################################")
     stored_value_diff = fpointer_funcs_all.difference(pc_funcs_all)
+    stored_value_diff_excluding_PC_inlines = fpointer_funcs_all.difference(pc_funcs_noinline)
     print(colored(f"Unique stored functions: (count={len(fpointer_funcs_all)})"))
+    print(colored(f"Stored functions have no inlines: {"yes" if fpointer_funcs_all == fpointer_funcs_noinline else "no"} "))
     print(colored(f"Stored functions that were not executed: (count={len(stored_value_diff)}):"),
+     ) # "\n{sorted(stored_value_diff)}")
+    # This is possibly bigger, but I expect it to be the same.
+    print(colored(f"Stored functions that were not executed (excluding inlines in PCs): (count={len(stored_value_diff_excluding_PC_inlines)}):"),
+     ) # "\n{sorted(stored_value_diff)}")
     print("################################################")
     
-     ) # "\n{sorted(stored_value_diff)}")
 
-def extract_func_names(all_pcs):
-    pc_info = set(f for flist in process_pc_offsets(all_pcs).values() for f in flist)
-    pc_info_no_inlines = set(flist[-1] for flist in process_pc_offsets(all_pcs).values())
+def extract_func_names(all_pcs: Iterable[str]) -> tuple[set[str],set[str]]:
+    '''
+    Receives an iterable of PCs (hexadecimal values)
+    Returns two sets.
+    The first is the set of function names those PCs are part of, including inlines.
+    The second is the set of function names those PCs are part of without considering inlines.
+    That means for PC 0x00c1, the following function structure:
+
+            0x00bg    int foo(){
+            0x00bf      int x = 7;
+                        // inlined "complement_modulo_3"
+            0x00c0        int y = -x;
+                          //inlined "modulo_3"
+            0x00c1        int z = y;
+            0x00c2        z = z % 3;
+                      (...)
+                    }
+    Would return {'modulo_3','complement_modulo_3','foo'} for 0x00c1 in the first set.
+    But it would return just {'foo'} for 0xc00c1 in the second set
+    '''
+    addr2fun_names = process_pc_offsets(all_pcs)
+    pc_info = set(f for flist in addr2fun_names.values() for f in flist)
+    pc_info_no_inlines = set(flist[-1] for flist in addr2fun_names.values())
     return pc_info, pc_info_no_inlines
         
 
@@ -548,7 +590,7 @@ def process_pc_cover_vs_fpointer(prog2log: dict[str, dict]) :
             all_fpointers.update(fp['StoredValue'] for fp in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD])
             all_fpointers_stores.update(fp['PC'] for fp in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD])
     
-    check_simple_diffs(all_pcs, all_fpointers_stores, all_fpointers)
+    check_PC_exec_funcStore_literal_diffs(all_pcs, all_fpointers_stores, all_fpointers)
     print(colored("################################################", "cyan"))
     check_addr2line_diffs(all_pcs, all_fpointers_stores, all_fpointers)
 
