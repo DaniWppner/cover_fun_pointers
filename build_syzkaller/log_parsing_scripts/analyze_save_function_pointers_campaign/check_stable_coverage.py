@@ -562,7 +562,7 @@ def check_addr2line_diffs(
           f"\n{sorted(store_inst_diff)}"),
     print(
         f"Function pointer store instructions in funcions different than PCs (ignoring inlines): (count={len(store_inst_diff_excluding_inlines)}):",
-        f"\n{sorted(store_inst_diff_excluding_inlines)}",
+        #f"\n{sorted(store_inst_diff_excluding_inlines)}",
     )
     print("------------------------------------------------")
     stored_value_diff = fpointer_locs.difference(pc_locs_all)
@@ -630,9 +630,8 @@ def process_pc_cover_vs_fpointer(prog2log: dict[str, dict]):
     for fpointer_addr, fpointer_loc in interesting_fpointer2loc.items():
         if fpointer_loc not in output_dir:
             output_dir[fpointer_loc] = set()
-        output_dir[fpointer_loc].update(
-            storeinst_addr2loc[storeinst_addr] for storeinst_addr in fpointer2storeinst[fpointer_addr]
-        )
+        for storeinst_addr in fpointer2storeinst[fpointer_addr]:
+            output_dir[fpointer_loc].update(storeinst_addr2loc[storeinst_addr])
     print(json.dumps(output_dir))
 
 
@@ -645,11 +644,9 @@ def __update_collections(all_fpointers_stores: set[str],
     storeinst = fp["PC"]
     all_fpointers.add(fpointer)
     all_fpointers_stores.add(storeinst)
-    if fpointer in fpointer2storeinst:
-        fpointer2storeinst[fpointer].add(storeinst)
-    else:
-        fpointer2storeinst[fpointer] = set([storeinst])
-
+    if fpointer not in fpointer2storeinst:
+        fpointer2storeinst[fpointer] = set()
+    fpointer2storeinst[fpointer].add(storeinst)
 
 if __name__ == "__main__":
 
