@@ -4,13 +4,14 @@ import json
 import re
 import subprocess
 import sys
-import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Any
 
 from logentry_keys import RESULT_KEYS, RESULT_VALUES
 from termcolor import colored
+
+type locInfo = tuple[str, str]
 
 
 def unify_per_prog(json_lines_file: Path) -> list[dict]:
@@ -170,7 +171,7 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
     return result_dict
 
 
-def successful_minimize(minim_entry:dict) -> bool:
+def successful_minimize(minim_entry: dict) -> bool:
     """
     Return true if this entry indicates that one of the minimization attempts produced something
     """
@@ -235,18 +236,22 @@ def warn_overwrite(result_entry: dict, log_entry: dict, prog_id: str) -> None:
         + colored(json.dumps(log_entry, indent=2), "yellow")
     )
 
-def cleanup_particular_fpointer(entries: dict[str,any], key2json_entry: str) -> None:
-    '''
+
+def cleanup_particular_fpointer(entries: dict[str, Any], key2json_entry: str) -> None:
+    """
     Receives a key where the value is a literal string containing json
     Parses the string into the nested json and writes it back in dict
-    '''
+    """
     fpointer_json = json.loads(entries[key2json_entry])
     entries[key2json_entry] = fpointer_json
-        
+
 
 def cleanup_fpointer_jsons(unified_json: dict) -> None:
     for entries in unified_json.values():
-        for key in (RESULT_KEYS.NEW_FPOINTERS_PAYLOAD, RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD):
+        for key in (
+            RESULT_KEYS.NEW_FPOINTERS_PAYLOAD,
+            RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD,
+        ):
             if key in entries:
                 cleanup_particular_fpointer(entries, key)
 
@@ -377,7 +382,11 @@ def check_saved_because_fpointer(prog2log: dict[str, dict]) -> None:
         has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP),
         has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER),
     )
-    deduplicate_interesting, saved_because_skip_signal, count_duplicate_saved_interesting_progs = deduplicate_saved_progs(saved_because_skip_signal)
+    (
+        deduplicate_interesting,
+        saved_because_skip_signal,
+        count_duplicate_saved_interesting_progs,
+    ) = deduplicate_saved_progs(saved_because_skip_signal)
 
     saved_because_fpointer_Wduplicate_fout = (
         Path.cwd() / "saved_because_fpointer_w_duplicates.json"
@@ -446,30 +455,34 @@ def check_minimization_stats(prog2log: dict[str, dict]) -> None:
         json.dump(unique_signal_and_fpointer, f, indent=2)
 
 
-def process_pc_offsets(offsets: Iterable[str]) -> dict[str, list[str]]:
-    '''
-    Returns a mapping containing the function name(s) for each 
+def process_pc_offsets(offsets: Iterable[str]) -> dict[str, list[locInfo]]:
+    """
+    Returns a mapping containing the function name(s) for each
     offset in the input, obtained using addr2line, including inlines
-    '''
-    LINUX_DIR = '/home/dwappner/Desktop/linux'
+    """
+    LINUX_DIR = "/home/dwappner/Desktop/linux"
     # hacky hack:
     # strictly optionally capture the hex value or "(inlined by)"
-    output_pattern = re.compile(r'^(?:(0x[0-9a-fA-F]+):\s+)?(?:\(inlined by\)\s+)?(.+?)\s+at\s+(.+)$')
-    
+    output_pattern = re.compile(
+        r"^(?:(0x[0-9a-fA-F]+):\s+)?(?:\(inlined by\)\s+)?(.+?)\s+at\s+(.+)$"
+    )
+
     offsets = set(offsets)
-    res = {}
-    
+    fnames = {}
+
     # Pass all addresses via stdin to avoid command-line argument limits
-    p = subprocess.Popen(args=['addr2line', '-ipfCa', '-e', 'vmlinux'],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                cwd=LINUX_DIR,
-                text=True,
-                encoding='utf8')
-    stdin_data = '\n'.join(offsets)
+    p = subprocess.Popen(
+        args=["addr2line", "-ipfCa", "-e", "vmlinux"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        cwd=LINUX_DIR,
+        text=True,
+        encoding="utf8",
+    )
+    stdin_data = "\n".join(offsets)
     stdout, _ = p.communicate(input=stdin_data)
     response = [l.strip() for l in stdout.splitlines()]
-    
+
     for line in response:
         match = output_pattern.match(line)
         if not match:
@@ -477,122 +490,159 @@ def process_pc_offsets(offsets: Iterable[str]) -> dict[str, list[str]]:
             if line == "0xffffffffffffffff: ?? ??:0":
                 offsets.remove("0xffffffffffffffff")
                 continue
-            print(colored("ERROR: no match wtf? addr2line line:\n", 'red'), line)
+            print(colored("ERROR: no match wtf? addr2line line:\n", "red"), line)
             sys.exit(1)
         # 0 is address, 1 is function name, 2 is file location
-        addr, fname, _ = match.groups()
+        addr, fname, floc = match.groups()
         if not addr:
             # hacky hack: if there's no address, we matched "(inlined by)" instead
-            res[current_addr].append(fname)
+            fnames[current_addr].append((floc, fname))
         else:
             current_addr = addr
-            res[addr] = [fname]
+            fnames[addr] = [(floc, fname)]
 
-    if len(res) != len(offsets):
-        print(colored("ERROR: addr2line returned fewer lines than expected. ", 'red'),
-              colored(f"Sent {len(offsets)}, got {len(res)}\n", 'red'))
+    if len(fnames) != len(offsets):
+        print(
+            colored("ERROR: addr2line returned fewer lines than expected. ", "red"),
+            colored(f"Sent {len(offsets)}, got {len(fnames)}\n", "red"),
+        )
         sys.exit(1)
 
-    return res
-    
+    return fnames
 
-def check_PC_exec_funcStore_literal_diffs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]) -> None:
-    '''
+
+def check_PC_exec_funcStore_literal_diffs(
+    all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]
+) -> None:
+    """
     Print differences between stored fpointer data and executed PCs using the literal stored numbers
-    '''
+    """
 
     # First question:
     # How many of the reported instructions that store a value
     #  do not appear in the general log of reported instructions?
     # This should ideally be zero
     store_inst_diff = all_fpointers_stores.difference(all_pcs)
-    print(colored(f"Unique function pointer store instructions: (count={len(all_fpointers_stores)})"))
-    print(colored(f"Function pointer store instructions that don't show up in exec log: (count={len(store_inst_diff)})"))
+    print(f"Unique function pointer store instructions: (count={len(all_fpointers_stores)})")
+    print(f"Function pointer store instructions that don't show up in exec log: (count={len(store_inst_diff)})")
     print("################################################")
     # Second question:
     # How many of the stored function pointers
     #  do not appear as executed instructions in the general log?
     stored_value_diff = all_fpointers.difference(all_pcs)
-    print(colored(f"Unique stored function pointers: (count={len(all_fpointers)})"))
-    print(colored(f"Stored function_pointers that don't show up in exec log: (count={len(stored_value_diff)})"))
+    print(f"Unique stored function pointers: (count={len(all_fpointers)})")
+    print(f"Stored function_pointers that don't show up in exec log: (count={len(stored_value_diff)})")
 
-def check_addr2line_diffs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]) -> None:
-    '''
+
+def check_addr2line_diffs(
+    all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]
+) -> tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo]]:
+    """
     Print differences between stored fpointer data and executed PCs using the addr2line of each
-    '''
-    pc_funcs_all, pc_funcs_noinline  = extract_func_names(all_pcs)
-    storeinst_funcs_all, storeinst_funcs_noinline =  extract_func_names(all_fpointers_stores)
-    fpointer_funcs_all, fpointer_funcs_noinline = extract_func_names(all_fpointers)
+    """
+    _, pc_locs_all, pc_locs_noinline = extract_func_names(all_pcs)
+    storeinst_addr2location, storeinst_locs_all, storeinst_locs_noinline = (extract_func_names(all_fpointers_stores))
+    fpointer_addr2location, fpointer_locs, _ = extract_func_names(all_fpointers)
 
     # First question:
     # How many of the reported instructions that store a value
-    #  appear in a function that is not covered by any of the 
-    #  PCs in the general log of reported instructions?    
-    store_inst_diff =  storeinst_funcs_all.difference(pc_funcs_all)
-    store_inst_diff_excluding_inlines = storeinst_funcs_noinline.difference(pc_funcs_noinline) #this one should be smaller
-    print(colored(f"Unique functions of fpointer stores: (count={len(storeinst_funcs_all)})"))
-    print(colored(f"Function pointer store instructions in funcions different than PCs: (count={len(store_inst_diff)}):"),
-          f"\n{sorted(store_inst_diff)}")
-    print(colored(f"Function pointer store instructions in funcions different than PCs (ignoring inlines): (count={len(store_inst_diff_excluding_inlines)}):"),
-          f"\n{sorted(store_inst_diff_excluding_inlines)}")    
+    #  appear in a function that is not covered by any of the
+    #  PCs in the general log of reported instructions?
+    store_inst_diff = storeinst_locs_all.difference(pc_locs_all)
+    # this second one should be smaller
+    store_inst_diff_excluding_inlines = storeinst_locs_noinline.difference(pc_locs_noinline)
+    print(f"Unique functions of fpointer stores: (count={len(storeinst_locs_all)})")
+    print(f"Function pointer store instructions in funcions different than PCs: (count={len(store_inst_diff)}):",
+          f"\n{sorted(store_inst_diff)}"),
+    print(
+        f"Function pointer store instructions in funcions different than PCs (ignoring inlines): (count={len(store_inst_diff_excluding_inlines)}):",
+        f"\n{sorted(store_inst_diff_excluding_inlines)}",
+    )
     print("------------------------------------------------")
-        
+    stored_value_diff = fpointer_locs.difference(pc_locs_all)
+    print(colored(f"Unique stored functions: (count={len(fpointer_locs)})"))
+    print(f"Stored functions that were not executed: (count={len(stored_value_diff)}):")
     print("################################################")
-    stored_value_diff = fpointer_funcs_all.difference(pc_funcs_all)
-    stored_value_diff_excluding_PC_inlines = fpointer_funcs_all.difference(pc_funcs_noinline)
-    print(colored(f"Unique stored functions: (count={len(fpointer_funcs_all)})"))
-    print(colored(f"Stored functions have no inlines: {"yes" if fpointer_funcs_all == fpointer_funcs_noinline else "no"} "))
-    print(colored(f"Stored functions that were not executed: (count={len(stored_value_diff)}):"),
-     ) # "\n{sorted(stored_value_diff)}")
-    # This is possibly bigger, but I expect it to be the same.
-    print(colored(f"Stored functions that were not executed (excluding inlines in PCs): (count={len(stored_value_diff_excluding_PC_inlines)}):"),
-     ) # "\n{sorted(stored_value_diff)}")
-    print("################################################")
-    
+    return fpointer_addr2location, storeinst_addr2location, stored_value_diff
 
-def extract_func_names(all_pcs: Iterable[str]) -> tuple[set[str],set[str]]:
-    '''
+
+def extract_func_names(
+    all_pcs: Iterable[str],
+) -> tuple[dict[str, list[locInfo]], set[locInfo], set[locInfo]]:
+    """
     Receives an iterable of PCs (hexadecimal values)
-    Returns two sets.
-    The first is the set of function names those PCs are part of, including inlines.
-    The second is the set of function names those PCs are part of without considering inlines.
+    Returns a dictionary and two sets.
+    The first set is the set of locations those PCs are part of, including inlines.
+    The second set is the set of locations those PCs are part of without considering inlines.
     That means for PC 0x00c1, the following function structure:
 
-            0x00bg    int foo(){
-            0x00bf      int x = 7;
-                        // inlined "complement_modulo_3"
-            0x00c0        int y = -x;
-                          //inlined "modulo_3"
-            0x00c1        int z = y;
-            0x00c2        z = z % 3;
-                      (...)
-                    }
-    Would return {'modulo_3','complement_modulo_3','foo'} for 0x00c1 in the first set.
-    But it would return just {'foo'} for 0xc00c1 in the second set
-    '''
+        // file a.c line 743
+        744:    0x00bg    int foo(){
+        745:    0x00bf      int x = 7;
+                            // inlined "complement_modulo_3"
+        746:    0x00c0       int y = -x;
+                             //inlined "modulo_3"
+        747:    0x00c1        int z = y;
+        748:    0x00c2        z = z % 3;
+                          (...)
+                        }
+    Would return {('modulo_3', ??), ('complement_modulo_3', ??) , ('foo', a.c:747)} for 0x00c1 in the first set.
+    But it would return just {('foo', a.c:747)} for 0xc00c1 in the second set.
+    Finally, the returned dictionary is a mapping from the input PCs to this information for each PC.
+    """
     addr2fun_names = process_pc_offsets(all_pcs)
     pc_info = set(f for flist in addr2fun_names.values() for f in flist)
     pc_info_no_inlines = set(flist[-1] for flist in addr2fun_names.values())
-    return pc_info, pc_info_no_inlines
-        
+    return addr2fun_names, pc_info, pc_info_no_inlines
 
-def process_pc_cover_vs_fpointer(prog2log: dict[str, dict]) :
+
+def process_pc_cover_vs_fpointer(prog2log: dict[str, dict]):
     all_pcs = set()
     all_fpointers_stores = set()
     all_fpointers = set()
+    fpointer2storeinst : dict[str, set[str]] = {}
     for entries in prog2log.values():
         if RESULT_KEYS.PC_COVER in entries:
             all_pcs.update(entries[RESULT_KEYS.PC_COVER])
         if RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in entries:
-            all_fpointers.update(fp['StoredValue'] for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD])
-            all_fpointers_stores.update(fp['PC'] for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD])
+            for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
+                __update_collections(all_fpointers_stores, all_fpointers, fpointer2storeinst, fp)
         if RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD in entries:
-            all_fpointers.update(fp['StoredValue'] for fp in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD])
-            all_fpointers_stores.update(fp['PC'] for fp in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD])
-    
+            for fp in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD]:
+                __update_collections(all_fpointers_stores, all_fpointers, fpointer2storeinst, fp)
+
     check_PC_exec_funcStore_literal_diffs(all_pcs, all_fpointers_stores, all_fpointers)
     print(colored("################################################", "cyan"))
-    check_addr2line_diffs(all_pcs, all_fpointers_stores, all_fpointers)
+    fpointer_addr2loc, storeinst_addr2loc, interesting_fpointer_locs = check_addr2line_diffs(all_pcs,
+                                                                                             all_fpointers_stores,
+                                                                                             all_fpointers)
+    interesting_fpointer2loc = {fpointer: locs[0] for fpointer, locs in fpointer_addr2loc.items() if
+                                locs[0] in interesting_fpointer_locs}
+    # output dir will be a mapping from interesting fpointer location to
+    #  the locations of the store instructions that store that fpointer.
+    output_dir = {}
+    for fpointer_addr, fpointer_loc in interesting_fpointer2loc.items():
+        if fpointer_loc not in output_dir:
+            output_dir[fpointer_loc] = set()
+        output_dir[fpointer_loc].update(
+            storeinst_addr2loc[storeinst_addr] for storeinst_addr in fpointer2storeinst[fpointer_addr]
+        )
+    print(json.dumps(output_dir))
+
+
+
+def __update_collections(all_fpointers_stores: set[str],
+                         all_fpointers: set[str],
+                         fpointer2storeinst: dict[str, set[str]],
+                         fp: dict[str, str]) -> None:
+    fpointer = fp["StoredValue"]
+    storeinst = fp["PC"]
+    all_fpointers.add(fpointer)
+    all_fpointers_stores.add(storeinst)
+    if fpointer in fpointer2storeinst:
+        fpointer2storeinst[fpointer].add(storeinst)
+    else:
+        fpointer2storeinst[fpointer] = set([storeinst])
 
 
 if __name__ == "__main__":
