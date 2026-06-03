@@ -14,7 +14,7 @@ from termcolor import colored
 type locInfo = tuple[str, str]
 
 
-def unify_per_prog(json_lines_file: Path) -> list[dict]:
+def unify_per_prog(json_lines_file: Path) -> dict:
     """Parse a JSON lines file and merge entries by prog/call identity.
 
     The returned dictionary maps a combined key representing pairs of
@@ -38,8 +38,8 @@ def unify_per_prog(json_lines_file: Path) -> list[dict]:
     # can be matched with a future "save to corpus" log entry via the <prog_id, traige_id> pair.
     # This allows the "save to corpus" entry to be overriden as another entry into the original
     # <prog, call> group instead of creating a lone <prog, newcall> group with just the "save" entry.
-    awaiting_corpus_entry = dict()
-    awaiting_pc_cover = dict()
+    awaiting_corpus_entry : dict[str, str] = {}
+    awaiting_pc_cover : dict[str, str] = {}
     with open(json_lines_file) as f:
         for line in f:
             log_entry: dict = json.loads(line)
@@ -183,9 +183,13 @@ def successful_minimize(minim_entry: dict) -> bool:
 
 
 def update_queues(
-    awaiting_corpus_entry, awaiting_pc_cover, prog_id, data_key, triage_id, minim_entry
-):
-
+    awaiting_corpus_entry:dict[str, str], awaiting_pc_cover:dict[str,str], prog_id: str, data_key: str, triage_id:str, minim_entry:dict
+) -> None:
+    '''
+    Store in awaiting_corpus_entry the data_key used for this prog_id, triage_id pair.
+    Also update awaiting_pc_cover if the minimization result was nonempty for pointer coverage,
+    since this will trigger a future pc_cover type entry for the same triage job.
+    '''
     awaiting_corpus_entry[get_ceq_key(prog_id, triage_id)] = data_key
 
     # additionally, if the prog is entering because of pointer coverage
@@ -198,10 +202,12 @@ def update_queues(
 
 
 def override_if_awaiting(
-    data_key, awaiting_queue, log_entry, prog_id, triage_id, RESULTKEY
-):
+    data_key: str, awaiting_queue:dict[str,str], log_entry:dict[str,dict], prog_id:str, triage_id:str, RESULTKEY:str
+) -> str:
     """
-    Override data_key with the one in the queue if necessary
+    Override data_key with one in the queue if 
+     (a) This log_entry has a RESULTKEY type entry, and
+     (b) The prog_id and triage_id match a pair in the queue
     """
     if RESULTKEY in log_entry:
         if get_ceq_key(prog_id, triage_id) in awaiting_queue:
@@ -262,7 +268,7 @@ def count_cond(prog2log: dict[str, dict], condition: Callable[[dict], bool]) -> 
 
 def filter_many_cond(
     prog2log: dict[str, dict], *conditions: Callable[[dict], bool]
-) -> int:
+) -> dict[str, dict]:
     return {
         key: val
         for key, val in prog2log.items()
@@ -314,7 +320,7 @@ def has_minimization_result(minimization_result_type: str) -> Callable[[dict], b
 
 def get_duplicate_progs(
     prog2log: dict[str, dict],
-) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+) -> tuple[dict[int, list[str]], dict[int, list[str]]]:
     prog2_count = defaultdict(list)
     for key, entry in prog2log.items():
         for prog in entry.get(RESULT_KEYS.SAVED_PROG, []):
@@ -468,7 +474,7 @@ def process_pc_offsets(offsets: Iterable[str]) -> dict[str, list[locInfo]]:
     )
 
     offsets = set(offsets)
-    fnames = {}
+    sourceInfo_data : dict[str, list[locInfo]] = {}
 
     # Pass all addresses via stdin to avoid command-line argument limits
     p = subprocess.Popen(
@@ -496,19 +502,19 @@ def process_pc_offsets(offsets: Iterable[str]) -> dict[str, list[locInfo]]:
         addr, fname, floc = match.groups()
         if not addr:
             # hacky hack: if there's no address, we matched "(inlined by)" instead
-            fnames[current_addr].append((floc, fname))
+            sourceInfo_data[current_addr].append((floc, fname))
         else:
             current_addr = addr
-            fnames[addr] = [(floc, fname)]
+            sourceInfo_data[addr] = [(floc, fname)]
 
-    if len(fnames) != len(offsets):
+    if len(sourceInfo_data) != len(offsets):
         print(
             colored("ERROR: addr2line returned fewer lines than expected. ", "red"),
-            colored(f"Sent {len(offsets)}, got {len(fnames)}\n", "red"),
+            colored(f"Sent {len(offsets)}, got {len(sourceInfo_data)}\n", "red"),
         )
         sys.exit(1)
 
-    return fnames
+    return sourceInfo_data
 
 
 def check_PC_exec_funcStore_literal_diffs(
@@ -597,9 +603,9 @@ def extract_func_names(
 
 
 def process_pc_cover_vs_fpointer(prog2log: dict[str, dict]):
-    all_pcs = set()
-    all_fpointers_stores = set()
-    all_fpointers = set()
+    all_pcs: set[str] = set()
+    all_fpointers_stores : set[str] = set()
+    all_fpointers : set[str] = set()
     fpointer2storeinst : dict[str, set[str]] = {}
     for entries in prog2log.values():
         if RESULT_KEYS.PC_COVER in entries:
@@ -620,7 +626,7 @@ def process_pc_cover_vs_fpointer(prog2log: dict[str, dict]):
                                 locs[0] in interesting_fpointer_locs}
     # output dir will be a mapping from interesting fpointer location to
     #  the locations of the store instructions that store that fpointer.
-    output_dir = {}
+    output_dir : dict [locInfo, set[locInfo]]= {}
     for fpointer_addr, fpointer_loc in interesting_fpointer2loc.items():
         if fpointer_loc not in output_dir:
             output_dir[fpointer_loc] = set()
