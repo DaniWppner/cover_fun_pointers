@@ -514,6 +514,10 @@ def process_pc_offsets(offsets: Iterable[str]) -> dict[str, list[locInfo]]:
         )
         sys.exit(1)
 
+    # hacky hack: since we are operating on PCs as strings instead of as hexadecimal integer values,
+    # we need to set the NULL pointer value back to no-trailing-zeroes formatting after addr2line modified it
+    if '0x0' in offsets:
+        sourceInfo_data['0x0'] = sourceInfo_data.pop('0x0000000000000000')
     return sourceInfo_data
 
 
@@ -632,7 +636,7 @@ def process_pc_cover_vs_fpointer(prog2log: dict[str, dict]):
             output_dir[fpointer_loc] = set()
         for storeinst_addr in fpointer2storeinst[fpointer_addr]:
             output_dir[fpointer_loc].update(storeinst_addr2loc[storeinst_addr])
-    print(json.dumps(output_dir))
+    print(output_dir)
 
 
 
