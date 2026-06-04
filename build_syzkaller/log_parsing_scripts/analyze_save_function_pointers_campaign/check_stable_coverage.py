@@ -546,7 +546,7 @@ def check_PC_exec_funcStore_literal_diffs(
 
 def check_addr2line_diffs(
     all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]
-) -> tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo]]:
+) -> tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo], set[locInfo]]:
     """
     Print differences between stored fpointer data and executed PCs using the addr2line of each
     """
@@ -554,26 +554,53 @@ def check_addr2line_diffs(
     storeinst_addr2location, storeinst_locs_all, storeinst_locs_noinline = (extract_func_names(all_fpointers_stores))
     fpointer_addr2location, fpointer_locs, _ = extract_func_names(all_fpointers)
 
+    print(f"Unique functions covered: (count={len(pc_locs_all)})")
+    print(f"Unique functions covered excluding inlines: (count={len(pc_locs_noinline)})")
+    print("------------------------------------------------")
     # First question:
     # How many of the reported instructions that store a value
     #  appear in a function that is not covered by any of the
     #  PCs in the general log of reported instructions?
-    store_inst_diff = storeinst_locs_all.difference(pc_locs_all)
+    store_inst_diff, _ = locInfo_fname_diff(storeinst_locs_all, pc_locs_all)
     # this second one should be smaller
-    store_inst_diff_excluding_inlines = storeinst_locs_noinline.difference(pc_locs_noinline)
+    store_inst_diff_excluding_inlines, _ = locInfo_fname_diff(storeinst_locs_noinline, pc_locs_noinline)
     print(f"Unique functions of fpointer stores: (count={len(storeinst_locs_all)})")
     print(f"Function pointer store instructions in funcions different than PCs: (count={len(store_inst_diff)}):",
           f"\n{sorted(store_inst_diff)}"),
     print(
-        f"Function pointer store instructions in funcions different than PCs (ignoring inlines): (count={len(store_inst_diff_excluding_inlines)}):",
-        #f"\n{sorted(store_inst_diff_excluding_inlines)}",
+        f"Function pointer store instructions in funcions different than PCs (ignoring inlines in both): (count={len(store_inst_diff_excluding_inlines)}):",
+        f"\n{sorted(store_inst_diff_excluding_inlines)}",
     )
     print("------------------------------------------------")
-    stored_value_diff = fpointer_locs.difference(pc_locs_all)
+    stored_value_diff, stored_value_intersection = locInfo_fname_diff(fpointer_locs, pc_locs_all)
+    stored_value_diff_without_inlines, _ = locInfo_fname_diff(fpointer_locs, pc_locs_noinline)
     print(colored(f"Unique stored functions: (count={len(fpointer_locs)})"))
     print(f"Stored functions that were not executed: (count={len(stored_value_diff)}):")
+    print(f"Stored functions that did get executed: (count={len(stored_value_intersection)}):")
+
+    # this second one could be smaller but I expect it to be the same:
+    print(f"Execution of functions does not depend on inlines: {'Yes' if stored_value_diff_without_inlines == stored_value_diff else 'No'}")
     print("################################################")
-    return fpointer_addr2location, storeinst_addr2location, stored_value_diff
+    return fpointer_addr2location, storeinst_addr2location, stored_value_diff, stored_value_intersection
+
+def locInfo_fname_diff(this: set[locInfo], other: set[locInfo]) -> tuple[set[locInfo], set[locInfo]]:
+    '''
+    Returns two subsets of `this`, using the function name as equality criteria.
+    The first set is the difference between `this` and `other, and the second is the intersection. 
+
+    i.e all elements in `this` that have a different function name from all elements in `other`
+     and all elements in `this` that have the same function name as one element in `other`
+    '''
+    other_fnames = set(fname for floc, fname in other)
+    intersection = set()
+    diff = set()
+    for floc, fname in this:
+        new_elem = (floc, fname)
+        if fname not in other_fnames:
+            diff.add(new_elem)
+        else:
+            intersection.add(new_elem)
+    return diff, intersection
 
 
 def extract_func_names(
@@ -623,20 +650,32 @@ def process_pc_cover_vs_fpointer(prog2log: dict[str, dict]):
 
     check_PC_exec_funcStore_literal_diffs(all_pcs, all_fpointers_stores, all_fpointers)
     print(colored("################################################", "cyan"))
-    fpointer_addr2loc, storeinst_addr2loc, interesting_fpointer_locs = check_addr2line_diffs(all_pcs,
+    fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs, covered_fpointer_locs = check_addr2line_diffs(all_pcs,
                                                                                              all_fpointers_stores,
                                                                                              all_fpointers)
+    show_info_on_fpointerlocs(fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs, '__uncovered_pairs.py')
+    show_info_on_fpointerlocs(fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs, '__covered_pairs.py')
+
+def show_info_on_fpointerlocs(fpointer2storeinst: dict[str, set[str]],
+                              fpointer_addr2loc: dict[str, list[locInfo]],
+                              storeinst_addr2loc: dict[str, list[locInfo]],
+                              interesting_fpointer_locs:set[locInfo],
+                              output_fname: str) -> None:
+    '''
+    Print a mapping from interesting fpointer location to
+     the locations of the store instructions that store that fpointer.
+    '''
     interesting_fpointer2loc = {fpointer: locs[0] for fpointer, locs in fpointer_addr2loc.items() if
                                 locs[0] in interesting_fpointer_locs}
-    # output dir will be a mapping from interesting fpointer location to
-    #  the locations of the store instructions that store that fpointer.
     output_dir : dict [locInfo, set[locInfo]]= {}
     for fpointer_addr, fpointer_loc in interesting_fpointer2loc.items():
         if fpointer_loc not in output_dir:
             output_dir[fpointer_loc] = set()
         for storeinst_addr in fpointer2storeinst[fpointer_addr]:
             output_dir[fpointer_loc].update(storeinst_addr2loc[storeinst_addr])
-    print(output_dir)
+    output_path = Path.cwd() / output_fname
+    with open(output_path, 'w') as f:
+        print(output_dir, file=f)
 
 
 
