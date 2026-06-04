@@ -29,6 +29,7 @@ import json
 import argparse
 import sys
 import itertools
+from datetime import datetime
 import tqdm.contrib as tcontrib
 from typing import Iterable
 from pathlib import Path
@@ -70,6 +71,82 @@ def read_serializaed_prog(line_number: int, og_text: list[int]) -> list[str]:
         else:
             res.append(line)
     return res
+
+
+def parse_timestamp_from_line(line: str) -> datetime | None:
+    timestamp_re = re.compile(r"^(?P<ts>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})")
+    match = timestamp_re.match(line)
+    if match is None:
+        return None
+    return datetime.strptime(match.group("ts"), "%Y/%m/%d %H:%M:%S")
+
+
+def find_next_timestamp_on_or_after(lines: list[str], start_index: int) -> tuple[int, datetime] | tuple[None, None]:
+    """
+    Return the index and timestamp of the first line after `start_index` that has a timestamp.
+    """
+    for index in range(start_index, len(lines)):
+        line_time = parse_timestamp_from_line(lines[index])
+        if line_time is not None:
+            return index, line_time
+    return None, None
+
+
+def find_first_line_after_timestamp(lines: list[str], cutoff: datetime) -> int:
+    """
+    Return the index of the first line with a timestamp later than cutoff.
+    Uses binary search.
+    """
+    low = 0
+    high = len(lines)
+    while low < high:
+        mid = (low + high) // 2
+        mid_time = parse_timestamp_from_line(lines[mid])
+        if mid_time is None:
+            next_idx, next_time = find_next_timestamp_on_or_after(lines, mid)
+            if next_idx is None:
+                high = mid
+            elif next_time <= cutoff:
+                low = next_idx + 1
+            else:
+                high = next_idx
+            continue
+
+        if mid_time <= cutoff:
+            low = mid + 1
+        else:
+            high = mid
+
+    while low < len(lines):
+        line_time = parse_timestamp_from_line(lines[low])
+        if line_time is not None:
+            if line_time > cutoff:
+                return low
+            low += 1
+        else:
+            low += 1
+    # fallback: return the last line if we got to the end of the list
+    return len(lines)
+
+
+def find_cutoff_before_status_block(lines: list[str], cutoff: datetime) -> int:
+    """
+    Return the index of the first line that has the format
+
+        2026/05/11 21:50:37 candidates=0 corpus=287 coverage=14363 exec total=17289 (80/min) pending=0 reproducing=0 
+
+    and has a timestamp later than `cutoff`
+    """
+    stats_line_re = re.compile(
+        r"^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} "
+        r"candidates=\d+ corpus=\d+ coverage=\d+ exec total=\d+ \([^\)]+\) pending=\d+ reproducing=\d+$"
+    )
+    cutoff_idx = find_first_line_after_timestamp(lines, cutoff)
+    for idx in range(cutoff_idx, len(lines)):
+        if stats_line_re.match(lines[idx]):
+            return idx
+    # fallback: return the last line if we got to the end of the list
+    return len(lines)
 
 
 def read_serialized_cover(line_number: int, og_text: list[str]) -> list[str]:
@@ -309,6 +386,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "out_path", type=str, nargs="?", help="Path to the output json."
     )
+    parser.add_argument(
+        "--cutoff-time",
+        dest="cutoff_time",
+        nargs="+",
+        type=str,
+        default=None,
+        help=(
+            "Cut off parsing before the first complete status block after this timestamp. "
+            "Expected format: YYYY/MM/DD HH:MM:SS. "
+            "If the timestamp is unquoted, it may be passed as two tokens."
+        ),
+    )
     args = parser.parse_args()
 
     if not args.log_path or not args.out_path:
@@ -323,7 +412,25 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    contents = log_path.read_text()
+    lines = log_path.read_text().splitlines()
+    if args.cutoff_time is not None:
+        cutoff_time_raw = (
+            " ".join(args.cutoff_time)
+            if isinstance(args.cutoff_time, list)
+            else args.cutoff_time
+        )
+        try:
+            cutoff = datetime.strptime(cutoff_time_raw, "%Y/%m/%d %H:%M:%S")
+        except ValueError:
+            print(
+                "Error: --cutoff-time must use format YYYY/MM/DD HH:MM:SS.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        cutoff_index = find_cutoff_before_status_block(lines, cutoff)
+        lines = lines[:cutoff_index]
+
+    contents = "\n".join(lines)
     with out_path.open("w") as f:
         for json_obj in parse_raw_triage_logs(contents):
             f.write(json.dumps(json_obj, indent=None) + "\n")
