@@ -137,10 +137,10 @@ def find_cutoff_before_status_block(lines: list[str], cutoff: datetime) -> int:
 
     and has a timestamp later than `cutoff`
     """
-    stats_line_re = re.compile(
-        r"^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} "
-        r"candidates=\d+ corpus=\d+ coverage=\d+ exec total=\d+ \([^\)]+\) pending=\d+ reproducing=\d+$"
-    )
+    timestamp_re = r"^(?P<ts>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})"
+    stats_line_re = re.compile(timestamp_re +
+                               r" candidates=\d+ corpus=\d+ coverage=\d+ exec total=\d+ \(.*\) pending=\d+ reproducing=\d+")
+
     cutoff_idx = find_first_line_after_timestamp(lines, cutoff)
     for idx in range(cutoff_idx, len(lines)):
         if stats_line_re.match(lines[idx]):
@@ -232,7 +232,7 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
     return __create_master_regex(patterns)
 
 
-def parse_raw_triage_logs(log_text: str) -> Iterable[dict]:
+def parse_raw_triage_logs(log_lines: list[str]) -> Iterable[dict]:
     # Regex breakdown:
     # \[(triage-[^\]]+)\] -> Captures the triage-id (e.g., triage-0x2c66bd608c80)
     # \[(prog-[^\]]+)\]   -> Captures the prog-id (e.g., prog-0x351ec85d0480)
@@ -241,7 +241,6 @@ def parse_raw_triage_logs(log_text: str) -> Iterable[dict]:
     indentify_triage_re = re.compile(r"\[(triage-[^\]]+)\] \[(prog-[^\]]+)\]: (.*)")
     triage_line_re, triage_re_map = create_triage_master_regex()
 
-    log_lines = log_text.strip().split("\n")
     for line_number, line in tcontrib.tenumerate(log_lines):
         match = indentify_triage_re.search(line)
         if match:
@@ -412,7 +411,7 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    lines = log_path.read_text().splitlines()
+    lines = log_path.read_text().strip().split("\n")
     if args.cutoff_time is not None:
         cutoff_time_raw = (
             " ".join(args.cutoff_time)
@@ -430,7 +429,6 @@ if __name__ == "__main__":
         cutoff_index = find_cutoff_before_status_block(lines, cutoff)
         lines = lines[:cutoff_index]
 
-    contents = "\n".join(lines)
     with out_path.open("w") as f:
-        for json_obj in parse_raw_triage_logs(contents):
+        for json_obj in parse_raw_triage_logs(lines):
             f.write(json.dumps(json_obj, indent=None) + "\n")
