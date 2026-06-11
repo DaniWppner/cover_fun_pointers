@@ -11,6 +11,9 @@ from typing import Callable, Iterable, Any
 from logentry_keys import RESULT_KEYS, RESULT_VALUES
 from termcolor import colored
 
+
+# First element represents file name and line number in the format file_name:lineno
+# Second element represents function containing said line number
 type locInfo = tuple[str, str]
 
 
@@ -481,8 +484,12 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]):
     fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs, covered_fpointer_locs = check_source_code_diffs(all_pcs,
                                                                                              all_fpointers_stores,
                                                                                              all_fpointers)
-    show_info_on_fpointerlocs(fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs, '__uncovered_pairs.py')
-    show_info_on_fpointerlocs(fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs, '__covered_pairs.py')
+    uncovered_fpointers_out = get_fpointer2storeinst_as_source_locations(fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs)
+    with open('__uncovered_pairs.py', 'w') as f:
+        print(uncovered_fpointers_out, file=f)
+    covered_fpointers_out = get_fpointer2storeinst_as_source_locations(fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs)
+    with open('__covered_pairs.py', 'w') as f:
+        print(covered_fpointers_out, file=f)
 
 
 def check_PC_exec_funcStore_literal_diffs(
@@ -512,7 +519,19 @@ def check_source_code_diffs(
     all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]
 ) -> tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo], set[locInfo]]:
     """
-    Print differences between stored fpointer data and executed PCs using the addr2line of each
+    Print differences between stored fpointer data and executed PCs using source code location data.
+
+    Args:
+        all_pcs: Set of covered instruction addresses (hexadecimal strings).
+        all_fpointers_stores: Set of instructions that store a function pointer (hexadecimal strings).
+        all_fpointers: Set of function pointer values stored (hexadecimal strings).
+
+    Returns:
+        tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo], set[locInfo]]: A tuple with four elements:
+            fpointer_addr2location: dict mapping function pointer addresses all its source code locations, including inline resolutions.
+            storeinst_addr2location: dict mapping store instruction addresses all its source code locations, including inline resolutions.
+            stored_value_diff: set of source code locations for function pointers that were not covered.
+            stored_value_intersection: set of source code locations for function pointers that were covered.
     """
     _, pc_locs_all, pc_locs_noinline = get_source_code_refs(all_pcs)
     storeinst_addr2location, storeinst_locs_all, storeinst_locs_noinline = (get_source_code_refs(all_fpointers_stores))
@@ -599,7 +618,7 @@ def get_source_code_refs(
 
 def _get_source_code_refs_impl(offsets: Iterable[str]) -> dict[str, list[locInfo]]:
     """
-    Returns a mapping containing the function name(s) for each
+    Returns a mapping containing the source code locations for each
     offset in the input, obtained using addr2line, including inlines
     """
     LINUX_DIR = "/home/dwappner/Desktop/linux"
@@ -657,14 +676,21 @@ def _get_source_code_refs_impl(offsets: Iterable[str]) -> dict[str, list[locInfo
     return sourceInfo_data
 
 
-def show_info_on_fpointerlocs(fpointer2storeinst: dict[str, set[str]],
+def get_fpointer2storeinst_as_source_locations(fpointer2storeinst: dict[str, set[str]],
                               fpointer_addr2loc: dict[str, list[locInfo]],
                               storeinst_addr2loc: dict[str, list[locInfo]],
-                              interesting_fpointer_locs:set[locInfo],
-                              output_fname: str) -> None:
+                              interesting_fpointer_locs:set[locInfo]) -> dict [locInfo, set[locInfo]]:
     '''
-    Print a mapping from interesting fpointer location to
-     the locations of the store instructions that store that fpointer.
+    Args:
+        fpointer2storeinst: dict from function pointer (hexadecimal strings) to the set of instructions that store it (hexadecimal strings).
+        fpointer_addr2loc: dict from function pointer (hexadecimal strings) to source code locations.
+        storeinst_addr2loc: dict from store instruction (hexadecimal strings) to source code locations.
+        interesting_fpointer_locs: set of source code locations (of function pointers) that must be a key in the output.
+
+    Returns:
+        A dict from source code locations to sets of source code locations.
+        The key represents the source code locations of the interesting function pointers.
+        The values represent the source code locations of the instructions that store them.
     '''
     interesting_fpointer2loc = {fpointer: locs[0] for fpointer, locs in fpointer_addr2loc.items() if
                                 locs[0] in interesting_fpointer_locs}
@@ -674,9 +700,7 @@ def show_info_on_fpointerlocs(fpointer2storeinst: dict[str, set[str]],
             output_dir[fpointer_loc] = set()
         for storeinst_addr in fpointer2storeinst[fpointer_addr]:
             output_dir[fpointer_loc].update(storeinst_addr2loc[storeinst_addr])
-    output_path = Path.cwd() / output_fname
-    with open(output_path, 'w') as f:
-        print(output_dir, file=f)
+    return output_dir
 
 
 
