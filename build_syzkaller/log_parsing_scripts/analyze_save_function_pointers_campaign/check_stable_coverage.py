@@ -11,7 +11,6 @@ from typing import Callable, Iterable, Any
 from logentry_keys import RESULT_KEYS, RESULT_VALUES
 from termcolor import colored
 
-
 # First element represents file name and line number in the format file_name:lineno
 # Second element represents function containing said line number
 type locInfo = tuple[str, str]
@@ -41,8 +40,8 @@ def unify_per_prog(json_lines_file: Path) -> dict:
     # can be matched with a future "save to corpus" log entry via the <prog_id, traige_id> pair.
     # This allows the "save to corpus" entry to be overriden as another entry into the original
     # <prog, call> group instead of creating a lone <prog, newcall> group with just the "save" entry.
-    awaiting_corpus_entry : dict[str, str] = {}
-    awaiting_pc_cover : dict[str, str] = {}
+    awaiting_corpus_entry: dict[str, str] = {}
+    awaiting_pc_cover: dict[str, str] = {}
     with open(json_lines_file) as f:
         for line in f:
             log_entry: dict = json.loads(line)
@@ -186,13 +185,18 @@ def successful_minimize(minim_entry: dict) -> bool:
 
 
 def update_queues(
-    awaiting_corpus_entry:dict[str, str], awaiting_pc_cover:dict[str,str], prog_id: str, data_key: str, triage_id:str, minim_entry:dict
+    awaiting_corpus_entry: dict[str, str],
+    awaiting_pc_cover: dict[str, str],
+    prog_id: str,
+    data_key: str,
+    triage_id: str,
+    minim_entry: dict,
 ) -> None:
-    '''
+    """
     Store in awaiting_corpus_entry the data_key used for this prog_id, triage_id pair.
     Also update awaiting_pc_cover if the minimization result was nonempty for pointer coverage,
     since this will trigger a future pc_cover type entry for the same triage job.
-    '''
+    """
     awaiting_corpus_entry[get_ceq_key(prog_id, triage_id)] = data_key
 
     # additionally, if the prog is entering because of pointer coverage
@@ -205,10 +209,15 @@ def update_queues(
 
 
 def override_if_awaiting(
-    data_key: str, awaiting_queue:dict[str,str], log_entry:dict[str,dict], prog_id:str, triage_id:str, RESULTKEY:str
+    data_key: str,
+    awaiting_queue: dict[str, str],
+    log_entry: dict[str, dict],
+    prog_id: str,
+    triage_id: str,
+    RESULTKEY: str,
 ) -> str:
     """
-    Override data_key with one in the queue if 
+    Override data_key with one in the queue if
      (a) This log_entry has a RESULTKEY type entry, and
      (b) The prog_id and triage_id match a pair in the queue
     """
@@ -466,9 +475,9 @@ def check_minimization_stats(prog2log: dict[str, dict]) -> None:
 
 def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]):
     all_pcs: set[str] = set()
-    all_fpointers_stores : set[str] = set()
-    all_fpointers : set[str] = set()
-    fpointer2storeinst : dict[str, set[str]] = {}
+    all_fpointers_stores: set[str] = set()
+    all_fpointers: set[str] = set()
+    fpointer2storeinst: dict[str, set[str]] = {}
     for entries in prog2log.values():
         if RESULT_KEYS.PC_COVER in entries:
             all_pcs.update(entries[RESULT_KEYS.PC_COVER])
@@ -481,14 +490,21 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]):
 
     check_PC_exec_funcStore_literal_diffs(all_pcs, all_fpointers_stores, all_fpointers)
     print(colored("################################################", "cyan"))
-    fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs, covered_fpointer_locs = check_source_code_diffs(all_pcs,
-                                                                                             all_fpointers_stores,
-                                                                                             all_fpointers)
-    uncovered_fpointers_out = get_fpointer2storeinst_as_source_locations(fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs)
-    with open('__uncovered_pairs.py', 'w') as f:
+    (
+        fpointer_addr2loc,
+        storeinst_addr2loc,
+        uncovered_fpointer_locs,
+        covered_fpointer_locs,
+    ) = check_source_code_diffs(all_pcs, all_fpointers_stores, all_fpointers)
+    uncovered_fpointers_out = get_fpointer2storeinst_as_source_locations(
+        fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs,
+    )
+    with open("__uncovered_pairs.py", "w") as f:
         print(uncovered_fpointers_out, file=f)
-    covered_fpointers_out = get_fpointer2storeinst_as_source_locations(fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs)
-    with open('__covered_pairs.py', 'w') as f:
+    covered_fpointers_out = get_fpointer2storeinst_as_source_locations(
+        fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs
+    )
+    with open("__covered_pairs.py", "w") as f:
         print(covered_fpointers_out, file=f)
 
 
@@ -517,7 +533,9 @@ def check_PC_exec_funcStore_literal_diffs(
 
 def check_source_code_diffs(
     all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]
-) -> tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo], set[locInfo]]:
+) -> tuple[
+    dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo], set[locInfo]
+]:
     """
     Print differences between stored fpointer data and executed PCs using source code location data.
 
@@ -534,7 +552,7 @@ def check_source_code_diffs(
             stored_value_intersection: set of source code locations for function pointers that were covered.
     """
     _, pc_locs_all, pc_locs_noinline = get_source_code_refs(all_pcs)
-    storeinst_addr2location, storeinst_locs_all, storeinst_locs_noinline = (get_source_code_refs(all_fpointers_stores))
+    storeinst_addr2location, storeinst_locs_all, storeinst_locs_noinline = get_source_code_refs(all_fpointers_stores)
     fpointer_addr2location, fpointer_locs, _ = get_source_code_refs(all_fpointers)
 
     print(f"Unique functions covered: (count={len(pc_locs_all)})")
@@ -546,10 +564,14 @@ def check_source_code_diffs(
     #  PCs in the general log of reported instructions?
     store_inst_diff, _ = locInfo_fname_diff(storeinst_locs_all, pc_locs_all)
     # this second one should be smaller
-    store_inst_diff_excluding_inlines, _ = locInfo_fname_diff(storeinst_locs_noinline, pc_locs_noinline)
+    store_inst_diff_excluding_inlines, _ = locInfo_fname_diff(
+        storeinst_locs_noinline, pc_locs_noinline
+    )
     print(f"Unique functions of fpointer stores: (count={len(storeinst_locs_all)})")
-    print(f"Function pointer store instructions in funcions different than PCs: (count={len(store_inst_diff)}):",
-          f"\n{sorted(store_inst_diff)}"),
+    print(
+        f"Function pointer store instructions in funcions different than PCs: (count={len(store_inst_diff)}):",
+        f"\n{sorted(store_inst_diff)}",
+    )
     print(
         f"Function pointer store instructions in funcions different than PCs (ignoring inlines in both): (count={len(store_inst_diff_excluding_inlines)}):",
         f"\n{sorted(store_inst_diff_excluding_inlines)}",
@@ -562,18 +584,28 @@ def check_source_code_diffs(
     print(f"Stored functions that did get executed: (count={len(stored_value_intersection)}):")
 
     # this second one could be smaller but I expect it to be the same:
-    print(f"Execution of functions does not depend on inlines: {'Yes' if stored_value_diff_without_inlines == stored_value_diff else 'No'}")
+    print(
+        f"Execution of functions does not depend on inlines: {'Yes' if stored_value_diff_without_inlines == stored_value_diff else 'No'}"
+    )
     print("################################################")
-    return fpointer_addr2location, storeinst_addr2location, stored_value_diff, stored_value_intersection
+    return (
+        fpointer_addr2location,
+        storeinst_addr2location,
+        stored_value_diff,
+        stored_value_intersection,
+    )
 
-def locInfo_fname_diff(this: set[locInfo], other: set[locInfo]) -> tuple[set[locInfo], set[locInfo]]:
-    '''
+
+def locInfo_fname_diff(
+    this: set[locInfo], other: set[locInfo]
+) -> tuple[set[locInfo], set[locInfo]]:
+    """
     Returns two subsets of `this`, using the function name as equality criteria.
-    The first set is the difference between `this` and `other, and the second is the intersection. 
+    The first set is the difference between `this` and `other, and the second is the intersection.
 
     i.e all elements in `this` that have a different function name from all elements in `other`
      and all elements in `this` that have the same function name as one element in `other`
-    '''
+    """
     other_fnames = set(fname for floc, fname in other)
     intersection = set()
     diff = set()
@@ -629,7 +661,7 @@ def _get_source_code_refs_impl(offsets: Iterable[str]) -> dict[str, list[locInfo
     )
 
     offsets = set(offsets)
-    sourceInfo_data : dict[str, list[locInfo]] = {}
+    sourceInfo_data: dict[str, list[locInfo]] = {}
 
     # Pass all addresses via stdin to avoid command-line argument limits
     p = subprocess.Popen(
@@ -671,16 +703,18 @@ def _get_source_code_refs_impl(offsets: Iterable[str]) -> dict[str, list[locInfo
 
     # hacky hack: since we are operating on PCs as strings instead of as hexadecimal integer values,
     # we need to set the NULL pointer value back to no-trailing-zeroes formatting after addr2line modified it
-    if '0x0' in offsets:
-        sourceInfo_data['0x0'] = sourceInfo_data.pop('0x0000000000000000')
+    if "0x0" in offsets:
+        sourceInfo_data["0x0"] = sourceInfo_data.pop("0x0000000000000000")
     return sourceInfo_data
 
 
-def get_fpointer2storeinst_as_source_locations(fpointer2storeinst: dict[str, set[str]],
-                              fpointer_addr2loc: dict[str, list[locInfo]],
-                              storeinst_addr2loc: dict[str, list[locInfo]],
-                              interesting_fpointer_locs:set[locInfo]) -> dict [locInfo, set[locInfo]]:
-    '''
+def get_fpointer2storeinst_as_source_locations(
+    fpointer2storeinst: dict[str, set[str]],
+    fpointer_addr2loc: dict[str, list[locInfo]],
+    storeinst_addr2loc: dict[str, list[locInfo]],
+    interesting_fpointer_locs: set[locInfo],
+) -> dict[locInfo, set[locInfo]]:
+    """
     Args:
         fpointer2storeinst: dict from function pointer (hexadecimal strings) to the set of instructions that store it (hexadecimal strings).
         fpointer_addr2loc: dict from function pointer (hexadecimal strings) to source code locations.
@@ -691,10 +725,13 @@ def get_fpointer2storeinst_as_source_locations(fpointer2storeinst: dict[str, set
         A dict from source code locations to sets of source code locations.
         The key represents the source code locations of the interesting function pointers.
         The values represent the source code locations of the instructions that store them.
-    '''
-    interesting_fpointer2loc = {fpointer: locs[0] for fpointer, locs in fpointer_addr2loc.items() if
-                                locs[0] in interesting_fpointer_locs}
-    output_dir : dict [locInfo, set[locInfo]]= {}
+    """
+    interesting_fpointer2loc = {
+        fpointer: locs[0]
+        for fpointer, locs in fpointer_addr2loc.items()
+        if locs[0] in interesting_fpointer_locs
+    }
+    output_dir: dict[locInfo, set[locInfo]] = {}
     for fpointer_addr, fpointer_loc in interesting_fpointer2loc.items():
         if fpointer_loc not in output_dir:
             output_dir[fpointer_loc] = set()
@@ -703,11 +740,12 @@ def get_fpointer2storeinst_as_source_locations(fpointer2storeinst: dict[str, set
     return output_dir
 
 
-
-def __update_collections(all_fpointers_stores: set[str],
-                         all_fpointers: set[str],
-                         fpointer2storeinst: dict[str, set[str]],
-                         fp: dict[str, str]) -> None:
+def __update_collections(
+    all_fpointers_stores: set[str],
+    all_fpointers: set[str],
+    fpointer2storeinst: dict[str, set[str]],
+    fp: dict[str, str],
+) -> None:
     fpointer = fp["StoredValue"]
     storeinst = fp["PC"]
     all_fpointers.add(fpointer)
@@ -715,6 +753,7 @@ def __update_collections(all_fpointers_stores: set[str],
     if fpointer not in fpointer2storeinst:
         fpointer2storeinst[fpointer] = set()
     fpointer2storeinst[fpointer].add(storeinst)
+
 
 if __name__ == "__main__":
 
