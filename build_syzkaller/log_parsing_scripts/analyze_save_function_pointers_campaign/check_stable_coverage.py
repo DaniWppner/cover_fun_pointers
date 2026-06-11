@@ -432,14 +432,16 @@ def check_saved_because_fpointer(prog2log: dict[str, dict]) -> None:
         Path.cwd() / "saved_because_fpointer_w_duplicates.json"
     )
     print(
-        f"Progs saved with fpointer and skip signal (count={len(saved_because_skip_signal)}) saved to {saved_because_fpointer_Wduplicate_fout.name}"
+        f"Progs saved with fpointer and skip signal (count={len(saved_because_skip_signal)})",
+        f"saved to {saved_because_fpointer_Wduplicate_fout.name}"
     )
     with open(saved_because_fpointer_Wduplicate_fout, "w") as f:
         json.dump(saved_because_skip_signal, f, indent=2)
 
     saved_deduplicate_fout = Path.cwd() / "saved_because_fpointer.json"
     print(
-        f"After deduplication, progs saved with fpointer and skip signal (count={len(deduplicate_interesting)}) saved to {saved_deduplicate_fout.name}"
+        f"After deduplication, progs saved with fpointer and skip signal (count={len(deduplicate_interesting)})",
+        f"saved to {saved_deduplicate_fout.name}"
     )
     with open(saved_deduplicate_fout, "w") as f:
         json.dump(deduplicate_interesting, f, indent=2)
@@ -495,6 +497,29 @@ def check_minimization_stats(prog2log: dict[str, dict]) -> None:
         json.dump(unique_signal_and_fpointer, f, indent=2)
 
 
+def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict],
+                                              fpointer_addr2loc: dict[str, list[locInfo]],
+                                              storeinst_addr2loc: dict[str, list[locInfo]]) -> dict[str, dict]:
+    for entry in prog2log.values():
+        for funcPointer_store_entry in entry.get(RESULT_KEYS.NEW_FPOINTERS_PAYLOAD, []):
+            fPointer = funcPointer_store_entry["StoredValue"]
+            storeInst = funcPointer_store_entry["PC"]
+            # hacky hack: we will not have a location for this "empty" pointer
+            fPointer_loc = fpointer_addr2loc[fPointer][0] if fPointer != '0xffffffffffffffff' else ''
+            funcPointer_store_entry[RESULT_KEYS.FPOINTER_PAYLOAD_FPOINTER_LOC_KEY] = fPointer_loc
+            funcPointer_store_entry[RESULT_KEYS.FPOINTER_PAYLOAD_STOREINST_LOC_KEY] = storeinst_addr2loc[storeInst][0]
+
+        for funcPointer_store_entry in entry.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, []):
+            fPointer = funcPointer_store_entry["StoredValue"]
+            storeInst = funcPointer_store_entry["PC"]
+            #hacky hack: see above
+            fPointer_loc = fpointer_addr2loc[fPointer][0] if fPointer != '0xffffffffffffffff' else ''
+            funcPointer_store_entry[RESULT_KEYS.FPOINTER_PAYLOAD_FPOINTER_LOC_KEY] = fPointer_loc
+            funcPointer_store_entry[RESULT_KEYS.FPOINTER_PAYLOAD_STOREINST_LOC_KEY] = storeinst_addr2loc[storeInst][0]
+
+    return prog2log
+
+
 def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]) -> None:
     all_pcs, all_fpointers_stores, all_fpointers, fpointer2storeinst = get_fpointer_store_info(prog2log)
 
@@ -507,6 +532,7 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]) -> None:
         covered_fpointer_locs,
     ) = check_source_code_diffs(all_pcs, all_fpointers_stores, all_fpointers)
 
+    prog2log = update_master_dict_with_fpointer_loc_data(prog2log, fpointer_addr2loc, storeinst_addr2loc)
     uncovered_fpointers_out, skip_count = get_fpointer2storeinst_as_source_locations(
         fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs,
     )
@@ -527,6 +553,9 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]) -> None:
 
     print(colored("################################################", "cyan"))
     check_saved_because_skip_signal_vs_fpointers(prog2log, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs, uncovered_fpointer_locs)
+    
+    return prog2log
+
 
 def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict],
                                                 fpointer_addr2loc: dict[str, list[locInfo]],
@@ -560,7 +589,31 @@ def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict],
         f"(count={len(uncovered_fpointers_saved_because_skip_signal)}",
         f"(ignored due to filter={missed_uncovered}) saved to {uncovered_fpointers_because_skip_signal_file.name}"
         )
+    print("------------------------------------------------")    
+    covered_fpointers_subdict = filter_many_cond(saved_because_skip_signal,
+                                                 lambda e: any(
+                                                     fPointer_entry[RESULT_KEYS.FPOINTER_PAYLOAD_FPOINTER_LOC_KEY] in covered_fpointer_locs
+                                                     for fPointer_entry in e.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, [])
+                                                 ))
+    uncovered_fpointers_subdict = filter_many_cond(saved_because_skip_signal,
+                                                 lambda e: any(
+                                                     fPointer_entry[RESULT_KEYS.FPOINTER_PAYLOAD_FPOINTER_LOC_KEY] in uncovered_fpointer_locs
+                                                     for fPointer_entry in e.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, [])
+                                                 ))
+    
+    covered_fpointers_subdict_fout = Path.cwd() / "registered_covered_fpointers_saved_because_fpointer.json"
+    with open(covered_fpointers_subdict_fout, "w") as f:
+        json.dump(covered_fpointers_subdict, f, indent=2)
+    print("Progs saved with fpointer and skip signal that registered a covered function pointer",
+         f"(count={len(covered_fpointers_subdict)}) saved to {covered_fpointers_subdict_fout.name}"
+    )
 
+    uncovered_fpointers_subdict_fout = Path.cwd() / "registered_uncovered_fpointers_saved_because_fpointer.json"
+    with open(uncovered_fpointers_subdict_fout, "w") as f:
+        json.dump(uncovered_fpointers_subdict, f, indent=2)
+    print("Progs saved with fpointer and skip signal that registered an uncovered function pointer",
+         f"(count={len(uncovered_fpointers_subdict)}) saved to {uncovered_fpointers_subdict_fout.name}"
+    )
 
 def get_fpointer_store_info(prog2log: dict[str, dict], stable_only = False) -> tuple[set[str], set[str], set[str], dict[str, set[str]]]:
     '''
@@ -806,7 +859,7 @@ def get_fpointer2storeinst_as_source_locations(
         interesting_fpointer_locs: set of source code locations (of function pointers) that must be a key in the output.
 
     Returns:
-        tuple[dict[locInfo, set[locInfo]], int]: A tuple with two elements:
+        tuple[dict[locInfo, set[locInfo]], set[str], int]: A tuple with two elements:
             output_dir: A dict from source code locations to sets of source code locations.
                         The key represents the source code locations of the interesting function pointers.
                         The values represent the source code locations of the instructions that store them.
@@ -876,7 +929,9 @@ if __name__ == "__main__":
 
     out_json = unify_per_prog(json_lines_path)
     cleanup_fpointer_jsons(out_json)
-
+    print(colored("################################################", "cyan"))
+    out_json = check_pc_cover_vs_fpointer(out_json)
+    print(colored("################################################", "cyan"))
     check_easy_stats(out_json)
     print(colored("################################################", "cyan"))
     check_duplicated_progs(out_json)
@@ -884,7 +939,6 @@ if __name__ == "__main__":
     check_saved_because_fpointer(out_json)
     print(colored("################################################", "cyan"))
     check_minimization_stats(out_json)
-    print(colored("################################################", "cyan"))
-    check_pc_cover_vs_fpointer(out_json)
+
     with out_path.open("w") as f:
         f.write(json.dumps(out_json, indent=2) + "\n")

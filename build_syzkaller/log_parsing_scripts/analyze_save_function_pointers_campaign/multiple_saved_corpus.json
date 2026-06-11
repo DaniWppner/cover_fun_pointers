@@ -17,31 +17,87 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff83a6b0bb",
-        "StoredValue": "0xffffffff83a6ad80"
+        "StoredValue": "0xffffffff83a6ad80",
+        "StoredValueLocation": [
+          "/home/linux/net/netlink/af_netlink.c:373",
+          "netlink_skb_destructor"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/af_netlink.c:389",
+          "netlink_attachskb"
+        ]
       },
       {
         "PC": "0xffffffff83a6c061",
-        "StoredValue": "0xffffffff83a6ad80"
+        "StoredValue": "0xffffffff83a6ad80",
+        "StoredValueLocation": [
+          "/home/linux/net/netlink/af_netlink.c:373",
+          "netlink_skb_destructor"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/af_netlink.c:389",
+          "netlink_unicast"
+        ]
       },
       {
         "PC": "0xffffffff83a81bc5",
-        "StoredValue": "0xffffffff84152060"
+        "StoredValue": "0xffffffff84152060",
+        "StoredValueLocation": [
+          "/home/linux/net/wireless/nl80211.c:9160",
+          "nl80211_trigger_scan"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/genetlink.c:187",
+          "genl_op_from_small"
+        ]
       },
       {
         "PC": "0xffffffff83a81c3d",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/genetlink.c:188",
+          "genl_op_from_small"
+        ]
       },
       {
         "PC": "0xffffffff83a85a01",
-        "StoredValue": "0xffffffff841cebb0"
+        "StoredValue": "0xffffffff841cebb0",
+        "StoredValueLocation": [
+          "/home/linux/net/wireless/nl80211.c:16397",
+          "nl80211_pre_doit"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/genetlink.c:275",
+          "genl_get_cmd"
+        ]
       },
       {
         "PC": "0xffffffff83a85a48",
-        "StoredValue": "0xffffffff84152060"
+        "StoredValue": "0xffffffff84152060",
+        "StoredValueLocation": [
+          "/home/linux/net/wireless/nl80211.c:9160",
+          "nl80211_trigger_scan"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/genetlink.c:276",
+          "genl_get_cmd"
+        ]
       },
       {
         "PC": "0xffffffff83a85a8e",
-        "StoredValue": "0xffffffff841cf390"
+        "StoredValue": "0xffffffff841cf390",
+        "StoredValueLocation": [
+          "/home/linux/net/wireless/nl80211.c:16499",
+          "nl80211_post_doit"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/genetlink.c:277",
+          "genl_get_cmd"
+        ]
       }
     ],
     "stable_signal": "386",
@@ -51,31 +107,87 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff83a6c061",
-        "StoredValue": "0xffffffff83a6ad80"
+        "StoredValue": "0xffffffff83a6ad80",
+        "StoredValueLocation": [
+          "/home/linux/net/netlink/af_netlink.c:373",
+          "netlink_skb_destructor"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/af_netlink.c:389",
+          "netlink_unicast"
+        ]
       },
       {
         "PC": "0xffffffff83a81bc5",
-        "StoredValue": "0xffffffff84152060"
+        "StoredValue": "0xffffffff84152060",
+        "StoredValueLocation": [
+          "/home/linux/net/wireless/nl80211.c:9160",
+          "nl80211_trigger_scan"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/genetlink.c:187",
+          "genl_op_from_small"
+        ]
       },
       {
         "PC": "0xffffffff83a81c3d",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/genetlink.c:188",
+          "genl_op_from_small"
+        ]
       },
       {
         "PC": "0xffffffff83a85a01",
-        "StoredValue": "0xffffffff841cebb0"
+        "StoredValue": "0xffffffff841cebb0",
+        "StoredValueLocation": [
+          "/home/linux/net/wireless/nl80211.c:16397",
+          "nl80211_pre_doit"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/genetlink.c:275",
+          "genl_get_cmd"
+        ]
       },
       {
         "PC": "0xffffffff83a85a48",
-        "StoredValue": "0xffffffff84152060"
+        "StoredValue": "0xffffffff84152060",
+        "StoredValueLocation": [
+          "/home/linux/net/wireless/nl80211.c:9160",
+          "nl80211_trigger_scan"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/genetlink.c:276",
+          "genl_get_cmd"
+        ]
       },
       {
         "PC": "0xffffffff83a85a8e",
-        "StoredValue": "0xffffffff841cf390"
+        "StoredValue": "0xffffffff841cf390",
+        "StoredValueLocation": [
+          "/home/linux/net/wireless/nl80211.c:16499",
+          "nl80211_post_doit"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/genetlink.c:277",
+          "genl_get_cmd"
+        ]
       },
       {
         "PC": "0xffffffff83a6b0bb",
-        "StoredValue": "0xffffffff83a6ad80"
+        "StoredValue": "0xffffffff83a6ad80",
+        "StoredValueLocation": [
+          "/home/linux/net/netlink/af_netlink.c:373",
+          "netlink_skb_destructor"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/af_netlink.c:389",
+          "netlink_attachskb"
+        ]
       }
     ],
     "minimization_result": [
@@ -503,11 +615,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff813db4cd",
-        "StoredValue": "0xffffffff811dacd0"
+        "StoredValue": "0xffffffff811dacd0",
+        "StoredValueLocation": [
+          "/home/linux/kernel/signal.c:3057",
+          "do_no_restart_syscall"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/time/hrtimer.c:2115",
+          "__x64_sys_nanosleep"
+        ]
       },
       {
         "PC": "0xffffffff813db0b1",
-        "StoredValue": "0xffffffff813dda40"
+        "StoredValue": "0xffffffff813dda40",
+        "StoredValueLocation": [
+          "/home/linux/kernel/time/hrtimer.c:1918",
+          "hrtimer_wakeup"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/time/hrtimer.c:1983",
+          "__hrtimer_init_sleeper"
+        ]
       }
     ],
     "stable_signal": "73",
@@ -517,11 +645,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff813db4cd",
-        "StoredValue": "0xffffffff811dacd0"
+        "StoredValue": "0xffffffff811dacd0",
+        "StoredValueLocation": [
+          "/home/linux/kernel/signal.c:3057",
+          "do_no_restart_syscall"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/time/hrtimer.c:2115",
+          "__x64_sys_nanosleep"
+        ]
       },
       {
         "PC": "0xffffffff813db0b1",
-        "StoredValue": "0xffffffff813dda40"
+        "StoredValue": "0xffffffff813dda40",
+        "StoredValueLocation": [
+          "/home/linux/kernel/time/hrtimer.c:1918",
+          "hrtimer_wakeup"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/time/hrtimer.c:1983",
+          "__hrtimer_init_sleeper"
+        ]
       }
     ],
     "minimization_result": [
@@ -659,11 +803,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff8192974a",
-        "StoredValue": "0xffffffff8193e5e0"
+        "StoredValue": "0xffffffff8193e5e0",
+        "StoredValueLocation": [
+          "/home/linux/fs/namespace.c:1273",
+          "__cleanup_mnt"
+        ],
+        "PCLocation": [
+          "/home/linux/./include/linux/task_work.h:13",
+          "init_task_work"
+        ]
       },
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "stable_signal": "27",
@@ -673,11 +833,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff8192974a",
-        "StoredValue": "0xffffffff8193e5e0"
+        "StoredValue": "0xffffffff8193e5e0",
+        "StoredValueLocation": [
+          "/home/linux/fs/namespace.c:1273",
+          "__cleanup_mnt"
+        ],
+        "PCLocation": [
+          "/home/linux/./include/linux/task_work.h:13",
+          "init_task_work"
+        ]
       },
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "minimization_result": [
@@ -1421,7 +1597,15 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "stable_signal": "97",
@@ -1431,7 +1615,15 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "minimization_result": [
@@ -1983,7 +2175,15 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "stable_signal": "97",
@@ -1993,7 +2193,15 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "minimization_result": [
@@ -2552,7 +2760,15 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff81090378",
-        "StoredValue": "0xffffffff811dacd0"
+        "StoredValue": "0xffffffff811dacd0",
+        "StoredValueLocation": [
+          "/home/linux/kernel/signal.c:3057",
+          "do_no_restart_syscall"
+        ],
+        "PCLocation": [
+          "/home/linux/arch/x86/kernel/signal_64.c:57",
+          "__do_sys_rt_sigreturn"
+        ]
       }
     ],
     "stable_signal": "1257",
@@ -2562,7 +2778,15 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff81090378",
-        "StoredValue": "0xffffffff811dacd0"
+        "StoredValue": "0xffffffff811dacd0",
+        "StoredValueLocation": [
+          "/home/linux/kernel/signal.c:3057",
+          "do_no_restart_syscall"
+        ],
+        "PCLocation": [
+          "/home/linux/arch/x86/kernel/signal_64.c:57",
+          "__do_sys_rt_sigreturn"
+        ]
       }
     ],
     "minimization_result": [
@@ -3901,7 +4125,15 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff818a9abd",
-        "StoredValue": "0xffffffff818a9df0"
+        "StoredValue": "0xffffffff818a9df0",
+        "StoredValueLocation": [
+          "/home/linux/fs/file_table.c:449",
+          "____fput"
+        ],
+        "PCLocation": [
+          "/home/linux/./include/linux/task_work.h:13",
+          "init_task_work"
+        ]
       }
     ],
     "stable_signal": "1593",
@@ -3911,7 +4143,15 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff818a9abd",
-        "StoredValue": "0xffffffff818a9df0"
+        "StoredValue": "0xffffffff818a9df0",
+        "StoredValueLocation": [
+          "/home/linux/fs/file_table.c:449",
+          "____fput"
+        ],
+        "PCLocation": [
+          "/home/linux/./include/linux/task_work.h:13",
+          "init_task_work"
+        ]
       }
     ],
     "minimization_result": [
@@ -5458,7 +5698,15 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "stable_signal": "580",
@@ -5468,7 +5716,15 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "minimization_result": [
@@ -6063,11 +6319,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff813f904c",
-        "StoredValue": "0xffffffff811dacd0"
+        "StoredValue": "0xffffffff811dacd0",
+        "StoredValueLocation": [
+          "/home/linux/kernel/signal.c:3057",
+          "do_no_restart_syscall"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/time/posix-timers.c:1392",
+          "__se_sys_clock_nanosleep"
+        ]
       },
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "stable_signal": "2386",
@@ -6077,11 +6349,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       },
       {
         "PC": "0xffffffff813f904c",
-        "StoredValue": "0xffffffff811dacd0"
+        "StoredValue": "0xffffffff811dacd0",
+        "StoredValueLocation": [
+          "/home/linux/kernel/signal.c:3057",
+          "do_no_restart_syscall"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/time/posix-timers.c:1392",
+          "__se_sys_clock_nanosleep"
+        ]
       }
     ],
     "minimization_result": [
@@ -8356,7 +8644,15 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "stable_signal": "1950",
@@ -8366,7 +8662,15 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "minimization_result": [
@@ -10224,11 +10528,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff813f904c",
-        "StoredValue": "0xffffffff811dacd0"
+        "StoredValue": "0xffffffff811dacd0",
+        "StoredValueLocation": [
+          "/home/linux/kernel/signal.c:3057",
+          "do_no_restart_syscall"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/time/posix-timers.c:1392",
+          "__se_sys_clock_nanosleep"
+        ]
       },
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "stable_signal": "2696",
@@ -10238,11 +10558,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff813f904c",
-        "StoredValue": "0xffffffff811dacd0"
+        "StoredValue": "0xffffffff811dacd0",
+        "StoredValueLocation": [
+          "/home/linux/kernel/signal.c:3057",
+          "do_no_restart_syscall"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/time/posix-timers.c:1392",
+          "__se_sys_clock_nanosleep"
+        ]
       },
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff816cf7f0"
+        "StoredValue": "0xffffffff816cf7f0",
+        "StoredValueLocation": [
+          "/home/linux/mm/shmem.c:4486",
+          "shmem_free_in_core_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "minimization_result": [
@@ -12707,15 +13043,39 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff83e3872f",
-        "StoredValue": "0xffffffff83e45bb0"
+        "StoredValue": "0xffffffff83e45bb0",
+        "StoredValueLocation": [
+          "/home/linux/net/unix/af_unix.c:534",
+          "unix_write_space"
+        ],
+        "PCLocation": [
+          "/home/linux/net/unix/af_unix.c:972",
+          "unix_create1"
+        ]
       },
       {
         "PC": "0xffffffff83e387a1",
-        "StoredValue": "0xffffffff83e46020"
+        "StoredValue": "0xffffffff83e46020",
+        "StoredValueLocation": [
+          "/home/linux/net/unix/af_unix.c:570",
+          "unix_sock_destructor"
+        ],
+        "PCLocation": [
+          "/home/linux/net/unix/af_unix.c:974",
+          "unix_create1"
+        ]
       },
       {
         "PC": "0xffffffff83e388ae",
-        "StoredValue": "0xffffffff83e46220"
+        "StoredValue": "0xffffffff83e46220",
+        "StoredValueLocation": [
+          "/home/linux/net/unix/af_unix.c:437",
+          "unix_dgram_peer_wake_relay"
+        ],
+        "PCLocation": [
+          "/home/linux/./include/linux/wait.h:92",
+          "unix_create1"
+        ]
       }
     ],
     "stable_signal": "399",
@@ -12725,15 +13085,39 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff83e3872f",
-        "StoredValue": "0xffffffff83e45bb0"
+        "StoredValue": "0xffffffff83e45bb0",
+        "StoredValueLocation": [
+          "/home/linux/net/unix/af_unix.c:534",
+          "unix_write_space"
+        ],
+        "PCLocation": [
+          "/home/linux/net/unix/af_unix.c:972",
+          "unix_create1"
+        ]
       },
       {
         "PC": "0xffffffff83e387a1",
-        "StoredValue": "0xffffffff83e46020"
+        "StoredValue": "0xffffffff83e46020",
+        "StoredValueLocation": [
+          "/home/linux/net/unix/af_unix.c:570",
+          "unix_sock_destructor"
+        ],
+        "PCLocation": [
+          "/home/linux/net/unix/af_unix.c:974",
+          "unix_create1"
+        ]
       },
       {
         "PC": "0xffffffff83e388ae",
-        "StoredValue": "0xffffffff83e46220"
+        "StoredValue": "0xffffffff83e46220",
+        "StoredValueLocation": [
+          "/home/linux/net/unix/af_unix.c:437",
+          "unix_dgram_peer_wake_relay"
+        ],
+        "PCLocation": [
+          "/home/linux/./include/linux/wait.h:92",
+          "unix_create1"
+        ]
       }
     ],
     "minimization_result": [
@@ -13148,7 +13532,15 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff83a85a48",
-        "StoredValue": "0xffffffff8414b730"
+        "StoredValue": "0xffffffff8414b730",
+        "StoredValueLocation": [
+          "/home/linux/net/wireless/nl80211.c:7635",
+          "nl80211_del_station"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/genetlink.c:276",
+          "genl_get_cmd"
+        ]
       }
     ],
     "stable_signal": "447",
@@ -13158,7 +13550,15 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff83a85a48",
-        "StoredValue": "0xffffffff8414b730"
+        "StoredValue": "0xffffffff8414b730",
+        "StoredValueLocation": [
+          "/home/linux/net/wireless/nl80211.c:7635",
+          "nl80211_del_station"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/genetlink.c:276",
+          "genl_get_cmd"
+        ]
       }
     ],
     "minimization_result": [
@@ -13630,15 +14030,39 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff818fd9f0",
-        "StoredValue": "0xffffffff818f8150"
+        "StoredValue": "0xffffffff818f8150",
+        "StoredValueLocation": [
+          "/home/linux/fs/select.c:224",
+          "__pollwait"
+        ],
+        "PCLocation": [
+          "/home/linux/./include/linux/poll.h:71",
+          "do_sys_poll"
+        ]
       },
       {
         "PC": "0xffffffff818fe3b9",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/select.c:?",
+          "do_sys_poll"
+        ]
       },
       {
         "PC": "0xffffffff846188c4",
-        "StoredValue": "0xffffffff813dda40"
+        "StoredValue": "0xffffffff813dda40",
+        "StoredValueLocation": [
+          "/home/linux/kernel/time/hrtimer.c:1918",
+          "hrtimer_wakeup"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/time/hrtimer.c:1983",
+          "__hrtimer_init_sleeper"
+        ]
       }
     ],
     "stable_signal": "35",
@@ -13648,15 +14072,39 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff818fd9f0",
-        "StoredValue": "0xffffffff818f8150"
+        "StoredValue": "0xffffffff818f8150",
+        "StoredValueLocation": [
+          "/home/linux/fs/select.c:224",
+          "__pollwait"
+        ],
+        "PCLocation": [
+          "/home/linux/./include/linux/poll.h:71",
+          "do_sys_poll"
+        ]
       },
       {
         "PC": "0xffffffff818fe3b9",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/select.c:?",
+          "do_sys_poll"
+        ]
       },
       {
         "PC": "0xffffffff846188c4",
-        "StoredValue": "0xffffffff813dda40"
+        "StoredValue": "0xffffffff813dda40",
+        "StoredValueLocation": [
+          "/home/linux/kernel/time/hrtimer.c:1918",
+          "hrtimer_wakeup"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/time/hrtimer.c:1983",
+          "__hrtimer_init_sleeper"
+        ]
       }
     ],
     "minimization_result": [
@@ -13824,11 +14272,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff815c993b",
-        "StoredValue": "0xffffffff815c99a0"
+        "StoredValue": "0xffffffff815c99a0",
+        "StoredValueLocation": [
+          "/home/linux/kernel/bpf/core.c:2768",
+          "bpf_prog_free_deferred"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/bpf/core.c:2813",
+          "bpf_prog_free"
+        ]
       },
       {
         "PC": "0xffffffff8394dd32",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/net/core/filter.c:1325",
+          "bpf_prepare_filter"
+        ]
       }
     ],
     "stable_signal": "390",
@@ -13838,11 +14302,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff8394dd32",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/net/core/filter.c:1325",
+          "bpf_prepare_filter"
+        ]
       },
       {
         "PC": "0xffffffff815c993b",
-        "StoredValue": "0xffffffff815c99a0"
+        "StoredValue": "0xffffffff815c99a0",
+        "StoredValueLocation": [
+          "/home/linux/kernel/bpf/core.c:2768",
+          "bpf_prog_free_deferred"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/bpf/core.c:2813",
+          "bpf_prog_free"
+        ]
       }
     ],
     "minimization_result": [
@@ -14320,15 +14800,39 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff818fe3b9",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/select.c:?",
+          "do_sys_poll"
+        ]
       },
       {
         "PC": "0xffffffff846188c4",
-        "StoredValue": "0xffffffff813dda40"
+        "StoredValue": "0xffffffff813dda40",
+        "StoredValueLocation": [
+          "/home/linux/kernel/time/hrtimer.c:1918",
+          "hrtimer_wakeup"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/time/hrtimer.c:1983",
+          "__hrtimer_init_sleeper"
+        ]
       },
       {
         "PC": "0xffffffff818fd9f0",
-        "StoredValue": "0xffffffff818f8150"
+        "StoredValue": "0xffffffff818f8150",
+        "StoredValueLocation": [
+          "/home/linux/fs/select.c:224",
+          "__pollwait"
+        ],
+        "PCLocation": [
+          "/home/linux/./include/linux/poll.h:71",
+          "do_sys_poll"
+        ]
       }
     ],
     "stable_signal": "75",
@@ -14338,15 +14842,39 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff846188c4",
-        "StoredValue": "0xffffffff813dda40"
+        "StoredValue": "0xffffffff813dda40",
+        "StoredValueLocation": [
+          "/home/linux/kernel/time/hrtimer.c:1918",
+          "hrtimer_wakeup"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/time/hrtimer.c:1983",
+          "__hrtimer_init_sleeper"
+        ]
       },
       {
         "PC": "0xffffffff818fd9f0",
-        "StoredValue": "0xffffffff818f8150"
+        "StoredValue": "0xffffffff818f8150",
+        "StoredValueLocation": [
+          "/home/linux/fs/select.c:224",
+          "__pollwait"
+        ],
+        "PCLocation": [
+          "/home/linux/./include/linux/poll.h:71",
+          "do_sys_poll"
+        ]
       },
       {
         "PC": "0xffffffff818fe3b9",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/select.c:?",
+          "do_sys_poll"
+        ]
       }
     ],
     "minimization_result": [
@@ -14478,11 +15006,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff83e3d6fd",
-        "StoredValue": "0xffffffff83e35520"
+        "StoredValue": "0xffffffff83e35520",
+        "StoredValueLocation": [
+          "/home/linux/net/unix/af_unix.c:2897",
+          "unix_stream_read_actor"
+        ],
+        "PCLocation": [
+          "/home/linux/net/unix/af_unix.c:2922",
+          "unix_stream_recvmsg"
+        ]
       },
       {
         "PC": "0xffffffff83e36da8",
-        "StoredValue": "0xffffffff812bc190"
+        "StoredValue": "0xffffffff812bc190",
+        "StoredValueLocation": [
+          "/home/linux/kernel/sched/wait.c:383",
+          "autoremove_wake_function"
+        ],
+        "PCLocation": [
+          "/home/linux/net/unix/af_unix.c:2517",
+          "unix_stream_read_generic"
+        ]
       }
     ],
     "stable_signal": "62",
@@ -14492,11 +15036,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff83e3d6fd",
-        "StoredValue": "0xffffffff83e35520"
+        "StoredValue": "0xffffffff83e35520",
+        "StoredValueLocation": [
+          "/home/linux/net/unix/af_unix.c:2897",
+          "unix_stream_read_actor"
+        ],
+        "PCLocation": [
+          "/home/linux/net/unix/af_unix.c:2922",
+          "unix_stream_recvmsg"
+        ]
       },
       {
         "PC": "0xffffffff83e36da8",
-        "StoredValue": "0xffffffff812bc190"
+        "StoredValue": "0xffffffff812bc190",
+        "StoredValueLocation": [
+          "/home/linux/kernel/sched/wait.c:383",
+          "autoremove_wake_function"
+        ],
+        "PCLocation": [
+          "/home/linux/net/unix/af_unix.c:2517",
+          "unix_stream_read_generic"
+        ]
       }
     ],
     "minimization_result": [
@@ -14610,11 +15170,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff83e3d6fd",
-        "StoredValue": "0xffffffff83e35520"
+        "StoredValue": "0xffffffff83e35520",
+        "StoredValueLocation": [
+          "/home/linux/net/unix/af_unix.c:2897",
+          "unix_stream_read_actor"
+        ],
+        "PCLocation": [
+          "/home/linux/net/unix/af_unix.c:2922",
+          "unix_stream_recvmsg"
+        ]
       },
       {
         "PC": "0xffffffff83e36da8",
-        "StoredValue": "0xffffffff812bc190"
+        "StoredValue": "0xffffffff812bc190",
+        "StoredValueLocation": [
+          "/home/linux/kernel/sched/wait.c:383",
+          "autoremove_wake_function"
+        ],
+        "PCLocation": [
+          "/home/linux/net/unix/af_unix.c:2517",
+          "unix_stream_read_generic"
+        ]
       }
     ],
     "stable_signal": "36",
@@ -14624,11 +15200,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff83e36da8",
-        "StoredValue": "0xffffffff812bc190"
+        "StoredValue": "0xffffffff812bc190",
+        "StoredValueLocation": [
+          "/home/linux/kernel/sched/wait.c:383",
+          "autoremove_wake_function"
+        ],
+        "PCLocation": [
+          "/home/linux/net/unix/af_unix.c:2517",
+          "unix_stream_read_generic"
+        ]
       },
       {
         "PC": "0xffffffff83e3d6fd",
-        "StoredValue": "0xffffffff83e35520"
+        "StoredValue": "0xffffffff83e35520",
+        "StoredValueLocation": [
+          "/home/linux/net/unix/af_unix.c:2897",
+          "unix_stream_read_actor"
+        ],
+        "PCLocation": [
+          "/home/linux/net/unix/af_unix.c:2922",
+          "unix_stream_recvmsg"
+        ]
       }
     ],
     "minimization_result": [
@@ -14766,15 +15358,39 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff817993bc",
-        "StoredValue": "0xffffffff817996c0"
+        "StoredValue": "0xffffffff817996c0",
+        "StoredValueLocation": [
+          "/home/linux/mm/rmap.c:1066",
+          "page_mkclean_one"
+        ],
+        "PCLocation": [
+          "/home/linux/mm/rmap.c:1087",
+          "folio_mkclean"
+        ]
       },
       {
         "PC": "0xffffffff81799400",
-        "StoredValue": "0xffffffff81799920"
+        "StoredValue": "0xffffffff81799920",
+        "StoredValueLocation": [
+          "/home/linux/mm/rmap.c:1076",
+          "invalid_mkclean_vma"
+        ],
+        "PCLocation": [
+          "/home/linux/mm/rmap.c:1087",
+          "folio_mkclean"
+        ]
       },
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff81d08df0"
+        "StoredValue": "0xffffffff81d08df0",
+        "StoredValueLocation": [
+          "/home/linux/fs/fat/inode.c:768",
+          "fat_free_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "stable_signal": "3543",
@@ -14784,15 +15400,39 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff817993bc",
-        "StoredValue": "0xffffffff817996c0"
+        "StoredValue": "0xffffffff817996c0",
+        "StoredValueLocation": [
+          "/home/linux/mm/rmap.c:1066",
+          "page_mkclean_one"
+        ],
+        "PCLocation": [
+          "/home/linux/mm/rmap.c:1087",
+          "folio_mkclean"
+        ]
       },
       {
         "PC": "0xffffffff81799400",
-        "StoredValue": "0xffffffff81799920"
+        "StoredValue": "0xffffffff81799920",
+        "StoredValueLocation": [
+          "/home/linux/mm/rmap.c:1076",
+          "invalid_mkclean_vma"
+        ],
+        "PCLocation": [
+          "/home/linux/mm/rmap.c:1087",
+          "folio_mkclean"
+        ]
       },
       {
         "PC": "0xffffffff8191af96",
-        "StoredValue": "0xffffffff81d08df0"
+        "StoredValue": "0xffffffff81d08df0",
+        "StoredValueLocation": [
+          "/home/linux/fs/fat/inode.c:768",
+          "fat_free_inode"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/inode.c:315",
+          "evict"
+        ]
       }
     ],
     "minimization_result": [
@@ -18021,19 +18661,51 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff82521ec0",
-        "StoredValue": "0xffffffff82526bb0"
+        "StoredValue": "0xffffffff82526bb0",
+        "StoredValueLocation": [
+          "/home/linux/drivers/tty/tty_io.c:668",
+          "do_tty_hangup"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/tty/tty_io.c:3134",
+          "alloc_tty_struct"
+        ]
       },
       {
         "PC": "0xffffffff82522046",
-        "StoredValue": "0xffffffff82526bd0"
+        "StoredValue": "0xffffffff82526bd0",
+        "StoredValueLocation": [
+          "/home/linux/drivers/tty/tty_io.c:3074",
+          "do_SAK_work"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/tty/tty_io.c:3140",
+          "alloc_tty_struct"
+        ]
       },
       {
         "PC": "0xffffffff82544bf2",
-        "StoredValue": "0xffffffff82544cb0"
+        "StoredValue": "0xffffffff82544cb0",
+        "StoredValueLocation": [
+          "/home/linux/drivers/tty/tty_buffer.c:463",
+          "flush_to_ldisc"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/tty/tty_buffer.c:587",
+          "tty_buffer_init"
+        ]
       },
       {
         "PC": "0xffffffff8251fa13",
-        "StoredValue": "0xffffffff82529000"
+        "StoredValue": "0xffffffff82529000",
+        "StoredValueLocation": [
+          "/home/linux/drivers/tty/tty_io.c:1530",
+          "release_one_tty"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/tty/tty_io.c:1558",
+          "queue_release_one_tty"
+        ]
       }
     ],
     "stable_signal": "321",
@@ -18043,19 +18715,51 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff82521ec0",
-        "StoredValue": "0xffffffff82526bb0"
+        "StoredValue": "0xffffffff82526bb0",
+        "StoredValueLocation": [
+          "/home/linux/drivers/tty/tty_io.c:668",
+          "do_tty_hangup"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/tty/tty_io.c:3134",
+          "alloc_tty_struct"
+        ]
       },
       {
         "PC": "0xffffffff82522046",
-        "StoredValue": "0xffffffff82526bd0"
+        "StoredValue": "0xffffffff82526bd0",
+        "StoredValueLocation": [
+          "/home/linux/drivers/tty/tty_io.c:3074",
+          "do_SAK_work"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/tty/tty_io.c:3140",
+          "alloc_tty_struct"
+        ]
       },
       {
         "PC": "0xffffffff82544bf2",
-        "StoredValue": "0xffffffff82544cb0"
+        "StoredValue": "0xffffffff82544cb0",
+        "StoredValueLocation": [
+          "/home/linux/drivers/tty/tty_buffer.c:463",
+          "flush_to_ldisc"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/tty/tty_buffer.c:587",
+          "tty_buffer_init"
+        ]
       },
       {
         "PC": "0xffffffff8251fa13",
-        "StoredValue": "0xffffffff82529000"
+        "StoredValue": "0xffffffff82529000",
+        "StoredValueLocation": [
+          "/home/linux/drivers/tty/tty_io.c:1530",
+          "release_one_tty"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/tty/tty_io.c:1558",
+          "queue_release_one_tty"
+        ]
       }
     ],
     "minimization_result": [
@@ -19386,7 +20090,15 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff81191aeb",
-        "StoredValue": "0xffffffff8214e5c0"
+        "StoredValue": "0xffffffff8214e5c0",
+        "StoredValueLocation": [
+          "/home/linux/io_uring/sqpoll.c:270",
+          "io_sq_thread"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/fork.c:2735",
+          "create_io_thread"
+        ]
       }
     ],
     "stable_signal": "1484",
@@ -19396,7 +20108,15 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff81191aeb",
-        "StoredValue": "0xffffffff8214e5c0"
+        "StoredValue": "0xffffffff8214e5c0",
+        "StoredValueLocation": [
+          "/home/linux/io_uring/sqpoll.c:270",
+          "io_sq_thread"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/fork.c:2735",
+          "create_io_thread"
+        ]
       }
     ],
     "minimization_result": [
@@ -21176,31 +21896,87 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff81efd7e7",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/security/keys/keyring.c:942",
+          "keyring_search"
+        ]
       },
       {
         "PC": "0xffffffff811f7eb4",
-        "StoredValue": "0xffffffff81f0d3f0"
+        "StoredValue": "0xffffffff81f0d3f0",
+        "StoredValueLocation": [
+          "/home/linux/security/keys/request_key.c:91",
+          "umh_keys_cleanup"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/umh.c:377",
+          "call_usermodehelper_setup"
+        ]
       },
       {
         "PC": "0xffffffff811f7ee1",
-        "StoredValue": "0xffffffff81f0d3a0"
+        "StoredValue": "0xffffffff81f0d3a0",
+        "StoredValueLocation": [
+          "/home/linux/security/keys/request_key.c:81",
+          "umh_keys_init"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/umh.c:378",
+          "call_usermodehelper_setup"
+        ]
       },
       {
         "PC": "0xffffffff81f0ad05",
-        "StoredValue": "0xffffffff81efbd20"
+        "StoredValue": "0xffffffff81efbd20",
+        "StoredValueLocation": [
+          "/home/linux/security/keys/keyring.c:567",
+          "key_default_cmp"
+        ],
+        "PCLocation": [
+          "/home/linux/security/keys/request_key.c:589",
+          "request_key_and_link"
+        ]
       },
       {
         "PC": "0xffffffff81f0adcf",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/security/keys/request_key.c:583",
+          "request_key_and_link"
+        ]
       },
       {
         "PC": "0xffffffff81efbdd7",
-        "StoredValue": "0xffffffff81efc030"
+        "StoredValue": "0xffffffff81efc030",
+        "StoredValueLocation": [
+          "/home/linux/security/keys/keyring.c:575",
+          "keyring_search_iterator"
+        ],
+        "PCLocation": [
+          "/home/linux/security/keys/keyring.c:905",
+          "keyring_search_rcu"
+        ]
       },
       {
         "PC": "0xffffffff81efd73b",
-        "StoredValue": "0xffffffff81efbd20"
+        "StoredValue": "0xffffffff81efbd20",
+        "StoredValueLocation": [
+          "/home/linux/security/keys/keyring.c:567",
+          "key_default_cmp"
+        ],
+        "PCLocation": [
+          "/home/linux/security/keys/keyring.c:947",
+          "keyring_search"
+        ]
       }
     ],
     "stable_signal": "301",
@@ -21210,31 +21986,87 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff81f0adcf",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/security/keys/request_key.c:583",
+          "request_key_and_link"
+        ]
       },
       {
         "PC": "0xffffffff81efbdd7",
-        "StoredValue": "0xffffffff81efc030"
+        "StoredValue": "0xffffffff81efc030",
+        "StoredValueLocation": [
+          "/home/linux/security/keys/keyring.c:575",
+          "keyring_search_iterator"
+        ],
+        "PCLocation": [
+          "/home/linux/security/keys/keyring.c:905",
+          "keyring_search_rcu"
+        ]
       },
       {
         "PC": "0xffffffff81efd73b",
-        "StoredValue": "0xffffffff81efbd20"
+        "StoredValue": "0xffffffff81efbd20",
+        "StoredValueLocation": [
+          "/home/linux/security/keys/keyring.c:567",
+          "key_default_cmp"
+        ],
+        "PCLocation": [
+          "/home/linux/security/keys/keyring.c:947",
+          "keyring_search"
+        ]
       },
       {
         "PC": "0xffffffff81efd7e7",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/security/keys/keyring.c:942",
+          "keyring_search"
+        ]
       },
       {
         "PC": "0xffffffff811f7eb4",
-        "StoredValue": "0xffffffff81f0d3f0"
+        "StoredValue": "0xffffffff81f0d3f0",
+        "StoredValueLocation": [
+          "/home/linux/security/keys/request_key.c:91",
+          "umh_keys_cleanup"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/umh.c:377",
+          "call_usermodehelper_setup"
+        ]
       },
       {
         "PC": "0xffffffff811f7ee1",
-        "StoredValue": "0xffffffff81f0d3a0"
+        "StoredValue": "0xffffffff81f0d3a0",
+        "StoredValueLocation": [
+          "/home/linux/security/keys/request_key.c:81",
+          "umh_keys_init"
+        ],
+        "PCLocation": [
+          "/home/linux/kernel/umh.c:378",
+          "call_usermodehelper_setup"
+        ]
       },
       {
         "PC": "0xffffffff81f0ad05",
-        "StoredValue": "0xffffffff81efbd20"
+        "StoredValue": "0xffffffff81efbd20",
+        "StoredValueLocation": [
+          "/home/linux/security/keys/keyring.c:567",
+          "key_default_cmp"
+        ],
+        "PCLocation": [
+          "/home/linux/security/keys/request_key.c:589",
+          "request_key_and_link"
+        ]
       }
     ],
     "minimization_result": [
@@ -21859,11 +22691,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff819b018f",
-        "StoredValue": "0xffffffff819b1ba0"
+        "StoredValue": "0xffffffff819b1ba0",
+        "StoredValueLocation": [
+          "/home/linux/fs/mpage.c:47",
+          "mpage_read_end_io"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/mpage.c:80",
+          "mpage_bio_submit_read"
+        ]
       },
       {
         "PC": "0xffffffff819ae93c",
-        "StoredValue": "0xffffffff81d1c660"
+        "StoredValue": "0xffffffff81d1c660",
+        "StoredValueLocation": [
+          "/home/linux/fs/isofs/inode.c:1120",
+          "isofs_get_block"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/mpage.c:372",
+          "mpage_readahead"
+        ]
       }
     ],
     "stable_signal": "53",
@@ -21873,11 +22721,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff819ae93c",
-        "StoredValue": "0xffffffff81d1c660"
+        "StoredValue": "0xffffffff81d1c660",
+        "StoredValueLocation": [
+          "/home/linux/fs/isofs/inode.c:1120",
+          "isofs_get_block"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/mpage.c:372",
+          "mpage_readahead"
+        ]
       },
       {
         "PC": "0xffffffff819b018f",
-        "StoredValue": "0xffffffff819b1ba0"
+        "StoredValue": "0xffffffff819b1ba0",
+        "StoredValueLocation": [
+          "/home/linux/fs/mpage.c:47",
+          "mpage_read_end_io"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/mpage.c:80",
+          "mpage_bio_submit_read"
+        ]
       }
     ],
     "minimization_result": [
@@ -23909,11 +24773,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff8217400f",
-        "StoredValue": "0xffffffff81244b70"
+        "StoredValue": "0xffffffff81244b70",
+        "StoredValueLocation": [
+          "/home/linux/kernel/groups.c:77",
+          "gid_cmp"
+        ],
+        "PCLocation": [
+          "/home/linux/lib/sort.c:295",
+          "sort"
+        ]
       },
       {
         "PC": "0xffffffff8217403a",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/lib/sort.c:295",
+          "sort"
+        ]
       }
     ],
     "stable_signal": "163",
@@ -23923,11 +24803,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff8217403a",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/lib/sort.c:295",
+          "sort"
+        ]
       },
       {
         "PC": "0xffffffff8217400f",
-        "StoredValue": "0xffffffff81244b70"
+        "StoredValue": "0xffffffff81244b70",
+        "StoredValueLocation": [
+          "/home/linux/kernel/groups.c:77",
+          "gid_cmp"
+        ],
+        "PCLocation": [
+          "/home/linux/lib/sort.c:295",
+          "sort"
+        ]
       }
     ],
     "minimization_result": [
@@ -24138,11 +25034,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff8217400f",
-        "StoredValue": "0xffffffff81244b70"
+        "StoredValue": "0xffffffff81244b70",
+        "StoredValueLocation": [
+          "/home/linux/kernel/groups.c:77",
+          "gid_cmp"
+        ],
+        "PCLocation": [
+          "/home/linux/lib/sort.c:295",
+          "sort"
+        ]
       },
       {
         "PC": "0xffffffff8217403a",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/lib/sort.c:295",
+          "sort"
+        ]
       }
     ],
     "stable_signal": "164",
@@ -24152,11 +25064,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff8217400f",
-        "StoredValue": "0xffffffff81244b70"
+        "StoredValue": "0xffffffff81244b70",
+        "StoredValueLocation": [
+          "/home/linux/kernel/groups.c:77",
+          "gid_cmp"
+        ],
+        "PCLocation": [
+          "/home/linux/lib/sort.c:295",
+          "sort"
+        ]
       },
       {
         "PC": "0xffffffff8217403a",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/lib/sort.c:295",
+          "sort"
+        ]
       }
     ],
     "minimization_result": [
@@ -24389,7 +25317,15 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff819a75d9",
-        "StoredValue": "0xffffffff819a0d30"
+        "StoredValue": "0xffffffff819a0d30",
+        "StoredValueLocation": [
+          "/home/linux/fs/buffer.c:379",
+          "end_buffer_async_write"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/buffer.c:449",
+          "mark_buffer_async_write_endio"
+        ]
       }
     ],
     "stable_signal": "1455",
@@ -24399,7 +25335,15 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff819a75d9",
-        "StoredValue": "0xffffffff819a0d30"
+        "StoredValue": "0xffffffff819a0d30",
+        "StoredValueLocation": [
+          "/home/linux/fs/buffer.c:379",
+          "end_buffer_async_write"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/buffer.c:449",
+          "mark_buffer_async_write_endio"
+        ]
       }
     ],
     "minimization_result": [
@@ -25949,11 +26893,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff8219c613",
-        "StoredValue": "0xffffffff819e1700"
+        "StoredValue": "0xffffffff819e1700",
+        "StoredValueLocation": [
+          "/home/linux/fs/aio.c:657",
+          "free_ioctx_users"
+        ],
+        "PCLocation": [
+          "/home/linux/lib/percpu-refcount.c:100",
+          "percpu_ref_init"
+        ]
       },
       {
         "PC": "0xffffffff8219c613",
-        "StoredValue": "0xffffffff819e18d0"
+        "StoredValue": "0xffffffff819e18d0",
+        "StoredValueLocation": [
+          "/home/linux/fs/aio.c:639",
+          "free_ioctx_reqs"
+        ],
+        "PCLocation": [
+          "/home/linux/lib/percpu-refcount.c:100",
+          "percpu_ref_init"
+        ]
       }
     ],
     "stable_signal": "42",
@@ -25963,11 +26923,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff8219c613",
-        "StoredValue": "0xffffffff819e1700"
+        "StoredValue": "0xffffffff819e1700",
+        "StoredValueLocation": [
+          "/home/linux/fs/aio.c:657",
+          "free_ioctx_users"
+        ],
+        "PCLocation": [
+          "/home/linux/lib/percpu-refcount.c:100",
+          "percpu_ref_init"
+        ]
       },
       {
         "PC": "0xffffffff8219c613",
-        "StoredValue": "0xffffffff819e18d0"
+        "StoredValue": "0xffffffff819e18d0",
+        "StoredValueLocation": [
+          "/home/linux/fs/aio.c:639",
+          "free_ioctx_reqs"
+        ],
+        "PCLocation": [
+          "/home/linux/lib/percpu-refcount.c:100",
+          "percpu_ref_init"
+        ]
       }
     ],
     "minimization_result": [
@@ -26705,7 +27681,15 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff818fe219",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/select.c:?",
+          "do_sys_poll"
+        ]
       }
     ],
     "stable_signal": "53",
@@ -26715,7 +27699,15 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff818fe219",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/select.c:?",
+          "do_sys_poll"
+        ]
       }
     ],
     "minimization_result": [
@@ -26814,7 +27806,15 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff818fe219",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/select.c:?",
+          "do_sys_poll"
+        ]
       }
     ],
     "stable_signal": "47",
@@ -26824,7 +27824,15 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff818fe219",
-        "StoredValue": "0x0"
+        "StoredValue": "0x0",
+        "StoredValueLocation": [
+          "/home/linux/arch/x86/kernel/cpu/common.c:2012",
+          "__per_cpu_start"
+        ],
+        "PCLocation": [
+          "/home/linux/fs/select.c:?",
+          "do_sys_poll"
+        ]
       }
     ],
     "minimization_result": [
@@ -26927,27 +27935,75 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff83a71659",
-        "StoredValue": "0xffffffff83a6ad80"
+        "StoredValue": "0xffffffff83a6ad80",
+        "StoredValueLocation": [
+          "/home/linux/net/netlink/af_netlink.c:373",
+          "netlink_skb_destructor"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/af_netlink.c:389",
+          "netlink_dump"
+        ]
       },
       {
         "PC": "0xffffffff83b12876",
-        "StoredValue": "0xffffffff83b15e80"
+        "StoredValue": "0xffffffff83b15e80",
+        "StoredValueLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:1054",
+          "ctnetlink_start"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:1664",
+          "ctnetlink_get_conntrack"
+        ]
       },
       {
         "PC": "0xffffffff83b128b2",
-        "StoredValue": "0xffffffff83b16020"
+        "StoredValue": "0xffffffff83b16020",
+        "StoredValueLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:1192",
+          "ctnetlink_dump_table"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:1664",
+          "ctnetlink_get_conntrack"
+        ]
       },
       {
         "PC": "0xffffffff83b128e5",
-        "StoredValue": "0xffffffff83b16f40"
+        "StoredValue": "0xffffffff83b16f40",
+        "StoredValueLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:865",
+          "ctnetlink_done"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:1664",
+          "ctnetlink_get_conntrack"
+        ]
       },
       {
         "PC": "0xffffffff83a70a17",
-        "StoredValue": "0xffffffff83b16020"
+        "StoredValue": "0xffffffff83b16020",
+        "StoredValueLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:1192",
+          "ctnetlink_dump_table"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/af_netlink.c:2432",
+          "__netlink_dump_start"
+        ]
       },
       {
         "PC": "0xffffffff83a70a60",
-        "StoredValue": "0xffffffff83b16f40"
+        "StoredValue": "0xffffffff83b16f40",
+        "StoredValueLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:865",
+          "ctnetlink_done"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/af_netlink.c:2433",
+          "__netlink_dump_start"
+        ]
       }
     ],
     "stable_signal": "34",
@@ -26957,27 +28013,75 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff83a70a60",
-        "StoredValue": "0xffffffff83b16f40"
+        "StoredValue": "0xffffffff83b16f40",
+        "StoredValueLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:865",
+          "ctnetlink_done"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/af_netlink.c:2433",
+          "__netlink_dump_start"
+        ]
       },
       {
         "PC": "0xffffffff83a71659",
-        "StoredValue": "0xffffffff83a6ad80"
+        "StoredValue": "0xffffffff83a6ad80",
+        "StoredValueLocation": [
+          "/home/linux/net/netlink/af_netlink.c:373",
+          "netlink_skb_destructor"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/af_netlink.c:389",
+          "netlink_dump"
+        ]
       },
       {
         "PC": "0xffffffff83b12876",
-        "StoredValue": "0xffffffff83b15e80"
+        "StoredValue": "0xffffffff83b15e80",
+        "StoredValueLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:1054",
+          "ctnetlink_start"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:1664",
+          "ctnetlink_get_conntrack"
+        ]
       },
       {
         "PC": "0xffffffff83b128b2",
-        "StoredValue": "0xffffffff83b16020"
+        "StoredValue": "0xffffffff83b16020",
+        "StoredValueLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:1192",
+          "ctnetlink_dump_table"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:1664",
+          "ctnetlink_get_conntrack"
+        ]
       },
       {
         "PC": "0xffffffff83b128e5",
-        "StoredValue": "0xffffffff83b16f40"
+        "StoredValue": "0xffffffff83b16f40",
+        "StoredValueLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:865",
+          "ctnetlink_done"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:1664",
+          "ctnetlink_get_conntrack"
+        ]
       },
       {
         "PC": "0xffffffff83a70a17",
-        "StoredValue": "0xffffffff83b16020"
+        "StoredValue": "0xffffffff83b16020",
+        "StoredValueLocation": [
+          "/home/linux/net/netfilter/nf_conntrack_netlink.c:1192",
+          "ctnetlink_dump_table"
+        ],
+        "PCLocation": [
+          "/home/linux/net/netlink/af_netlink.c:2432",
+          "__netlink_dump_start"
+        ]
       }
     ],
     "minimization_result": [
@@ -27371,11 +28475,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff8256ca74",
-        "StoredValue": "0xffffffff82558400"
+        "StoredValue": "0xffffffff82558400",
+        "StoredValueLocation": [
+          "/home/linux/drivers/tty/vt/vt_ioctl.c:977",
+          "vc_SAK"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/tty/vt/vt.c:1072",
+          "vc_allocate"
+        ]
       },
       {
         "PC": "0xffffffff82ebd19d",
-        "StoredValue": "0xffffffff82ec3230"
+        "StoredValue": "0xffffffff82ec3230",
+        "StoredValueLocation": [
+          "/home/linux/drivers/base/core.c:4336",
+          "device_create_release"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/base/core.c:4364",
+          "device_create"
+        ]
       }
     ],
     "stable_signal": "133",
@@ -27385,11 +28505,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff8256ca74",
-        "StoredValue": "0xffffffff82558400"
+        "StoredValue": "0xffffffff82558400",
+        "StoredValueLocation": [
+          "/home/linux/drivers/tty/vt/vt_ioctl.c:977",
+          "vc_SAK"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/tty/vt/vt.c:1072",
+          "vc_allocate"
+        ]
       },
       {
         "PC": "0xffffffff82ebd19d",
-        "StoredValue": "0xffffffff82ec3230"
+        "StoredValue": "0xffffffff82ec3230",
+        "StoredValueLocation": [
+          "/home/linux/drivers/base/core.c:4336",
+          "device_create_release"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/base/core.c:4364",
+          "device_create"
+        ]
       }
     ],
     "minimization_result": [
@@ -28724,11 +29860,27 @@
     "new_fpointers_json": [
       {
         "PC": "0xffffffff8256ca74",
-        "StoredValue": "0xffffffff82558400"
+        "StoredValue": "0xffffffff82558400",
+        "StoredValueLocation": [
+          "/home/linux/drivers/tty/vt/vt_ioctl.c:977",
+          "vc_SAK"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/tty/vt/vt.c:1072",
+          "vc_allocate"
+        ]
       },
       {
         "PC": "0xffffffff82ebd19d",
-        "StoredValue": "0xffffffff82ec3230"
+        "StoredValue": "0xffffffff82ec3230",
+        "StoredValueLocation": [
+          "/home/linux/drivers/base/core.c:4336",
+          "device_create_release"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/base/core.c:4364",
+          "device_create"
+        ]
       }
     ],
     "stable_signal": "1464",
@@ -28738,11 +29890,27 @@
     "new_stable_fpointers_json": [
       {
         "PC": "0xffffffff82ebd19d",
-        "StoredValue": "0xffffffff82ec3230"
+        "StoredValue": "0xffffffff82ec3230",
+        "StoredValueLocation": [
+          "/home/linux/drivers/base/core.c:4336",
+          "device_create_release"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/base/core.c:4364",
+          "device_create"
+        ]
       },
       {
         "PC": "0xffffffff8256ca74",
-        "StoredValue": "0xffffffff82558400"
+        "StoredValue": "0xffffffff82558400",
+        "StoredValueLocation": [
+          "/home/linux/drivers/tty/vt/vt_ioctl.c:977",
+          "vc_SAK"
+        ],
+        "PCLocation": [
+          "/home/linux/drivers/tty/vt/vt.c:1072",
+          "vc_allocate"
+        ]
       }
     ],
     "minimization_result": [
