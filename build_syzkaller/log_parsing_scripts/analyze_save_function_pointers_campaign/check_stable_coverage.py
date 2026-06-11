@@ -309,6 +309,13 @@ def check_easy_stats(prog2log: dict[str, dict]) -> None:
 
 
 def has_minimization_result(minimization_result_type: str) -> Callable[[dict], bool]:
+    '''
+    Args:
+        minimization_result_type: desired key in one of the minimization results in an entry
+
+    Returns:
+        function that returns True for entries that have the specified minimization result type
+    '''
     def checker(prog_entry: dict) -> bool:
         if RESULT_KEYS.MINIMIZATION_RESULT not in prog_entry:
             return False
@@ -344,9 +351,14 @@ def get_duplicate_progs(
 
 def deduplicate_saved_progs(prog2log: dict[str, dict]) -> tuple[dict, dict, int]:
     """
-    The first dictionary is the subdict of the input where each saved program in the corpus appears only once
-    The second dictionary is the full input sorted in decreasing order by the amount of repetitions of the saved program
-    The returned integer is the amount of programs saved in the corpus that appeared more than once in the input
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
+
+    Returns:
+        tuple[dict, dict, int]: A tuple with three elements:
+            not_duplicate_dict: sub-dictionary of the input where each saved program in the corpus appears only once
+            sorted_by_duplicates: input dictionary sorted in decreasing order by the amount of repetitions of the saved program
+            count: amount of programs saved in the corpus that appear more than once in the input
     """
     count, duplicate = get_duplicate_progs(prog2log)
     # we need this so upcoming lists are also sorted in decreasing order of repetitions
@@ -387,6 +399,21 @@ def deduplicate_saved_progs(prog2log: dict[str, dict]) -> tuple[dict, dict, int]
     return not_duplicate_dict, sorted_by_duplicates, len(duplicate)
 
 
+def get_saved_because_skip_signal(prog2log: dict[str, dict]) -> dict[str, dict]:
+    '''
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
+
+    Returns:
+        sub-dictionary of the input where only functionPointerCoverage was interesting
+    '''
+    return filter_many_cond(
+        prog2log,
+        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP),
+        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER),
+    )
+
+
 def check_duplicated_progs(prog2log: dict[str, dict]) -> None:
     prog2_count, duplicate = get_duplicate_progs(prog2log)
     print(f"Number of unique progs saved in corpus: {len(prog2_count)}")
@@ -394,12 +421,7 @@ def check_duplicated_progs(prog2log: dict[str, dict]) -> None:
 
 
 def check_saved_because_fpointer(prog2log: dict[str, dict]) -> None:
-
-    saved_because_skip_signal = filter_many_cond(
-        prog2log,
-        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP),
-        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER),
-    )
+    saved_because_skip_signal = get_saved_because_skip_signal(prog2log)
     (
         deduplicate_interesting,
         saved_because_skip_signal,
@@ -473,20 +495,8 @@ def check_minimization_stats(prog2log: dict[str, dict]) -> None:
         json.dump(unique_signal_and_fpointer, f, indent=2)
 
 
-def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]):
-    all_pcs: set[str] = set()
-    all_fpointers_stores: set[str] = set()
-    all_fpointers: set[str] = set()
-    fpointer2storeinst: dict[str, set[str]] = {}
-    for entries in prog2log.values():
-        if RESULT_KEYS.PC_COVER in entries:
-            all_pcs.update(entries[RESULT_KEYS.PC_COVER])
-        if RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in entries:
-            for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
-                __update_collections(all_fpointers_stores, all_fpointers, fpointer2storeinst, fp)
-        if RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD in entries:
-            for fp in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD]:
-                __update_collections(all_fpointers_stores, all_fpointers, fpointer2storeinst, fp)
+def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]) -> None:
+    all_pcs, all_fpointers_stores, all_fpointers, fpointer2storeinst = get_fpointer_store_info(prog2log)
 
     check_PC_exec_funcStore_literal_diffs(all_pcs, all_fpointers_stores, all_fpointers)
     print(colored("################################################", "cyan"))
@@ -496,16 +506,89 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]):
         uncovered_fpointer_locs,
         covered_fpointer_locs,
     ) = check_source_code_diffs(all_pcs, all_fpointers_stores, all_fpointers)
-    uncovered_fpointers_out = get_fpointer2storeinst_as_source_locations(
+
+    uncovered_fpointers_out, skip_count = get_fpointer2storeinst_as_source_locations(
         fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs,
     )
-    with open("__uncovered_pairs.py", "w") as f:
+    assert skip_count == 0
+    uncovered_fpointers_file = Path.cwd() / "__uncovered_pairs.py"
+    with open(uncovered_fpointers_file, "w") as f:
         print(uncovered_fpointers_out, file=f)
-    covered_fpointers_out = get_fpointer2storeinst_as_source_locations(
+    print(f"Mapping of uncovered function pointer to instructions that store them saved to {uncovered_fpointers_file.name}")
+
+    covered_fpointers_out, skip_count = get_fpointer2storeinst_as_source_locations(
         fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs
     )
-    with open("__covered_pairs.py", "w") as f:
+    assert skip_count == 0
+    covered_fpointers_file = Path.cwd() / "__covered_pairs.py"
+    with open(covered_fpointers_file, "w") as f:
         print(covered_fpointers_out, file=f)
+    print(f"Mapping of covered function pointer to instructions that store them saved to {covered_fpointers_file.name}")
+
+    print(colored("################################################", "cyan"))
+    check_saved_because_skip_signal_vs_fpointers(prog2log, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs, uncovered_fpointer_locs)
+
+def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict],
+                                                fpointer_addr2loc: dict[str, list[locInfo]],
+                                                storeinst_addr2loc:  dict[str, list[locInfo]],
+                                                covered_fpointer_locs:  set[locInfo],
+                                                uncovered_fpointer_locs:  set[locInfo],
+                                                ) -> None:
+    saved_because_skip_signal = get_saved_because_skip_signal(prog2log)
+    _, _, _, skip_signal_fpointer2storeinst = get_fpointer_store_info(saved_because_skip_signal, stable_only=True)
+    covered_fpointers_saved_because_skip_signal, missed_covered = get_fpointer2storeinst_as_source_locations(
+        skip_signal_fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs
+    )
+    uncovered_fpointers_saved_because_skip_signal, missed_uncovered = get_fpointer2storeinst_as_source_locations(
+        skip_signal_fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs
+    )
+
+    covered_fpointers_because_skip_signal_file = Path.cwd() / "__covered_pairs_saved_because_fpointer.py"
+    with open(covered_fpointers_because_skip_signal_file, "w") as f:
+        print(covered_fpointers_saved_because_skip_signal, file=f)
+    print(
+        "Mapping of covered function pointers to instructions that save them registered in tests that produced no interesting signal",
+        f"(count={len(covered_fpointers_saved_because_skip_signal)}",
+        f"(ignored due to filter={missed_covered}) saved to {covered_fpointers_because_skip_signal_file.name}"
+        )
+
+    uncovered_fpointers_because_skip_signal_file = Path.cwd() / "__uncovered_pairs_saved_because_fpointer.py"
+    with open(uncovered_fpointers_because_skip_signal_file, "w") as f:
+        print(uncovered_fpointers_saved_because_skip_signal, file=f)
+    print(
+        "Mapping of uncovered function pointers to instructions that save them registered in tests that produced no interesting signal",
+        f"(count={len(uncovered_fpointers_saved_because_skip_signal)}",
+        f"(ignored due to filter={missed_uncovered}) saved to {uncovered_fpointers_because_skip_signal_file.name}"
+        )
+
+
+def get_fpointer_store_info(prog2log: dict[str, dict], stable_only = False) -> tuple[set[str], set[str], set[str], dict[str, set[str]]]:
+    '''
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
+        stable_only: if true, ignore function pointer stores registered in NEW_FPOINTERS_PAYLOAD.
+
+    Returns:
+        tuple[set[str], set[str], set[str], dict[str, set[str]]]: A tuple with four elements:
+            all_pcs: set of covered instruction addresses (hexadecimal strings).
+            all_fpointers_stores: set of instructions that store a function pointer (hexadecimal strings).
+            all_fpointers: set of function pointer values stored (hexadecimal strings).
+            fpointer2storeinst: dict function pointer values stored to instructions that store them (hexadecimal strings).
+    '''
+    all_pcs: set[str] = set()
+    all_fpointers_stores: set[str] = set()
+    all_fpointers: set[str] = set()
+    fpointer2storeinst: dict[str, set[str]] = {}
+    for entries in prog2log.values():
+        if RESULT_KEYS.PC_COVER in entries:
+            all_pcs.update(entries[RESULT_KEYS.PC_COVER])
+        if not stable_only and RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in entries:
+            for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
+                __update_collections(all_fpointers_stores, all_fpointers, fpointer2storeinst, fp)
+        if RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD in entries:
+            for fp in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD]:
+                __update_collections(all_fpointers_stores, all_fpointers, fpointer2storeinst, fp)
+    return all_pcs, all_fpointers_stores, all_fpointers, fpointer2storeinst
 
 
 def check_PC_exec_funcStore_literal_diffs(
@@ -587,7 +670,6 @@ def check_source_code_diffs(
     print(
         f"Execution of functions does not depend on inlines: {'Yes' if stored_value_diff_without_inlines == stored_value_diff else 'No'}"
     )
-    print("################################################")
     return (
         fpointer_addr2location,
         storeinst_addr2location,
@@ -713,8 +795,10 @@ def get_fpointer2storeinst_as_source_locations(
     fpointer_addr2loc: dict[str, list[locInfo]],
     storeinst_addr2loc: dict[str, list[locInfo]],
     interesting_fpointer_locs: set[locInfo],
-) -> dict[locInfo, set[locInfo]]:
+) -> tuple[dict[locInfo, set[locInfo]], int]:
     """
+    Filters the `fpointer2storeinst` dictionary using `interesting_fpointer_locs`.
+
     Args:
         fpointer2storeinst: dict from function pointer (hexadecimal strings) to the set of instructions that store it (hexadecimal strings).
         fpointer_addr2loc: dict from function pointer (hexadecimal strings) to source code locations.
@@ -722,22 +806,28 @@ def get_fpointer2storeinst_as_source_locations(
         interesting_fpointer_locs: set of source code locations (of function pointers) that must be a key in the output.
 
     Returns:
-        A dict from source code locations to sets of source code locations.
-        The key represents the source code locations of the interesting function pointers.
-        The values represent the source code locations of the instructions that store them.
+        tuple[dict[locInfo, set[locInfo]], int]: A tuple with two elements:
+            output_dir: A dict from source code locations to sets of source code locations.
+                        The key represents the source code locations of the interesting function pointers.
+                        The values represent the source code locations of the instructions that store them.
+            skip_count: The number of `interesting_fpointer_locs` that did not match any fpointer in `fpointer2storeinst`
     """
     interesting_fpointer2loc = {
         fpointer: locs[0]
         for fpointer, locs in fpointer_addr2loc.items()
         if locs[0] in interesting_fpointer_locs
     }
+    skip_count = 0
     output_dir: dict[locInfo, set[locInfo]] = {}
     for fpointer_addr, fpointer_loc in interesting_fpointer2loc.items():
+        if fpointer_addr not in fpointer2storeinst:
+            skip_count += 1
+            continue
         if fpointer_loc not in output_dir:
             output_dir[fpointer_loc] = set()
         for storeinst_addr in fpointer2storeinst[fpointer_addr]:
             output_dir[fpointer_loc].update(storeinst_addr2loc[storeinst_addr])
-    return output_dir
+    return output_dir, skip_count
 
 
 def __update_collections(
