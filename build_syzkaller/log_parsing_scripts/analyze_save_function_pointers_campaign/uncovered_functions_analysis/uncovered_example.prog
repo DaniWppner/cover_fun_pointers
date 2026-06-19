@@ -1,0 +1,50 @@
+r0 = socket$nl_generic(0x10, 0x3, 0x10)
+r1 = syz_genetlink_get_family_id$nl80211(&(0x7f0000000940), 0xffffffffffffffff)
+
+sendmsg$NL80211_CMD_GET_KEY(r0, &(0x7f00000001c0)={0x0, 0x0, &(0x7f0000000180)={&(0x7f0000000100)={0x14, r1, 0x211, 0x70bd25, 0x25dfdbfb, {{}, {@void, @void}}}, 0x14}, 0x1, 0x0, 0x0, 0x8014}, 0x40844)
+
+#Breakdown:
+#
+# syscall specification:
+# ----------------------
+# sendmsg$NL80211_CMD_GET_KEY(fd sock_nl_generic, msg ptr[in, msghdr_nl80211_wdev[NL80211_CMD_GET_KEY, nl80211_policy$cmd_key]], f flags[send_flags])
+#
+#
+#
+# concrete parameters:
+# --------------------
+# r0                --> fd sock_nl_generic (arg0)
+# &(0x7f00000001c0) --> msg ptr            (arg1)
+# 0x40844           --> f flags            (arg2) 
+#
+#
+#  arg1 in detail:
+#  --------------
+#   type: msghdr_nl80211_wdev[NL80211_CMD_GET_KEY, nl80211_policy$cmd_key]
+#
+#    (using type msghdr_nl80211_wdev[CMD, POLICY] ≡def msghdr_nl80211[CMD, nl80211_wdev_payload, POLICY])
+#
+#
+#   type: msghdr_nl80211[NL80211_CMD_GET_KEY, nl80211_wdev_payload, nl80211_policy$cmd_key]
+#
+#    (using type nl80211_wdev_payload {
+#       	NL80211_ATTR_IFINDEX	optional[nlattr[NL80211_ATTR_IFINDEX, nl80211_ifindex]]
+#   	    NL80211_ATTR_WDEV	optional[nlattr[NL80211_ATTR_WDEV, nl80211_wdev]]
+#      } [packed, align[4]]
+#    )
+#
+#   type: msghdr_nl80211[NL80211_CMD_GET_KEY, {
+#           NL80211_ATTR_IFINDEX	optional[nlattr[NL80211_ATTR_IFINDEX, nl80211_ifindex]]
+#   	    NL80211_ATTR_WDEV	    optional[nlattr[NL80211_ATTR_WDEV, nl80211_wdev]]
+#         },
+#         nl80211_policy$cmd_key]
+#
+#
+#    should read documentation in order to continue the understanding of this
+#    https://github.com/google/syzkaller/blob/master/docs/syscall_descriptions_syntax.md
+#   (using ????)
+#
+#
+#
+#
+#

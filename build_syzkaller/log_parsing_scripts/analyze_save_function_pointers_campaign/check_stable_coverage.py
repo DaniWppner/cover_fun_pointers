@@ -134,7 +134,7 @@ def unify_per_prog(json_lines_file: Path) -> dict:
                 if no_new and minim_key in result_dict[data_key]:
                     if minimization_would_overwrite(result_dict[data_key], minim_entry):
                         warn_overwrite(
-                            result_dict[data_key][minim_key], minim_entry, data_key
+                            result_dict[data_key][minim_key], minim_entry, data_key, minim_key
                         )
                         sys.exit(1)
                     # the current entry is by default a list of one element.
@@ -165,11 +165,18 @@ def unify_per_prog(json_lines_file: Path) -> dict:
                 # all remaining keys should appear only once
                 # per <prog_id, call> pair. Note that the ones for which
                 # this doesn't hold have been removed previously.
-                if any(key in result_dict[data_key] for key in log_entry):
-                    warn_overwrite(result_dict[data_key], log_entry, data_key)
-                    sys.exit(1)
+                for key in log_entry:
+                    if key in result_dict[data_key]:
+                        warn_overwrite(result_dict[data_key], log_entry, data_key, key)
+                        sys.exit(1)
                 result_dict[data_key].update(log_entry)
-    assert len(awaiting_corpus_entry) == 0
+    if len(awaiting_corpus_entry) > 0:
+        print(
+            colored(f"ERROR: after parsing all triage lines there is at least one job awaiting entry:", 'red')
+            + colored(json.dumps(awaiting_corpus_entry, indent=2), "yellow"),
+            file=sys.stderr
+        )
+        sys.exit(1)
     return result_dict
 
 
@@ -177,10 +184,10 @@ def successful_minimize(minim_entry: dict) -> bool:
     """
     Return true if this entry indicates that one of the minimization attempts produced something
     """
-    return minim_entry[0][RESULT_KEYS.MINIMIZATION_RES_TYPE] not in [
-        RESULT_VALUES.MINIMIZATION_SKIP,
-        RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP,
-        RESULT_VALUES.MINIMIZATION_RES_FPOINTER_SKIP,
+    return minim_entry[0][RESULT_KEYS.MINIMIZATION_RES_TYPE] in [
+        RESULT_VALUES.MINIMIZATION_RES_NODIFF,
+        RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER,
+        RESULT_VALUES.MINIMIZATION_RES_SAVE_SIGNAL,
     ]
 
 
@@ -246,12 +253,13 @@ def minimization_would_overwrite(result_entry: dict, minim_entry: dict) -> bool:
     )
 
 
-def warn_overwrite(result_entry: dict, log_entry: dict, prog_id: str) -> None:
+def warn_overwrite(result_entry: dict, log_entry: dict, prog_id: str, conflicting_key: str) -> None:
     print(
-        colored(f"ERROR: would overrite key in {prog_id}\n", "red")
+        colored(f"ERROR: would overrite key {conflicting_key} in {prog_id}\n", "red")
         + colored(json.dumps(result_entry, indent=2), "yellow")
         + colored("\nwhen adding\n", "red")
-        + colored(json.dumps(log_entry, indent=2), "yellow")
+        + colored(json.dumps(log_entry, indent=2), "yellow"),
+        file=sys.stderr
     )
 
 
@@ -326,8 +334,9 @@ def has_minimization_result(minimization_result_type: str) -> Callable[[dict], b
                     "ERROR: type of minimization result is not list. Minimization result:",
                     "red",
                 )
+                + colored(str(minimization_result), "yellow"),
+                file=sys.stderr
             )
-            print(colored(str(minimization_result), "yellow"))
             sys.exit(1)
         return any(
             minimization_result_type == res[RESULT_KEYS.MINIMIZATION_RES_TYPE]
@@ -654,7 +663,8 @@ def check_PC_exec_funcStore_literal_diffs(
     # First question:
     # How many of the reported instructions that store a value
     #  do not appear in the general log of reported instructions?
-    # This should ideally be zero
+    # This should ideally be zero.
+    # It will not be since instruction vs basic block start often misalign
     store_inst_diff = all_fpointers_stores.difference(all_pcs)
     print(f"Unique function pointer store instructions: (count={len(all_fpointers_stores)})")
     print(f"Function pointer store instructions that don't show up in exec log: (count={len(store_inst_diff)})")
@@ -818,7 +828,7 @@ def _get_source_code_refs_impl(offsets: Iterable[str]) -> dict[str, list[locInfo
             if line == "0xffffffffffffffff: ?? ??:0":
                 offsets.remove("0xffffffffffffffff")
                 continue
-            print(colored("ERROR: no match wtf? addr2line line:\n", "red"), line)
+            print(colored("ERROR: no match wtf? addr2line line:\n", "red"), line, file=sys.stderr)
             sys.exit(1)
         # 0 is address, 1 is function name, 2 is file location
         addr, fname, floc = match.groups()
@@ -833,6 +843,7 @@ def _get_source_code_refs_impl(offsets: Iterable[str]) -> dict[str, list[locInfo
         print(
             colored("ERROR: addr2line returned fewer lines than expected. ", "red"),
             colored(f"Sent {len(offsets)}, got {len(sourceInfo_data)}\n", "red"),
+            file=sys.stderr
         )
         sys.exit(1)
 

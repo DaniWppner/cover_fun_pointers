@@ -11,6 +11,7 @@ class LOGENTRY_KEYS(StrEnum):
     MINIMIZATION_REPORT_NO_DIFF = "minimization_result_equal"
     MINIMIZATION_REPORT_SAVE_FPOINTERS = "minimization_result_no_signal"
     MINIMIZATION_REPORT_SAVE_SIGNAL = "minimization_result_no_fpointer"
+    MINIMIZATION_SPLIT = "minimization_split"
     MINIMIZATION_WHOLE_SKIP = "minimization_skip"
     MINIMIZATION_FPOINTER_SKIP = "minimization_skip_fpointer"
     MINIMIZATION_SIGNAL_SKIP = "minimization_skip_signal"
@@ -39,6 +40,7 @@ class RESULT_KEYS(StrEnum):
     ORIGINAL_PROG = "original_prog"
     COUNT = "count"
     PC_COVER = "PC_COVER"
+    TIMESTAMP = "timestamp"
 
 
 class RESULT_VALUES(StrEnum):
@@ -48,3 +50,4 @@ class RESULT_VALUES(StrEnum):
     MINIMIZATION_RES_FPOINTER_SKIP = "skip_fpointer"
     MINIMIZATION_RES_SIGNAL_SKIP = "skip_signal"
     MINIMIZATION_SKIP = "minimization_skip"
+    MINIMIZATION_SPLIT = "minimization_split"

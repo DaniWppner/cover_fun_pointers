@@ -44,7 +44,7 @@ class TriageSkipLine(Exception):
     pass
 
 
-
+TIMESTAMP_RE = r"^(?P<ts>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})"
 
 def read_serializaed_prog(line_number: int, og_text: list[int]) -> list[str]:
     """
@@ -74,8 +74,7 @@ def read_serializaed_prog(line_number: int, og_text: list[int]) -> list[str]:
 
 
 def parse_timestamp_from_line(line: str) -> datetime | None:
-    timestamp_re = re.compile(r"^(?P<ts>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})")
-    match = timestamp_re.match(line)
+    match = re.compile(TIMESTAMP_RE).match(line)
     if match is None:
         return None
     return datetime.strptime(match.group("ts"), "%Y/%m/%d %H:%M:%S")
@@ -137,8 +136,7 @@ def find_cutoff_before_status_block(lines: list[str], cutoff: datetime) -> int:
 
     and has a timestamp later than `cutoff`
     """
-    timestamp_re = r"^(?P<ts>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})"
-    stats_line_re = re.compile(timestamp_re +
+    stats_line_re = re.compile(TIMESTAMP_RE +
                                r" candidates=\d+ corpus=\d+ coverage=\d+ exec total=\d+ \(.*\) pending=\d+ reproducing=\d+")
 
     cutoff_idx = find_first_line_after_timestamp(lines, cutoff)
@@ -214,6 +212,8 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
         # Need to retrieve prog after this entry
         LOGENTRY_KEYS.MINIMIZATION_REPORT_SAVE_SIGNAL: call_pattern
         + r": minimization yielded prog for signal different from stored function pointers. New prog \(call #\d+\):",
+        LOGENTRY_KEYS.MINIMIZATION_SPLIT: call_pattern
+        + r": minimization step splitted$",
         # The end-of-line anchor '$' here is crucial to be able to distinguish between these three entries
         LOGENTRY_KEYS.MINIMIZATION_WHOLE_SKIP: call_pattern + r": skip minimize$",
         LOGENTRY_KEYS.MINIMIZATION_SIGNAL_SKIP : call_pattern + r": skip minimize of empty new stable signal$",
@@ -275,7 +275,7 @@ def parse_raw_triage_logs(log_lines: list[str]) -> Iterable[dict]:
                         )
                     )
                     raise
-
+            entry[RESULT_KEYS.TIMESTAMP] = str(parse_timestamp_from_line(line))
             entry[RESULT_KEYS.PROGID] = prog_id
             entry[RESULT_KEYS.TRIAGEID] = triage_id
             yield entry
@@ -348,6 +348,11 @@ def match_against_triage_log_line_types(
                 RESULT_KEYS.MINIMIZATION_RES_PROG: read_serializaed_prog(
                     line_number + 1, og_text
                 ),
+            }]
+        case LOGENTRY_KEYS.MINIMIZATION_SPLIT:
+            res[RESULT_KEYS.CALL_NAME] = match_groups[0]
+            res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
+                RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_SPLIT,
             }]
         case LOGENTRY_KEYS.MINIMIZATION_WHOLE_SKIP:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
