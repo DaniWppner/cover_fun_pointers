@@ -1,0 +1,29 @@
+0xffffffff8252e617: n_tty_write at /home/linux/drivers/tty/n_tty.c:2362
+0xffffffff812beac0: woken_wake_function at /home/linux/kernel/sched/wait.c:439
+
+0xffffffff83a8f241: netlink_unicast at /home/linux/net/netlink/af_netlink.c:389
+0xffffffff83a8df60: netlink_skb_destructor at /home/linux/net/netlink/af_netlink.c:373
+
+0xffffffff83aa5035: genl_op_from_small at /home/linux/net/netlink/genetlink.c:187
+0xffffffff84168810: nl80211_get_key at /home/linux/net/wireless/nl80211.c:4495
+
+0xffffffff83aa50ad: genl_op_from_small at /home/linux/net/netlink/genetlink.c:188
+0x0000000000000000: __per_cpu_start at /home/linux/arch/x86/kernel/cpu/common.c:2012
+
+0xffffffff83aa8e71: genl_get_cmd at /home/linux/net/netlink/genetlink.c:275
+0xffffffff841f7340: nl80211_pre_doit at /home/linux/net/wireless/nl80211.c:16397
+
+0xffffffff83aa8eb8: genl_get_cmd at /home/linux/net/netlink/genetlink.c:276
+0xffffffff84168810: nl80211_get_key at /home/linux/net/wireless/nl80211.c:4495
+
+0xffffffff83aa8efe: genl_get_cmd at /home/linux/net/netlink/genetlink.c:277
+0xffffffff841f7b20: nl80211_post_doit at /home/linux/net/wireless/nl80211.c:16499
+
+0xffffffff83a8e29b: netlink_attachskb at /home/linux/net/netlink/af_netlink.c:389
+0xffffffff83a8df60: netlink_skb_destructor at /home/linux/net/netlink/af_netlink.c:373
+
+0xffffffff8252e617: n_tty_write at /home/linux/drivers/tty/n_tty.c:2362
+0xffffffff812beac0: woken_wake_function at /home/linux/kernel/sched/wait.c:439
+
+0xffffffff8252e617: n_tty_write at /home/linux/drivers/tty/n_tty.c:2362
+0xffffffff812beac0: woken_wake_function at /home/linux/kernel/sched/wait.c:439
