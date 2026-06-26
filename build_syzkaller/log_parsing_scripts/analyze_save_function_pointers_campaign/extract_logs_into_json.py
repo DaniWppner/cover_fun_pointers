@@ -43,8 +43,8 @@ class InvalidTriageLine(Exception):
 class TriageSkipLine(Exception):
     pass
 
-
 TIMESTAMP_RE = r"^(?P<ts>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})"
+TIMESTAMP_TRIAGE_RE = r"^(?P<tstriage>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"
 
 def read_serializaed_prog(line_number: int, og_text: list[int]) -> list[str]:
     """
@@ -68,6 +68,12 @@ def read_serializaed_prog(line_number: int, og_text: list[int]) -> list[str]:
             break
         elif line.startswith("syz_mount_image$"):
             res.append("syz_mount_image$REDACTED")
+        elif "(BADINDEX)[prog-" in line:
+            # this is a hacky hack that works around syzkaller bugging out
+            # during program serialization and outputing weird strings that
+            # eat into the beginning of the next triage log.
+            res.append(line.split("[prog-")[0])
+            break
         else:
             res.append(line)
     return res
@@ -78,6 +84,12 @@ def parse_timestamp_from_line(line: str) -> datetime | None:
     if match is None:
         return None
     return datetime.strptime(match.group("ts"), "%Y/%m/%d %H:%M:%S")
+
+def parse_timestamp_from_triage_line(line: str) -> datetime | None:
+    match = re.compile(TIMESTAMP_TRIAGE_RE).match(line)
+    if match is None:
+        return None
+    return datetime.strptime(match.group("tstriage"), "%Y-%m-%d %H:%M:%S")
 
 
 def find_next_timestamp_on_or_after(lines: list[str], start_index: int) -> tuple[int, datetime] | tuple[None, None]:
@@ -275,7 +287,7 @@ def parse_raw_triage_logs(log_lines: list[str]) -> Iterable[dict]:
                         )
                     )
                     raise
-            entry[RESULT_KEYS.TIMESTAMP] = str(parse_timestamp_from_line(line))
+            entry[RESULT_KEYS.TIMESTAMP] = str(parse_timestamp_from_triage_line(line))
             entry[RESULT_KEYS.PROGID] = prog_id
             entry[RESULT_KEYS.TRIAGEID] = triage_id
             yield entry
@@ -434,6 +446,10 @@ if __name__ == "__main__":
         cutoff_index = find_cutoff_before_status_block(lines, cutoff)
         lines = lines[:cutoff_index]
 
+    out_str = '\n'.join(
+        json.dumps(json_obj, indent=None)
+        for json_obj in parse_raw_triage_logs(lines)
+    )
+
     with out_path.open("w") as f:
-        for json_obj in parse_raw_triage_logs(lines):
-            f.write(json.dumps(json_obj, indent=None) + "\n")
+        f.write(out_str)

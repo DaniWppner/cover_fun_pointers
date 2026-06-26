@@ -5,6 +5,7 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Iterable, Any
 
@@ -156,6 +157,18 @@ def unify_per_prog(json_lines_file: Path) -> dict:
                     # the current entry becomes the whole list
                     log_entry[RESULT_KEYS.SAVED_PROG] = [saved_prog]
 
+            # timestamp needs to be joined accross entries for the same triage.
+            # we keep the latest timestamp instead of a range.
+            if RESULT_KEYS.TIMESTAMP in log_entry:
+                timestamp_entry = log_entry.pop(RESULT_KEYS.TIMESTAMP)
+                timestamp_value = datetime.strptime(timestamp_entry, '%Y-%m-%d %H:%M:%S')
+                if no_new:
+                    assert RESULT_KEYS.TIMESTAMP in result_dict[data_key]
+                    old_ts = result_dict[data_key][RESULT_KEYS.TIMESTAMP]
+                    result_dict[data_key][RESULT_KEYS.TIMESTAMP] = max(timestamp_value, old_ts)
+                else:
+                    log_entry[RESULT_KEYS.TIMESTAMP] = timestamp_value
+
             if not no_new:
                 log_entry[RESULT_KEYS.ORIGINAL_PROG] = curr_original_prog
                 log_entry[RESULT_KEYS.COUNT] = 1
@@ -170,6 +183,8 @@ def unify_per_prog(json_lines_file: Path) -> dict:
                         warn_overwrite(result_dict[data_key], log_entry, data_key, key)
                         sys.exit(1)
                 result_dict[data_key].update(log_entry)
+
+    awaiting_corpus_entry = fix_buggy_awaiting_queue(result_dict, awaiting_corpus_entry)
     if len(awaiting_corpus_entry) > 0:
         print(
             colored(f"ERROR: after parsing all triage lines there is at least one job awaiting entry:", 'red')
@@ -178,6 +193,27 @@ def unify_per_prog(json_lines_file: Path) -> dict:
         )
         sys.exit(1)
     return result_dict
+
+def fix_buggy_awaiting_queue(result_dict: dict[str, dict], awaiting_corpus_entry: dict[str, str]) -> dict[str, str]:
+    '''
+    Remove from result_dict and awaiting_corpus_entry
+    all entries in awaiting_corpus_entry that have '(BADINDEX)'
+    in the description of the original prog, as these are
+    instances where syzkaller bugged out.
+    '''
+    __awaiting = {}
+    for awaiting_key, res_dict_key in awaiting_corpus_entry.items():
+        progs_to_check = [result_dict[res_dict_key][RESULT_KEYS.ORIGINAL_PROG]]
+        if RESULT_KEYS.MINIMIZATION_RESULT in result_dict[res_dict_key]:
+            for min_result_entry in result_dict[res_dict_key][RESULT_KEYS.MINIMIZATION_RESULT]:
+                progs_to_check.append(min_result_entry.get(RESULT_KEYS.MINIMIZATION_RES_PROG, []))
+        if any("(BADINDEX)" in prog_line for check_prog in progs_to_check for prog_line in check_prog):
+            result_dict.pop(res_dict_key)
+        else:
+            # This was not a bugged out syzkaller log, actually keep it in the awaiting dictionary
+            __awaiting[awaiting_key] = res_dict_key
+    awaiting_corpus_entry = __awaiting
+    return awaiting_corpus_entry
 
 
 def successful_minimize(minim_entry: dict) -> bool:
@@ -281,6 +317,14 @@ def cleanup_fpointer_jsons(unified_json: dict) -> None:
             if key in entries:
                 cleanup_particular_fpointer(entries, key)
 
+
+def serialize_datetimes(unified_json: dict[str, dict]) -> None:
+    for entries in unified_json.values():
+        entries[RESULT_KEYS.TIMESTAMP] = str(entries[RESULT_KEYS.TIMESTAMP])
+
+def cleanup_unified_json(unified_json: dict) -> None:
+    cleanup_fpointer_jsons(unified_json)
+    serialize_datetimes(unified_json)
 
 def count_cond(prog2log: dict[str, dict], condition: Callable[[dict], bool]) -> int:
     return len([entry for entry in prog2log.values() if condition(entry)])
@@ -939,7 +983,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     out_json = unify_per_prog(json_lines_path)
-    cleanup_fpointer_jsons(out_json)
+    cleanup_unified_json(out_json)
     print(colored("################################################", "cyan"))
     out_json = check_pc_cover_vs_fpointer(out_json)
     print(colored("################################################", "cyan"))

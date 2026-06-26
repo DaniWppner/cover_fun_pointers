@@ -59,7 +59,7 @@ root@localhost
 ```
 once connected,
 ```bash
-/syz-execprog -executor /syz-executor -repeat 2 -procs 2 -cover=1 -output -coverfile /cover_{prog_name} /{prog_name}
+/syz-execprog -executor /syz-executor -repeat 1 -procs 2 -cover=1 -output -coverfile /cover_{prog_name} /{prog_name}
 ## wait until it's finished
 exit
 ```
