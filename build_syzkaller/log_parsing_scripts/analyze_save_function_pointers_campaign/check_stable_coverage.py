@@ -169,6 +169,16 @@ def unify_per_prog(json_lines_file: Path) -> dict:
                 else:
                     log_entry[RESULT_KEYS.TIMESTAMP] = timestamp_value
 
+            # tags also needs to be joined accross entries for the same triage.
+            # we keep an union of tags and assume they are incremental.
+            if RESULT_KEYS.TAGS in log_entry:
+                entry_tags = log_entry.pop(RESULT_KEYS.TAGS)
+                if no_new:
+                    assert (all(tag in entry_tags for tag in result_dict[data_key][RESULT_KEYS.TAGS]))
+                    result_dict[data_key][RESULT_KEYS.TAGS] = entry_tags
+                else:
+                    log_entry[RESULT_KEYS.TAGS] = entry_tags
+
             if not no_new:
                 log_entry[RESULT_KEYS.ORIGINAL_PROG] = curr_original_prog
                 log_entry[RESULT_KEYS.COUNT] = 1
@@ -290,11 +300,15 @@ def minimization_would_overwrite(result_entry: dict, minim_entry: dict) -> bool:
 
 
 def warn_overwrite(result_entry: dict, log_entry: dict, prog_id: str, conflicting_key: str) -> None:
+    result_container = {conflicting_key: result_entry}
+    entry_container = {conflicting_key: log_entry}
+    serialize_datetimes(result_container)
+    serialize_datetimes(entry_container)
     print(
         colored(f"ERROR: would overrite key {conflicting_key} in {prog_id}\n", "red")
-        + colored(json.dumps(result_entry, indent=2), "yellow")
+        + colored(json.dumps(result_container[conflicting_key], indent=2), "yellow")
         + colored("\nwhen adding\n", "red")
-        + colored(json.dumps(log_entry, indent=2), "yellow"),
+        + colored(json.dumps(entry_container[conflicting_key], indent=2), "yellow"),
         file=sys.stderr
     )
 
@@ -319,8 +333,13 @@ def cleanup_fpointer_jsons(unified_json: dict) -> None:
 
 
 def serialize_datetimes(unified_json: dict[str, dict]) -> None:
+    '''
+    Serializes datetimes in each entry up to the first level (does not look into nested json)
+    '''
     for entries in unified_json.values():
-        entries[RESULT_KEYS.TIMESTAMP] = str(entries[RESULT_KEYS.TIMESTAMP])
+        for k, v in entries.items():
+            if isinstance(v, datetime):
+                entries[k] = str(v)
 
 def cleanup_unified_json(unified_json: dict) -> None:
     cleanup_fpointer_jsons(unified_json)
