@@ -34,7 +34,7 @@ import tqdm.contrib as tcontrib
 from typing import Iterable
 from pathlib import Path
 from termcolor import colored
-from logentry_keys import LOGENTRY_KEYS, RESULT_KEYS, RESULT_VALUES
+from logentry_keys import LOGENTRY_KEYS, RESULT_KEYS, MINIMIZATION_RESULT_VALUES, TAG_RESULT_VALUES
 
 class InvalidTriageLine(Exception):
     pass
@@ -197,11 +197,11 @@ def __create_master_regex(
 def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
     # Regex breakdown:
     # call #\d+ \[([^\]]+)\] -> Captures the call name (e.g., syz_genetlink)
-    call_id = r"(#\d+ \[[^\]]+\])"
+    call_id = r"(#-?\d+ \[[^\]]+\])"
     call_pattern = "call " + call_id
 
     # Some entries include information from the couple log lines following the entry itself.
-    # Those are the onees where the pattern ends in something like "with program:"
+    # Those are the ones where the pattern ends in something like "with program:"
     patterns = {
         LOGENTRY_KEYS.NEW_SIGNAL: call_pattern + r": \|new signal\|=(\d+)",
         LOGENTRY_KEYS.NEW_FPOINTERS: call_pattern
@@ -220,17 +220,23 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
         + r": minimization yielded same prog for signal and stored function pointers",
         # Need to retrieve prog after this entry
         LOGENTRY_KEYS.MINIMIZATION_REPORT_SAVE_FPOINTERS: call_pattern
-        + r": minimization yielded prog for stored function pointers different from signal. New prog \(call #\d+\):",
+        + r": minimization yielded prog for stored function pointers different from signal. New prog \(call #-?\d+\):",
         # Need to retrieve prog after this entry
         LOGENTRY_KEYS.MINIMIZATION_REPORT_SAVE_SIGNAL: call_pattern
-        + r": minimization yielded prog for signal different from stored function pointers. New prog \(call #\d+\):",
+        + r": minimization yielded prog for signal different from stored function pointers. New prog \(call #-?\d+\):",
         LOGENTRY_KEYS.MINIMIZATION_SPLIT: call_pattern
         + r": minimization step splitted$",
         # The end-of-line anchor '$' here is crucial to be able to distinguish between these three entries
         LOGENTRY_KEYS.MINIMIZATION_WHOLE_SKIP: call_pattern + r": skip minimize$",
-        LOGENTRY_KEYS.MINIMIZATION_SIGNAL_SKIP : call_pattern + r": skip minimize of empty new stable signal$",
-        LOGENTRY_KEYS.MINIMIZATION_FPOINTER_SKIP : call_pattern + r": skip minimize of empty new stable stored function pointers$",
+        LOGENTRY_KEYS.MINIMIZATION_SIGNAL_SKIP: call_pattern + r": skip minimize of empty new stable signal$",
+        LOGENTRY_KEYS.MINIMIZATION_FPOINTER_SKIP: call_pattern + r": skip minimize of empty new stable stored function pointers$",
         LOGENTRY_KEYS.PC_COVER: r"total cover for " + call_pattern + r":",
+        # This syzkaller log is actually formatted wrong, since it's trying to output a float as an integer. But we can still match it.
+        LOGENTRY_KEYS.TOTAL_JOB_DURATION: r"total job duration: \%\!d\(float64=(\d+\.\d+)\) seconds$",
+        # This other syzkaller log outputs seconds where it means nanoseconds. We need to remember to convert between units properly.
+        LOGENTRY_KEYS.PROG_EXECUTIONS_JOB_DURATION: r"test executions job duration: (\d+) seconds$",
+        LOGENTRY_KEYS.TOTAL_PROG_EXECUTIONS: r"(\d+) total test case executions$",
+        LOGENTRY_KEYS.FPOINTER_PROG_EXECUTIONS: r"(\d+) new test case executions because of function pointer coverage$",
         "SKIP": "|".join(
             [
                 call_pattern + r": minimize started",
@@ -256,9 +262,14 @@ def parse_raw_triage_logs(log_lines: list[str]) -> Iterable[dict]:
     for line_number, line in tcontrib.tenumerate(log_lines):
         match = indentify_triage_re.search(line)
         if match:
+            fpcov_orig = False
             triage_id = match.group(1)
             prog_id = match.group(2)
             triage_log_line = match.group(3)
+            # hackily remove the [fpcov-orig] tag from the begginning of the triage line if it's there
+            if triage_log_line.startswith("[fpcov-orig] "):
+                fpcov_orig = True
+                triage_log_line = triage_log_line[len("[fpcov-orig] "):]
             if triage_log_line == "":
                 # this is a hardcoded special case where the serialized prog
                 # is logged at the beginning of the triage job
@@ -290,6 +301,8 @@ def parse_raw_triage_logs(log_lines: list[str]) -> Iterable[dict]:
             entry[RESULT_KEYS.TIMESTAMP] = str(parse_timestamp_from_triage_line(line))
             entry[RESULT_KEYS.PROGID] = prog_id
             entry[RESULT_KEYS.TRIAGEID] = triage_id
+            if fpcov_orig:
+                entry[RESULT_KEYS.TAGS] = [TAG_RESULT_VALUES.FPOINTER_ORIGIN]
             yield entry
 
 
@@ -343,12 +356,12 @@ def match_against_triage_log_line_types(
         case LOGENTRY_KEYS.MINIMIZATION_REPORT_NO_DIFF:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
-                RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_RES_NODIFF
+                RESULT_KEYS.MINIMIZATION_RES_TYPE: MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_NODIFF
             }]
         case LOGENTRY_KEYS.MINIMIZATION_REPORT_SAVE_FPOINTERS:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
-                RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER,
+                RESULT_KEYS.MINIMIZATION_RES_TYPE: MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER,
                 RESULT_KEYS.MINIMIZATION_RES_PROG: read_serializaed_prog(
                     line_number + 1, og_text
                 ),
@@ -356,7 +369,7 @@ def match_against_triage_log_line_types(
         case LOGENTRY_KEYS.MINIMIZATION_REPORT_SAVE_SIGNAL:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
-                RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_RES_SAVE_SIGNAL,
+                RESULT_KEYS.MINIMIZATION_RES_TYPE: MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_SIGNAL,
                 RESULT_KEYS.MINIMIZATION_RES_PROG: read_serializaed_prog(
                     line_number + 1, og_text
                 ),
@@ -364,26 +377,35 @@ def match_against_triage_log_line_types(
         case LOGENTRY_KEYS.MINIMIZATION_SPLIT:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
-                RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_SPLIT,
+                RESULT_KEYS.MINIMIZATION_RES_TYPE: MINIMIZATION_RESULT_VALUES.MINIMIZATION_SPLIT,
             }]
         case LOGENTRY_KEYS.MINIMIZATION_WHOLE_SKIP:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
-                RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_SKIP,
+                RESULT_KEYS.MINIMIZATION_RES_TYPE: MINIMIZATION_RESULT_VALUES.MINIMIZATION_SKIP,
             }]
         case LOGENTRY_KEYS.MINIMIZATION_FPOINTER_SKIP:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
-                RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_RES_FPOINTER_SKIP,
+                RESULT_KEYS.MINIMIZATION_RES_TYPE: MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_FPOINTER_SKIP,
             }]
         case LOGENTRY_KEYS.MINIMIZATION_SIGNAL_SKIP:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.MINIMIZATION_RESULT] = [{
-                RESULT_KEYS.MINIMIZATION_RES_TYPE: RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP,
+                RESULT_KEYS.MINIMIZATION_RES_TYPE: MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP,
             }]
         case LOGENTRY_KEYS.PC_COVER:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.PC_COVER] = read_serialized_cover(line_number + 1, og_text)
+        case LOGENTRY_KEYS.TOTAL_JOB_DURATION:
+            res[RESULT_KEYS.TOTAL_JOB_DURATION] = float(match_groups[0])
+        case LOGENTRY_KEYS.PROG_EXECUTIONS_JOB_DURATION:
+            # convert from nanoseconds to seconds
+            res[RESULT_KEYS.PROG_EXECUTIONS_JOB_DURATION] = int(match_groups[0]) * 1e-9
+        case LOGENTRY_KEYS.TOTAL_PROG_EXECUTIONS:
+            res[RESULT_KEYS.TOTAL_PROG_EXECUTIONS] = int(match_groups[0])
+        case LOGENTRY_KEYS.FPOINTER_PROG_EXECUTIONS:
+            res[RESULT_KEYS.FPOINTER_PROG_EXECUTIONS] = int(match_groups[0])
         case "SKIP":
             raise TriageSkipLine
     if res == {}:

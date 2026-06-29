@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Iterable, Any
 
-from logentry_keys import RESULT_KEYS, RESULT_VALUES
+from logentry_keys import RESULT_KEYS, MINIMIZATION_RESULT_VALUES
 from termcolor import colored
 
 # First element represents file name and line number in the format file_name:lineno
@@ -221,9 +221,9 @@ def successful_minimize(minim_entry: dict) -> bool:
     Return true if this entry indicates that one of the minimization attempts produced something
     """
     return minim_entry[0][RESULT_KEYS.MINIMIZATION_RES_TYPE] in [
-        RESULT_VALUES.MINIMIZATION_RES_NODIFF,
-        RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER,
-        RESULT_VALUES.MINIMIZATION_RES_SAVE_SIGNAL,
+        MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_NODIFF,
+        MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER,
+        MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_SIGNAL,
     ]
 
 
@@ -245,8 +245,8 @@ def update_queues(
     # additionally, if the prog is entering because of pointer coverage
     # we need to capture the raw pc coverage
     if minim_entry[0][RESULT_KEYS.MINIMIZATION_RES_TYPE] in [
-        RESULT_VALUES.MINIMIZATION_RES_NODIFF,
-        RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER,
+        MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_NODIFF,
+        MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER,
     ]:
         awaiting_pc_cover[get_ceq_key(prog_id, triage_id)] = data_key
 
@@ -462,8 +462,8 @@ def get_saved_because_skip_signal(prog2log: dict[str, dict]) -> dict[str, dict]:
     '''
     return filter_many_cond(
         prog2log,
-        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP),
-        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER),
+        has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP),
+        has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER),
     )
 
 
@@ -504,31 +504,31 @@ def check_saved_because_fpointer(prog2log: dict[str, dict]) -> None:
 
 def check_minimization_stats(prog2log: dict[str, dict]) -> None:
     n_skip_all = count_cond(
-        prog2log, has_minimization_result(RESULT_VALUES.MINIMIZATION_SKIP)
+        prog2log, has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_SKIP)
     )
     n_skip_fpointer = count_cond(
-        prog2log, has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_FPOINTER_SKIP)
+        prog2log, has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_FPOINTER_SKIP)
     )
     n_skip_signal = count_cond(
-        prog2log, has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP)
+        prog2log, has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP)
     )
 
     n_saved_fpointer = count_cond(
-        prog2log, has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER)
+        prog2log, has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER)
     )
 
     n_saved_signal = count_cond(
-        prog2log, has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_SIGNAL)
+        prog2log, has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_SIGNAL)
     )
 
     n_keep_both = count_cond(
-        prog2log, has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_NODIFF)
+        prog2log, has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_NODIFF)
     )
 
     unique_signal_and_fpointer = filter_many_cond(
         prog2log,
-        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER),
-        has_minimization_result(RESULT_VALUES.MINIMIZATION_RES_SAVE_SIGNAL),
+        has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER),
+        has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_SIGNAL),
     )
 
     print(f"Number of minimizations that keep both: {n_keep_both}")

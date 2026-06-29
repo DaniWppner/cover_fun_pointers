@@ -16,7 +16,10 @@ class LOGENTRY_KEYS(StrEnum):
     MINIMIZATION_FPOINTER_SKIP = "minimization_skip_fpointer"
     MINIMIZATION_SIGNAL_SKIP = "minimization_skip_signal"
     PC_COVER = "total_cover"
-    
+    TOTAL_JOB_DURATION = "total_job_duration"
+    TOTAL_PROG_EXECUTIONS = "total_test_case_executions"
+    FPOINTER_PROG_EXECUTIONS = "new_test_case_executions_because_of_fpcov"
+    PROG_EXECUTIONS_JOB_DURATION = "test_executions_job_duration"
 
 
 class RESULT_KEYS(StrEnum):
@@ -41,9 +44,16 @@ class RESULT_KEYS(StrEnum):
     COUNT = "count"
     PC_COVER = "PC_COVER"
     TIMESTAMP = "timestamp"
+    TOTAL_JOB_DURATION = "job_duration"
+    TOTAL_PROG_EXECUTIONS = "prog_executions"
+    FPOINTER_PROG_EXECUTIONS = "prog_executions_because_of_fpcov"
+    PROG_EXECUTIONS_JOB_DURATION = "prog_executions_job_duration"
+    TAGS = "tags"
 
+class TAG_RESULT_VALUES(StrEnum):
+    FPOINTER_ORIGIN = "fpointer_origin"
 
-class RESULT_VALUES(StrEnum):
+class MINIMIZATION_RESULT_VALUES(StrEnum):
     MINIMIZATION_RES_NODIFF = "signal_fpointer_equal"
     MINIMIZATION_RES_SAVE_SIGNAL = "save_signal_no_fpointer"
     MINIMIZATION_RES_SAVE_FPOINTER = "save_fpointer_no_signal"
