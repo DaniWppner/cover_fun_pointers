@@ -151,10 +151,12 @@ def main() -> None:
     parser.add_argument(
         "--skip-time",
         type=parse_skip_time,
-        default=0,
+        default=None,
         help="Ignore entries until this much elapsed time has passed (format: hh:mm:ss)",
     )
     args = parser.parse_args()
+
+    skip_seconds = args.skip_time if args.skip_time is not None else 0
 
     exec_totals, exec_rates, timestamps = parse_status_lines(args.input)
     (
@@ -166,14 +168,16 @@ def main() -> None:
         skipped_rates,
         skipped_timestamps,
         skipped_x,
-    ) = filter_by_elapsed_time(exec_totals, exec_rates, timestamps, args.skip_time)
+    ) = filter_by_elapsed_time(exec_totals, exec_rates, timestamps, skip_seconds)
 
     prefix = args.prefix
     if prefix and not prefix.endswith("_"):
         prefix = prefix + "_"
 
     cwd = Path.cwd()
-    skip_suffix = f"_skip_{args.skip_time // 3600:02d}_{(args.skip_time % 3600) // 60:02d}_{args.skip_time % 60:02d}"
+    skip_suffix = ""
+    if args.skip_time is not None:
+        skip_suffix = f"_skip_{args.skip_time // 3600:02d}_{(args.skip_time % 3600) // 60:02d}_{args.skip_time % 60:02d}"
     out_total = cwd / f"{prefix}exec_total_evolution{skip_suffix}.png"
     out_rate = cwd / f"{prefix}exec_per_min_evolution{skip_suffix}.png"
     out_total_skipped = cwd / f"{prefix}exec_total_evolution_skipped_prefix{skip_suffix}.png"

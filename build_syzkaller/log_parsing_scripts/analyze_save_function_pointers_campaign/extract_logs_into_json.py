@@ -231,10 +231,12 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
         LOGENTRY_KEYS.MINIMIZATION_SIGNAL_SKIP: call_pattern + r": skip minimize of empty new stable signal$",
         LOGENTRY_KEYS.MINIMIZATION_FPOINTER_SKIP: call_pattern + r": skip minimize of empty new stable stored function pointers$",
         LOGENTRY_KEYS.PC_COVER: r"total cover for " + call_pattern + r":",
-        # This syzkaller log is actually formatted wrong, since it's trying to output a float as an integer. But we can still match it.
-        LOGENTRY_KEYS.TOTAL_JOB_DURATION: r"total job duration: \%\!d\(float64=(\d+\.\d+)\) seconds$",
-        # This other syzkaller log outputs seconds where it means nanoseconds. We need to remember to convert between units properly.
-        LOGENTRY_KEYS.PROG_EXECUTIONS_JOB_DURATION: r"test executions job duration: (\d+) seconds$",
+        # This syzkaller log was actually formatted wrong in some versions, since it's trying to output a float as an integer.
+        # But we can still match it. We have to account for the %!(float64=) wrapper.
+        LOGENTRY_KEYS.TOTAL_JOB_DURATION: r"total job duration: (?:\%\!d\(float64=)?(\d+\.\d+)\)? seconds$",
+        # This other syzkaller log outputs nanoseconds instead of seconds in some versions.
+        # We need to match both floating point numbers and integers but also remember to convert between units later.
+        LOGENTRY_KEYS.PROG_EXECUTIONS_JOB_DURATION: r"test executions job duration: ((?:\d+)|(?:\d+\.\d+)) seconds$",
         LOGENTRY_KEYS.TOTAL_PROG_EXECUTIONS: r"(\d+) total test case executions$",
         LOGENTRY_KEYS.FPOINTER_PROG_EXECUTIONS: r"(\d+) new test case executions because of function pointer coverage$",
         "SKIP": "|".join(
@@ -242,8 +244,8 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
                 call_pattern + r": minimize started",
                 r"deflake started",
                 r"deflake complete",
-                call_pattern + r": minimization step failure",
-                call_pattern + r": minimization step \(.*\) success \(\|calls\| = \d+\)",
+                call_pattern + r":? minimization step failure",
+                call_pattern + r":? minimization step (?:\(.*\) )?success \(\|calls\| = \d+\)",
             ]
         ),
     }
@@ -400,8 +402,13 @@ def match_against_triage_log_line_types(
         case LOGENTRY_KEYS.TOTAL_JOB_DURATION:
             res[RESULT_KEYS.TOTAL_JOB_DURATION] = float(match_groups[0])
         case LOGENTRY_KEYS.PROG_EXECUTIONS_JOB_DURATION:
-            # convert from nanoseconds to seconds
-            res[RESULT_KEYS.PROG_EXECUTIONS_JOB_DURATION] = int(match_groups[0]) * 1e-9
+            try:
+                # try to convert from nanoseconds to seconds if it's an integer
+                j_duration = int(match_groups[0]) * 1e-9
+            except ValueError:
+                # assume seconds if its a float
+                j_duration = float(match_groups[0])
+            res[RESULT_KEYS.PROG_EXECUTIONS_JOB_DURATION] = j_duration
         case LOGENTRY_KEYS.TOTAL_PROG_EXECUTIONS:
             res[RESULT_KEYS.TOTAL_PROG_EXECUTIONS] = int(match_groups[0])
         case LOGENTRY_KEYS.FPOINTER_PROG_EXECUTIONS:

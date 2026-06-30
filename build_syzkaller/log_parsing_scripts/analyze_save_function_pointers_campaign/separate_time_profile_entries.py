@@ -94,17 +94,32 @@ def save_histogram_plot(
 
 def process_time_profile_lines(lines: list[dict]):
     unified_dict = {}
-    for start_idx in range(0, len(lines), N_INTERESTING_KEYS):
-        job_lines = lines[start_idx: start_idx + N_INTERESTING_KEYS]
+    
+    # we can have any number of the interesting keys for each job, but all jobs must have the same
+    # (perhaps this syzkaller run was not outputting one kind of log)
+    present_keys = []
+    for i in range(N_INTERESTING_KEYS):
+        if INTERESTING_KEYS[i] in lines[len(present_keys)]:
+            present_keys.append(INTERESTING_KEYS[i])
+
+    n_interesting_keys = len(present_keys)
+    for start_idx in range(0, len(lines), n_interesting_keys):
+        job_lines = lines[start_idx: start_idx + n_interesting_keys]
         # check that our assumption that all entries for a given job are consecutive holds
         job_ids =  [(l[RESULT_KEYS.TRIAGEID], l[RESULT_KEYS.PROGID]) for l in job_lines]
         assert all(job_ids[0] == jid for jid in job_ids)
         unified_key = job_ids[0][0] + '|' + job_ids[0][1]
-        unified_dict[unified_key] = {i_key: j_line[i_key] for i_key, j_line in zip(INTERESTING_KEYS, job_lines)}
+        unified_dict[unified_key] = {i_key: j_line[i_key] for i_key, j_line in zip(present_keys, job_lines)}
 
-    all_execs = [entry[RESULT_KEYS.TOTAL_PROG_EXECUTIONS] for entry in unified_dict.values()]
-    function_pointer_execs = [entry[RESULT_KEYS.FPOINTER_PROG_EXECUTIONS] for entry in unified_dict.values()]
-
+    all_execs, function_pointer_execs = None, None
+    try:
+        all_execs = [entry[RESULT_KEYS.TOTAL_PROG_EXECUTIONS] for entry in unified_dict.values()]
+    except KeyError:
+        pass
+    try:
+        function_pointer_execs = [entry[RESULT_KEYS.FPOINTER_PROG_EXECUTIONS] for entry in unified_dict.values()]
+    except KeyError:
+        pass
 
     # some times a single execution of a job can trigger many prog executions in parallel.
     # that's why the total prog executions can be larger than the (linear) time of the job itself.
@@ -115,6 +130,8 @@ def process_time_profile_lines(lines: list[dict]):
         job_duration = entry[RESULT_KEYS.TOTAL_JOB_DURATION]
         prog_exec_times_w_celiing.append(min(exec_duration, job_duration))
 
+    prog_exec_times = [entry[RESULT_KEYS.PROG_EXECUTIONS_JOB_DURATION] for entry in unified_dict.values()]
+
     job_times = [entry[RESULT_KEYS.TOTAL_JOB_DURATION] for entry in unified_dict.values()]
     save_line_plot(
         [t / 3600 for t in job_times],
@@ -123,43 +140,47 @@ def process_time_profile_lines(lines: list[dict]):
         "Hours",
     )
     save_line_plot(
-        [t / 3600 for t in prog_exec_times_w_celiing],
+        [t / 3600 for t in prog_exec_times],
         "prog_exec_duration_series.png",
         "Prog execution duration over time",
         "Hours",
     )
-    save_scatter_plot(
-        all_execs,
-        "all_execs_series.png",
-        "Prog executions per job over time",
-        "",
-    )
-    save_histogram_plot(
-        all_execs,
-        "all_execs_histogram.png",
-        "Frequency of prog executions per job",
-        "Number of prog executions in a single job",
-    )
-    save_scatter_plot(
-        function_pointer_execs,
-        "function_pointer_exec_series.png",
-        "Prog executions per job over time triggered by new coverage",
-        "",
-    )
-    save_histogram_plot(
-        function_pointer_execs,
-        "function_pointer_histogram.png",
-        "Frequency of prog executions per job triggered by new coverage",
-        "Number of prog executions in a single job",
-    )    
+    if all_execs is not None:
+        save_scatter_plot(
+            all_execs,
+            "all_execs_series.png",
+            "Prog executions per job over time",
+            "",
+        )
+        save_histogram_plot(
+            all_execs,
+            "all_execs_histogram.png",
+            "Frequency of prog executions per job",
+            "Number of prog executions in a single job",
+        )
+    if function_pointer_execs is not None:
+        save_scatter_plot(
+            function_pointer_execs,
+            "function_pointer_exec_series.png",
+            "Prog executions per job over time triggered by new coverage",
+            "",
+        )
+        save_histogram_plot(
+            function_pointer_execs,
+            "function_pointer_histogram.png",
+            "Frequency of prog executions per job triggered by new coverage",
+            "Number of prog executions in a single job",
+        )    
     print("-------------------------------------")
     print(f"Total job execution time: {timedelta(seconds=sum(job_times))}")
     print("-------------------------------------")
     print(f"Total prog execution time during jobs: {timedelta(seconds=sum(prog_exec_times_w_celiing))}")
-    print("-------------------------------------")
-    print(f"Total prog executions during jobs: {sum(all_execs)}")
-    print("-------------------------------------")
-    print(f"Total prog executions during jobs triggered due to our new coverage: {sum(function_pointer_execs)}")
+    if all_execs is not None:    
+        print("-------------------------------------")
+        print(f"Total prog executions during jobs: {sum(all_execs)}")
+    if function_pointer_execs is not None:
+        print("-------------------------------------")
+        print(f"Total prog executions during jobs triggered due to our new coverage: {sum(function_pointer_execs)}")
 
 
 if __name__ == "__main__":
