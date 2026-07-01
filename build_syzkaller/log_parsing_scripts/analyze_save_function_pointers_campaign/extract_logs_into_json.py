@@ -165,6 +165,9 @@ def read_serialized_cover(line_number: int, og_text: list[str]) -> list[str]:
     cover_line = cover_line[1:-1]
     return [x.strip() for x in cover_line.split(",")]
 
+def read_exec_durations(line: str) -> list[dict]:
+    return json.loads(line)
+
 def __create_master_regex(
     patterns: dict[str, str],
 ) -> tuple[re.Pattern, dict[str, list[int]]]:
@@ -236,9 +239,14 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
         LOGENTRY_KEYS.TOTAL_JOB_DURATION: r"total job duration: (?:\%\!d\(float64=)?(\d+\.\d+)\)? seconds$",
         # This other syzkaller log outputs nanoseconds instead of seconds in some versions.
         # We need to match both floating point numbers and integers but also remember to convert between units later.
-        LOGENTRY_KEYS.PROG_EXECUTIONS_JOB_DURATION: r"test executions job duration: ((?:\d+)|(?:\d+\.\d+)) seconds$",
+        LOGENTRY_KEYS.PROG_EXECUTIONS_JOB_DURATION: r"test executions(?: \(total\))? job duration: ((?:\d+)|(?:\d+\.\d+)) seconds$",
+        LOGENTRY_KEYS.FPOINTER_PROG_EXECUTIONS_JOB_DURATION: r"test executions \(function pointer coverage\) job duration: (\d+\.\d+) seconds$",
         LOGENTRY_KEYS.TOTAL_PROG_EXECUTIONS: r"(\d+) total test case executions$",
         LOGENTRY_KEYS.FPOINTER_PROG_EXECUTIONS: r"(\d+) new test case executions because of function pointer coverage$",
+        # Need to parse the json contained at the end of this entry
+        LOGENTRY_KEYS.PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS: r"test executions \(total\) individual durations: (.*)$",
+        # Need to parse the json contained at the end of this entry
+        LOGENTRY_KEYS.PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS: r"test executions \(function pointer coverage\) individual durations: (.*)$",
         "SKIP": "|".join(
             [
                 call_pattern + r": minimize started",
@@ -409,10 +417,16 @@ def match_against_triage_log_line_types(
                 # assume seconds if its a float
                 j_duration = float(match_groups[0])
             res[RESULT_KEYS.PROG_EXECUTIONS_JOB_DURATION] = j_duration
+        case LOGENTRY_KEYS.FPOINTER_PROG_EXECUTIONS_JOB_DURATION:
+            res[RESULT_KEYS.FPOINTER_PROG_EXECUTIONS_JOB_DURATION] = float(match_groups[0])            
         case LOGENTRY_KEYS.TOTAL_PROG_EXECUTIONS:
             res[RESULT_KEYS.TOTAL_PROG_EXECUTIONS] = int(match_groups[0])
         case LOGENTRY_KEYS.FPOINTER_PROG_EXECUTIONS:
             res[RESULT_KEYS.FPOINTER_PROG_EXECUTIONS] = int(match_groups[0])
+        case LOGENTRY_KEYS.PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS:
+                res[RESULT_KEYS.PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS] = read_exec_durations(match_groups[0])
+        case LOGENTRY_KEYS.PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS:
+                res[RESULT_KEYS.PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS] = read_exec_durations(match_groups[0])                
         case "SKIP":
             raise TriageSkipLine
     if res == {}:

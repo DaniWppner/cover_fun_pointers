@@ -20,6 +20,9 @@ class LOGENTRY_KEYS(StrEnum):
     TOTAL_PROG_EXECUTIONS = "total_test_case_executions"
     FPOINTER_PROG_EXECUTIONS = "new_test_case_executions_because_of_fpcov"
     PROG_EXECUTIONS_JOB_DURATION = "test_executions_job_duration"
+    FPOINTER_PROG_EXECUTIONS_JOB_DURATION = "test_executions_because_of_fpcov_job_duration"
+    PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS = "test_executions_individual_durations"
+    PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS = "test_executions_individual_durations_because_of_fpcov"
 
 
 class RESULT_KEYS(StrEnum):
@@ -48,6 +51,9 @@ class RESULT_KEYS(StrEnum):
     TOTAL_PROG_EXECUTIONS = "prog_executions"
     FPOINTER_PROG_EXECUTIONS = "prog_executions_because_of_fpcov"
     PROG_EXECUTIONS_JOB_DURATION = "prog_executions_job_duration"
+    FPOINTER_PROG_EXECUTIONS_JOB_DURATION = "test_executions_because_of_fpcov_job_duration"
+    PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS = "test_executions_individual_durations"
+    PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS = "test_executions_individual_durations"    
     TAGS = "tags"
 
 class TAG_RESULT_VALUES(StrEnum):
