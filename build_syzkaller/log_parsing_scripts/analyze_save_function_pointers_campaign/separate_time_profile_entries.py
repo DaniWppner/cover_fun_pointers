@@ -42,6 +42,28 @@ def filter_time_profile_lines(json_lines_path: Path) -> tuple[list[dict], list[d
     return interesting_lines, not_interesting_lines
 
 
+def add_secondary_x_axis(
+    ax: plt.Axes,
+    secondary_x_values: Iterable[float],
+    x_positions: Iterable[float] | None = None,
+    axis_label: str = "Hours since first entry",
+) -> None:
+    secondary_x_values = list(secondary_x_values)
+
+    x_positions = list(x_positions) if x_positions is not None else list(range(1, len(secondary_x_values) + 1))
+    if len(secondary_x_values) != len(x_positions):
+        raise ValueError("secondary_x_values and x_positions must have the same length")
+
+    secondary_values = list(secondary_x_values)
+    assert secondary_values
+
+    sec_ax = ax.twiny()
+    # hacky hack: plot an invisible y axis to include the secondary x_label
+    sec_ax.plot(secondary_values, [0] * len(secondary_values), visible=False)
+    sec_ax.set_xlim(min(secondary_values), max(secondary_values))
+    sec_ax.set_xlabel(axis_label)
+
+
 def save_plot(
     values: list[float],
     output_name: str,
@@ -51,6 +73,8 @@ def save_plot(
     bins: int = 20,
     x_values: Iterable[float | datetime] | None = None,
     x_label: str = "Entry",
+    secondary_x_values: Iterable[float] | None = None,
+    secondary_x_label: str = "Hours since first entry",
 ) -> None:
     """
     plot_type can be one of: "line", "scatter", or "hist".
@@ -60,31 +84,39 @@ def save_plot(
     if not values:
         return
 
-    plt.figure(figsize=(8, 4))
+    fig = plt.figure(figsize=(8, 4))
+    ax = fig.add_subplot(111)
     if plot_type == "line":
         x_vals = list(x_values) if x_values is not None else list(range(1, len(values) + 1))
-        plt.plot(x_vals, values, marker=".")
-        plt.xlabel(x_label)
-        plt.ylabel(ylabel)
+        ax.plot(x_vals, values, marker=".")
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(ylabel)
     elif plot_type == "scatter":
         x_vals = list(x_values) if x_values is not None else list(range(1, len(values) + 1))
-        plt.scatter(x_vals, values, marker=".")
-        plt.xlabel(x_label)
-        plt.ylabel(ylabel)
+        ax.scatter(x_vals, values, marker=".")
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(ylabel)
     elif plot_type == "hist":
-        plt.hist(values, bins=bins)
-        plt.xlabel(ylabel)
-        plt.ylabel("Count")
+        ax.hist(values, bins=bins)
+        ax.set_xlabel(ylabel)
+        ax.set_ylabel("Count")
     else:
         raise ValueError(f"Unsupported plot type: {plot_type}")
 
-    plt.title(title)
-    plt.tight_layout()
+    if plot_type != "hist" and secondary_x_values is not None:
+        add_secondary_x_axis(
+            ax,
+            secondary_x_values,
+            x_positions=x_vals,
+            axis_label=secondary_x_label,
+        )
+
+    ax.set_title(title)
 
     out_path = Path.cwd() / output_name
-    plt.savefig(out_path)
-    plt.close()
-    print(f"Saved plot to {out_path}")
+    fig.savefig(out_path)
+    plt.close(fig)
+    print(f"Saved plot to {out_path.name}")
 
 
 def save_line_plot(
@@ -94,6 +126,8 @@ def save_line_plot(
     ylabel: str,
     x_values: Iterable[float | datetime] | None = None,
     x_label: str = "Entry",
+    secondary_x_values: Iterable[float] | None = None,
+    secondary_x_label: str = "Hours since first entry",
 ) -> None:
     save_plot(
         values,
@@ -103,6 +137,8 @@ def save_line_plot(
         plot_type="line",
         x_values=x_values,
         x_label=x_label,
+        secondary_x_values=secondary_x_values,
+        secondary_x_label=secondary_x_label,
     )
 
 
@@ -113,6 +149,8 @@ def save_scatter_plot(
     ylabel: str,
     x_values: Iterable[float | datetime] | None = None,
     x_label: str = "Entry",
+    secondary_x_values: Iterable[float] | None = None,
+    secondary_x_label: str = "Hours since first entry",
 ) -> None:
     save_plot(
         values,
@@ -122,6 +160,8 @@ def save_scatter_plot(
         plot_type="scatter",
         x_values=x_values,
         x_label=x_label,
+        secondary_x_values=secondary_x_values,
+        secondary_x_label=secondary_x_label,
     )
 
 
@@ -131,18 +171,26 @@ def save_histogram_plot(
     save_plot(values, output_name, title, xlabel, plot_type="hist", bins=bins, x_label=xlabel)
 
 
-def show_plots(all_execs, function_pointer_execs, prog_exec_times, job_times):
+def show_plots(
+    all_execs,
+    function_pointer_execs,
+    prog_exec_times,
+    job_times,
+    entry_hours: Iterable[float] | None = None,
+):
     save_line_plot(
         [t / 3600 for t in job_times],
         "job_duration_series.png",
         "Job duration over time",
         "Hours",
+        secondary_x_values=entry_hours,
     )
     save_line_plot(
         [t / 3600 for t in prog_exec_times],
         "prog_exec_duration_series.png",
         "Prog execution duration over time",
         "Hours",
+        secondary_x_values=entry_hours,
     )
     if all_execs is not None:
         save_scatter_plot(
@@ -255,6 +303,12 @@ def process_time_profile_lines(lines: list[dict]):
         entry[RESULT_KEYS.TOTAL_JOB_DURATION] for entry in unified_dict.values()
     ]
 
+    entry_timestamps = [entry[RESULT_KEYS.TIMESTAMP] for entry in unified_dict.values()]
+    start_time = min(entry_timestamps)
+    entry_hours = [
+        (timestamp - start_time).total_seconds() / 3600 for timestamp in entry_timestamps
+    ]
+
     in_flight_generic_progs_at, generic_start_time, generic_end_time = calculate_in_flight_progs([
         entry[RESULT_KEYS.PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS]
         for entry in unified_dict.values()
@@ -281,7 +335,7 @@ def process_time_profile_lines(lines: list[dict]):
         ylabel="In-flight prog executions",
     )
 
-    show_plots(all_execs, function_pointer_execs, prog_exec_times, job_times)
+    show_plots(all_execs, function_pointer_execs, prog_exec_times, job_times, entry_hours)
     show_info(all_execs, function_pointer_execs, prog_exec_times_w_celiing, job_times)
     return unified_dict
 
@@ -360,9 +414,15 @@ def unify_per_job(lines):
         job_ids = [(l[RESULT_KEYS.TRIAGEID], l[RESULT_KEYS.PROGID]) for l in job_lines]
         assert all(job_ids[0] == jid for jid in job_ids)
         unified_key = job_ids[0][0] + "|" + job_ids[0][1]
-        unified_dict[unified_key] = {
+        unified_entry = {
             i_key: j_line[i_key] for i_key, j_line in zip(present_keys, job_lines)
         }
+        timestamp_entry = job_lines[0][RESULT_KEYS.TIMESTAMP]
+        unified_entry[RESULT_KEYS.TIMESTAMP] = datetime.strptime(
+            timestamp_entry,
+            "%Y-%m-%d %H:%M:%S",
+        )
+        unified_dict[unified_key] = unified_entry
     return unified_dict
 
 
@@ -402,13 +462,13 @@ if __name__ == "__main__":
     unified_time_profile = process_time_profile_lines(time_profile_jsonl)
 
     out_str = "\n".join(
-        json.dumps(json_obj, indent=None) for json_obj in not_time_profile_jsonl
+        json.dumps(json_obj, indent=None, default=str) for json_obj in not_time_profile_jsonl
     )
     with out_path.open("w") as f:
         f.write(out_str)
     print("##############################")
     print(f"Cleaned up json lines outputted to {out_path.name}")
     with open("time_profile_data.json", "w") as f:
-        f.write(json.dumps(unified_time_profile, indent=1))
+        f.write(json.dumps(unified_time_profile, indent=1, default=str))
     print("##############################")
     print(f"Time profile data outputted to time_profile_data.json")
