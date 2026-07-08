@@ -85,18 +85,17 @@ def normalize_timestamps(timestamps: List[datetime]) -> List[float]:
     return [(ts - start).total_seconds() for ts in timestamps]
 
 
-def parse_skip_time(value: str) -> int:
+def parse_time_value(value: str) -> int:
     parts = value.split(":")
     if len(parts) != 3:
-        raise argparse.ArgumentTypeError("skip-time must use hh:mm:ss format")
+        raise argparse.ArgumentTypeError("time value must use hh:mm:ss format")
     try:
         hours, minutes, seconds = (int(p) for p in parts)
     except ValueError as exc:
-        raise argparse.ArgumentTypeError("skip-time must use hh:mm:ss format") from exc
+        raise argparse.ArgumentTypeError("time value must use hh:mm:ss format") from exc
     if hours < 0 or minutes < 0 or seconds < 0:
-        raise argparse.ArgumentTypeError("skip-time values must be non-negative")
+        raise argparse.ArgumentTypeError("time values must be non-negative")
     return hours * 3600 + minutes * 60 + seconds
-
 
 
 def filter_by_elapsed_time(
@@ -128,6 +127,26 @@ def filter_by_elapsed_time(
         skipped_rates,
         skipped_timestamps,
         skipped_x,
+    )
+
+
+def filter_by_max_elapsed_time(
+    exec_totals: List[int],
+    exec_rates: List[int],
+    timestamps: List[datetime],
+    max_seconds: int,
+) -> Tuple[List[int], List[int], List[datetime], List[float]]:
+    normalized = normalize_timestamps(timestamps)
+    keep_mask = [elapsed <= max_seconds for elapsed in normalized]
+    filtered_totals = [value for value, keep in zip(exec_totals, keep_mask) if keep]
+    filtered_rates = [value for value, keep in zip(exec_rates, keep_mask) if keep]
+    filtered_timestamps = [ts for ts, keep in zip(timestamps, keep_mask) if keep]
+    filtered_x = [elapsed for elapsed, keep in zip(normalized, keep_mask) if keep]
+    return (
+        filtered_totals,
+        filtered_rates,
+        filtered_timestamps,
+        filtered_x,
     )
 
 
@@ -183,14 +202,24 @@ def main() -> None:
     parser.add_argument("input", type=Path, help="Path to the file containing status lines")
     parser.add_argument("--prefix", type=str, default="", help="Output filename prefix")
     parser.add_argument(
+        "--skip-beginning",
         "--skip-time",
-        type=parse_skip_time,
+        dest="skip_beginning",
+        type=parse_time_value,
         default=None,
-        help="Ignore entries until this much elapsed time has passed (format: hh:mm:ss)",
+        help="Ignore entries before this much elapsed time has passed (format: hh:mm:ss)",
+    )
+    parser.add_argument(
+        "--cut-after",
+        dest="cut_after_time",
+        type=parse_time_value,
+        default=None,
+        help="Discard entries after this much elapsed time has passed (format: hh:mm:ss)",
     )
     args = parser.parse_args()
 
-    skip_seconds = args.skip_time if args.skip_time is not None else 0
+    skip_seconds = args.skip_beginning if args.skip_beginning is not None else 0
+    cut_after_seconds = args.cut_after_time
 
     exec_totals, exec_rates, timestamps = parse_status_lines(args.input)
     (
@@ -204,18 +233,35 @@ def main() -> None:
         skipped_x,
     ) = filter_by_elapsed_time(exec_totals, exec_rates, timestamps, skip_seconds)
 
+    if cut_after_seconds is not None:
+        (
+            exec_totals,
+            exec_rates,
+            timestamps,
+            x,
+        ) = filter_by_max_elapsed_time(exec_totals, exec_rates, timestamps, cut_after_seconds)
+
     prefix = args.prefix
     if prefix and not prefix.endswith("_"):
         prefix = prefix + "_"
 
-    cwd = Path.cwd()
-    skip_suffix = ""
-    if args.skip_time is not None:
-        skip_suffix = f"_skip_{args.skip_time // 3600:02d}_{(args.skip_time % 3600) // 60:02d}_{args.skip_time % 60:02d}"
-    out_total = cwd / f"{prefix}exec_total_evolution{skip_suffix}.png"
-    out_rate = cwd / f"{prefix}exec_per_min_evolution{skip_suffix}.png"
-    out_total_skipped = cwd / f"{prefix}exec_total_evolution_skipped_prefix{skip_suffix}.png"
-    out_rate_skipped = cwd / f"{prefix}exec_per_min_evolution_skipped_prefix{skip_suffix}.png"
+    out_dir = Path.cwd() / "exec_over_time"
+    suffix_parts = []
+    if args.skip_beginning is not None:
+        suffix_parts.append(
+            f"skip_{args.skip_beginning // 3600:02d}_{(args.skip_beginning % 3600) // 60:02d}_{args.skip_beginning % 60:02d}"
+        )
+    if args.cut_after_time is not None:
+        suffix_parts.append(
+            f"cut_{args.cut_after_time // 3600:02d}_{(args.cut_after_time % 3600) // 60:02d}_{args.cut_after_time % 60:02d}"
+        )
+    suffix = ""
+    if suffix_parts:
+        suffix = "_" + "_".join(suffix_parts)
+    out_total = out_dir / f"{prefix}exec_total_evolution{suffix}.png"
+    out_rate = out_dir / f"{prefix}exec_per_min_evolution{suffix}.png"
+    out_total_skipped = out_dir / f"{prefix}exec_total_evolution_skipped_prefix{suffix}.png"
+    out_rate_skipped = out_dir / f"{prefix}exec_per_min_evolution_skipped_prefix{suffix}.png"
 
     save_time_series(x, exec_totals, out_total, "Exec total over time", "Exec total")
     save_time_series(x, exec_rates, out_rate, "Exec/min over time", "Exec/min")
