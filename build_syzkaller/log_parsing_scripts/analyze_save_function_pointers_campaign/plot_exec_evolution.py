@@ -18,6 +18,7 @@ import re
 import argparse
 import numpy
 from pathlib import Path
+from collections.abc import Sequence
 from typing import List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
@@ -25,19 +26,29 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 
 
-@dataclass
+@dataclass(init=False)
 class SeriesData:
     exec_totals: List[int]
     exec_rates: List[int]
     timestamps: List[float]
 
-    def __post_init__(self) -> None:
-        if not self.exec_totals or not self.exec_rates or not self.timestamps:
+    def __init__(
+        self,
+        exec_totals: List[int],
+        exec_rates: List[int],
+        timestamps: List[datetime | float],
+    ) -> None:
+        if not exec_totals or not exec_rates or not timestamps:
             raise ValueError("SeriesData must contain non-empty exec_totals, exec_rates, and timestamps")
-        if len(self.exec_totals) != len(self.exec_rates) or len(self.exec_totals) != len(self.timestamps):
+        if len(exec_totals) != len(exec_rates) or len(exec_totals) != len(timestamps):
             raise ValueError("SeriesData fields must have the same length")
-        if isinstance(self.timestamps[0], datetime):
-            self.timestamps = normalize_timestamps(self.timestamps)
+
+        self.exec_totals = exec_totals
+        self.exec_rates = exec_rates
+        self.timestamps = normalize_timestamps(timestamps)
+
+    def copy(self) -> SeriesData:
+        return SeriesData(list(self.exec_totals), list(self.exec_rates), list(self.timestamps))
 
 
 def entry_to_time(entry_n_array: numpy.ndarray) -> numpy.ndarray:
@@ -94,9 +105,16 @@ def parse_status_lines(path: Path) -> SeriesData:
     return SeriesData(exec_totals=exec_totals, exec_rates=exec_rates, timestamps=timestamps)
 
 
-def normalize_timestamps(timestamps: List[datetime]) -> List[float]:
+def normalize_timestamps(timestamps: List[datetime | float]) -> List[float]:
+    if not timestamps:
+        raise ValueError("Cannot normalize empty timestamps")
+
     start = timestamps[0]
-    return [(ts - start).total_seconds() for ts in timestamps]
+    if isinstance(start, datetime):
+        normalized = [(ts - start).total_seconds() for ts in timestamps]
+    else:
+        normalized = [ts - start for ts in timestamps]
+    return normalized
 
 
 def parse_time_value(value: str) -> int:
@@ -112,77 +130,116 @@ def parse_time_value(value: str) -> int:
     return hours * 3600 + minutes * 60 + seconds
 
 
-def filter_by_elapsed_time(series: SeriesData, skip_seconds: int) -> Tuple[Optional[SeriesData], Optional[SeriesData]]:
-    keep_mask = [elapsed >= skip_seconds for elapsed in series.timestamps]
+def filter_by_elapsed_time(
+    series_list: Sequence[SeriesData],
+    skip_seconds: int,
+) -> Tuple[List[SeriesData], List[SeriesData]]:
+    filtered_list: List[SeriesData] = []
+    skipped_list: List[SeriesData] = []
 
-    filtered_totals = [value for value, keep in zip(series.exec_totals, keep_mask) if keep]
-    filtered_rates = [value for value, keep in zip(series.exec_rates, keep_mask) if keep]
-    filtered_timestamps = [elapsed for elapsed, keep in zip(series.timestamps, keep_mask) if keep]
+    for series in series_list:
+        keep_mask = [elapsed >= skip_seconds for elapsed in series.timestamps]
 
-    skipped_totals = [value for value, keep in zip(series.exec_totals, keep_mask) if not keep]
-    skipped_rates = [value for value, keep in zip(series.exec_rates, keep_mask) if not keep]
-    skipped_timestamps = [elapsed for elapsed, keep in zip(series.timestamps, keep_mask) if not keep]
+        filtered_totals = [value for value, keep in zip(series.exec_totals, keep_mask) if keep]
+        filtered_rates = [value for value, keep in zip(series.exec_rates, keep_mask) if keep]
+        filtered_timestamps = [elapsed for elapsed, keep in zip(series.timestamps, keep_mask) if keep]
 
-    filtered = None
-    skipped = None
-    if filtered_totals:
-        filtered = SeriesData(exec_totals=filtered_totals, exec_rates=filtered_rates, timestamps=filtered_timestamps)
-    if skipped_totals:
-        skipped = SeriesData(exec_totals=skipped_totals, exec_rates=skipped_rates, timestamps=skipped_timestamps)
-    return filtered, skipped
+        skipped_totals = [value for value, keep in zip(series.exec_totals, keep_mask) if not keep]
+        skipped_rates = [value for value, keep in zip(series.exec_rates, keep_mask) if not keep]
+        skipped_timestamps = [elapsed for elapsed, keep in zip(series.timestamps, keep_mask) if not keep]
+
+        if filtered_totals:
+            filtered_list.append(
+                SeriesData(exec_totals=filtered_totals, exec_rates=filtered_rates, timestamps=filtered_timestamps)
+            )
+        if skipped_totals:
+            skipped_list.append(
+                SeriesData(exec_totals=skipped_totals, exec_rates=skipped_rates, timestamps=skipped_timestamps)
+            )
+
+    return filtered_list, skipped_list
 
 
-def filter_by_max_elapsed_time(series: SeriesData, max_seconds: int) -> Optional[SeriesData]:
-    keep_mask = [elapsed <= max_seconds for elapsed in series.timestamps]
-    filtered_totals = [value for value, keep in zip(series.exec_totals, keep_mask) if keep]
-    filtered_rates = [value for value, keep in zip(series.exec_rates, keep_mask) if keep]
-    filtered_timestamps = [elapsed for elapsed, keep in zip(series.timestamps, keep_mask) if keep]
-    if not filtered_totals:
-        return None
-    return SeriesData(exec_totals=filtered_totals, exec_rates=filtered_rates, timestamps=filtered_timestamps)
+def filter_by_max_elapsed_time(
+    series_list: Sequence[SeriesData],
+    max_seconds: int,
+) -> List[SeriesData]:
+    filtered_list: List[SeriesData] = []
+
+    for series in series_list:
+        keep_mask = [elapsed <= max_seconds for elapsed in series.timestamps]
+        filtered_totals = [value for value, keep in zip(series.exec_totals, keep_mask) if keep]
+        filtered_rates = [value for value, keep in zip(series.exec_rates, keep_mask) if keep]
+        filtered_timestamps = [elapsed for elapsed, keep in zip(series.timestamps, keep_mask) if keep]
+        if filtered_totals:
+            filtered_list.append(
+                SeriesData(exec_totals=filtered_totals, exec_rates=filtered_rates, timestamps=filtered_timestamps)
+            )
+
+    return filtered_list
+
+
+def choose_plot_time_unit(series_list: Sequence[SeriesData]) -> tuple[str, SeriesData]:
+    s_in_h = 3600
+    s_in_m = 60
+    longest = max(series_list, key= lambda s: len(s.timestamps))
+    if longest.timestamps[-1] - longest.timestamps[0] > s_in_h * 2:
+        result = "Hours"
+        ratio = s_in_h
+    else:
+        result = "Minutes"
+        ratio = s_in_m
+    for s in series_list:
+        s.timestamps = [t / ratio for t in s.timestamps]
+    return result, longest
+
+
+def plot_single_series(ax: plt.Axes, series: SeriesData, values_key: str, color: str, label: str | None = None) -> bool:
+    values = getattr(series, values_key)
+    if not values:
+        return False
+    ax.plot(range(len(series.timestamps)), values, marker=".", linewidth=0.2, color=color, label=label)
+    return True
 
 
 def save_time_series(
-    series: Optional[SeriesData],
+    series_list: Sequence[SeriesData],
     out_name: Path,
     title: str,
     ylabel: str,
     values_key: str,
+    labels: Sequence[str] | None = None,
 ) -> None:
     '''
-    Plot a single metric from a SeriesData object.
-
-    Plot with two x_axes: entry number and timestamp on two modes:
-        If the total elapsed time in timestamps is less than 2 hours, use minutes as the time unit.
-        Else, use hours.
+    Plot one or two metrics from a list of SeriesData objects on the same axes.
     '''
-    if series is None:
-        print(f"No data for {title}; skipping plot")
-        return
-
-    s_in_h = 3600
-    s_in_m = 60
-
-    values = getattr(series, values_key)
-    if not values:
-        print(f"No data for {title}; skipping plot")
-        return
-
-    timestamps = list(series.timestamps)
-
-    time_unit = None
-    if timestamps[-1] - timestamps[0] > s_in_h * 2:
-        timestamps = [t / s_in_h for t in timestamps]
-        time_unit = "Hours"
-    else:
-        timestamps = [t / s_in_m for t in timestamps]
-        time_unit = "Minutes"
-    assert time_unit is not None
-    initialize_convertion_functions(list(range(len(timestamps))), timestamps)
+    assert series_list, "save_time_series requires at least one SeriesData"
+    assert len(series_list) <= 2, "At most two series may be plotted"
+    series_list = [s.copy() for s in series_list]
+    if len(series_list) == 2:
+        if (labels is None or len(labels) != 2):
+            raise ValueError("Two series require labels for legend entries")
+    time_unit, longest = choose_plot_time_unit(series_list)
+    initialize_convertion_functions(range(len(longest.timestamps)), longest.timestamps)
 
     fig = plt.figure(figsize=(10, 4))
     ax = fig.add_subplot(111)
-    ax.plot(range(len(timestamps)), values, marker=".", linewidth=0.2)
+
+    colors = ["tab:blue", "tab:orange"]
+    plotted = 0
+    for index, (series, color) in enumerate(zip(series_list, colors)):
+        label = labels[index] if labels is not None else None
+        if plot_single_series(ax, series, values_key, color, label):
+            plotted += 1
+
+    if plotted == 0:
+        print(f"No data for {title}; skipping plot")
+        plt.close(fig)
+        return
+
+    if len(series_list) > 1 and labels is not None:
+        ax.legend(loc="best")
+
     ax.set_title(title, loc="left", fontsize="15")
     ax.set_xlabel("Number of sample")
     ax.set_ylabel(ylabel)
@@ -197,7 +254,7 @@ def save_time_series(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot exec totals and exec/min from syzkaller status lines")
-    parser.add_argument("input", type=Path, help="Path to the file containing status lines")
+    parser.add_argument("input", nargs="+", type=Path, help="One or two paths to files containing status lines")
     parser.add_argument("--prefix", type=str, default="", help="Output filename prefix")
     parser.add_argument(
         "--skip-beginning",
@@ -219,11 +276,19 @@ def main() -> None:
     skip_seconds = args.skip_beginning if args.skip_beginning is not None else 0
     cut_after_seconds = args.cut_after_time
 
-    series = parse_status_lines(args.input)
-    filtered_series, skipped_series = filter_by_elapsed_time(series, skip_seconds)
+    inputs: Sequence[Path] = args.input
+    if len(inputs) > 2:
+        parser.error("Please provide at most two input files")
+
+    if len(inputs) == 2 and inputs[0] == inputs[1]:
+        parser.error("Please provide two different input files")
+
+    series_list = [parse_status_lines(path) for path in inputs]
+    labels = [path.resolve().parent.name for path in inputs]
+    filtered_series_list, skipped_series_list = filter_by_elapsed_time(series_list, skip_seconds)
 
     if cut_after_seconds is not None:
-        filtered_series = filter_by_max_elapsed_time(filtered_series, cut_after_seconds)
+        filtered_series_list = filter_by_max_elapsed_time(filtered_series_list, cut_after_seconds)
 
     prefix = args.prefix
     if prefix and not prefix.endswith("_"):
@@ -243,15 +308,20 @@ def main() -> None:
     suffix = ""
     if suffix_parts:
         suffix = "_" + "_".join(suffix_parts)
-    out_total = out_dir / f"{prefix}exec_total_evolution{suffix}.png"
-    out_rate = out_dir / f"{prefix}exec_per_min_evolution{suffix}.png"
-    out_total_skipped = out_dir / f"{prefix}exec_total_evolution_skipped_prefix{suffix}.png"
-    out_rate_skipped = out_dir / f"{prefix}exec_per_min_evolution_skipped_prefix{suffix}.png"
+    if len(inputs) > 1:
+        combined_suffix = f"_combined{suffix}"
+    else:
+        combined_suffix = suffix
 
-    save_time_series(filtered_series, out_total, "Exec total over time", "Exec total", "exec_totals")
-    save_time_series(filtered_series, out_rate, "Exec/min over time", "Exec/min", "exec_rates")
-    save_time_series(skipped_series, out_total_skipped, "Exec total over skipped prefix", "Exec total", "exec_totals")
-    save_time_series(skipped_series, out_rate_skipped, "Exec/min over skipped prefix", "Exec/min", "exec_rates")
+    out_total = out_dir / f"{prefix}exec_total_evolution{combined_suffix}.png"
+    out_rate = out_dir / f"{prefix}exec_per_min_evolution{combined_suffix}.png"
+    out_total_skipped = out_dir / f"{prefix}exec_total_evolution_skipped_prefix{combined_suffix}.png"
+    out_rate_skipped = out_dir / f"{prefix}exec_per_min_evolution_skipped_prefix{combined_suffix}.png"
+
+    save_time_series(filtered_series_list, out_total, "Exec total over time", "Exec total", "exec_totals", labels)
+    save_time_series(filtered_series_list, out_rate, "Exec/min over time", "Exec/min", "exec_rates", labels)
+    save_time_series(skipped_series_list, out_total_skipped, "Exec total over skipped prefix", "Exec total", "exec_totals", labels)
+    save_time_series(skipped_series_list, out_rate_skipped, "Exec/min over skipped prefix", "Exec/min", "exec_rates", labels)
 
 
 if __name__ == "__main__":
