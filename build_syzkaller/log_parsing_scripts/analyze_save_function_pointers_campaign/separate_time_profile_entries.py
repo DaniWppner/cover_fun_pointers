@@ -2,6 +2,7 @@
 import argparse
 import intervaltree
 import json
+import numpy
 import matplotlib.pyplot as plt
 import sys
 from datetime import datetime, timedelta
@@ -42,25 +43,38 @@ def filter_time_profile_lines(json_lines_path: Path) -> tuple[list[dict], list[d
     return interesting_lines, not_interesting_lines
 
 
+def entry_to_time(entry_n_array: numpy.ndarray) -> numpy.ndarray:
+    assert ENTRY_NUMBER_VALUES_GLOBAL is not None
+    assert TIMESTAMP_VALUES_GLOBAL is not None
+    return numpy.interp(entry_n_array, ENTRY_NUMBER_VALUES_GLOBAL, TIMESTAMP_VALUES_GLOBAL, left=0)
+
+
+def time_to_entry(timestamp_array: numpy.ndarray) -> numpy.ndarray:
+    assert ENTRY_NUMBER_VALUES_GLOBAL is not None
+    assert TIMESTAMP_VALUES_GLOBAL is not None
+    return numpy.interp(timestamp_array, TIMESTAMP_VALUES_GLOBAL, ENTRY_NUMBER_VALUES_GLOBAL, left=0)
+
+
+def initialize_convertion_functions(entry_values, timestamp_values):
+    global ENTRY_NUMBER_VALUES_GLOBAL, TIMESTAMP_VALUES_GLOBAL
+    ENTRY_NUMBER_VALUES_GLOBAL = entry_values
+    TIMESTAMP_VALUES_GLOBAL = timestamp_values
+
 def add_secondary_x_axis(
     ax: plt.Axes,
     secondary_x_values: Iterable[float],
-    x_positions: Iterable[float] | None = None,
+    x_positions: Iterable[float],
     axis_label: str = "Hours since first entry",
 ) -> None:
     secondary_x_values = list(secondary_x_values)
+    x_positions = list(x_positions)
 
-    x_positions = list(x_positions) if x_positions is not None else list(range(1, len(secondary_x_values) + 1))
+    assert secondary_x_values
+    assert x_positions
     if len(secondary_x_values) != len(x_positions):
         raise ValueError("secondary_x_values and x_positions must have the same length")
 
-    secondary_values = list(secondary_x_values)
-    assert secondary_values
-
-    sec_ax = ax.twiny()
-    # hacky hack: plot an invisible y axis to include the secondary x_label
-    sec_ax.plot(secondary_values, [0] * len(secondary_values), visible=False)
-    sec_ax.set_xlim(min(secondary_values), max(secondary_values))
+    sec_ax = ax.secondary_xaxis('top', functions=(entry_to_time, time_to_entry))
     sec_ax.set_xlabel(axis_label)
 
 
@@ -111,8 +125,8 @@ def save_plot(
             axis_label=secondary_x_label,
         )
 
-    ax.set_title(title)
-
+    ax.set_title(title, loc='left', fontsize=15)
+    fig.tight_layout()
     out_path = Path.cwd() / output_name
     fig.savefig(out_path)
     plt.close(fig)
@@ -127,8 +141,12 @@ def save_line_plot(
     x_values: Iterable[float | datetime] | None = None,
     x_label: str = "Entry",
     secondary_x_values: Iterable[float] | None = None,
-    secondary_x_label: str = "Hours since first entry",
+    secondary_x_label: str | None = None,
 ) -> None:
+    '''
+    Save line plot assuming entry number as first x axis and
+    Timestamp as secondary x axis
+    '''
     save_plot(
         values,
         output_name,
@@ -150,7 +168,7 @@ def save_scatter_plot(
     x_values: Iterable[float | datetime] | None = None,
     x_label: str = "Entry",
     secondary_x_values: Iterable[float] | None = None,
-    secondary_x_label: str = "Hours since first entry",
+    secondary_x_label: str | None = None,
 ) -> None:
     save_plot(
         values,
@@ -176,21 +194,23 @@ def show_plots(
     function_pointer_execs,
     prog_exec_times,
     job_times,
-    entry_hours: Iterable[float] | None = None,
+    entry_hours: Iterable[float],
 ):
     save_line_plot(
         [t / 3600 for t in job_times],
         "job_duration_series.png",
         "Job duration over time",
-        "Hours",
+        "Duration (Hours)",
         secondary_x_values=entry_hours,
+        secondary_x_label="Hours since start"
     )
     save_line_plot(
         [t / 3600 for t in prog_exec_times],
         "prog_exec_duration_series.png",
         "Prog execution duration over time",
-        "Hours",
+        "Duration (Hours)",
         secondary_x_values=entry_hours,
+        secondary_x_label="Hours since start"
     )
     if all_execs is not None:
         save_scatter_plot(
@@ -262,8 +282,10 @@ def show_in_flight_timelapse(
         output_name,
         title,
         ylabel,
-        x_values=relative_times,
-        x_label="Hours since start",
+        x_values=time_to_entry(numpy.asarray(relative_times)),
+        x_label="Entry",
+        secondary_x_values=relative_times,
+        secondary_x_label="Hours since start"
     )
 
 
@@ -308,6 +330,7 @@ def process_time_profile_lines(lines: list[dict]):
     entry_hours = [
         (timestamp - start_time).total_seconds() / 3600 for timestamp in entry_timestamps
     ]
+    initialize_convertion_functions(list(range(len(entry_hours))),entry_hours)
 
     in_flight_generic_progs_at, generic_start_time, generic_end_time = calculate_in_flight_progs([
         entry[RESULT_KEYS.PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS]
