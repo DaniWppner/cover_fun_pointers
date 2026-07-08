@@ -60,21 +60,13 @@ def initialize_convertion_functions(entry_values, timestamp_values):
     ENTRY_NUMBER_VALUES_GLOBAL = entry_values
     TIMESTAMP_VALUES_GLOBAL = timestamp_values
 
-def add_secondary_x_axis(
+
+def add_secondary_time_x_axis(
     ax: plt.Axes,
-    secondary_x_values: Iterable[float],
-    x_positions: Iterable[float],
     axis_label: str = "Hours since first entry",
 ) -> None:
-    secondary_x_values = list(secondary_x_values)
-    x_positions = list(x_positions)
 
-    assert secondary_x_values
-    assert x_positions
-    if len(secondary_x_values) != len(x_positions):
-        raise ValueError("secondary_x_values and x_positions must have the same length")
-
-    sec_ax = ax.secondary_xaxis('top', functions=(entry_to_time, time_to_entry))
+    sec_ax = ax.secondary_xaxis("top", functions=(entry_to_time, time_to_entry))
     sec_ax.set_xlabel(axis_label)
 
 
@@ -101,12 +93,12 @@ def save_plot(
     fig = plt.figure(figsize=(8, 4))
     ax = fig.add_subplot(111)
     if plot_type == "line":
-        x_vals = list(x_values) if x_values is not None else list(range(1, len(values) + 1))
+        x_vals = (list(x_values) if x_values is not None else list(range(1, len(values) + 1)))
         ax.plot(x_vals, values, marker=".")
         ax.set_xlabel(x_label)
         ax.set_ylabel(ylabel)
     elif plot_type == "scatter":
-        x_vals = list(x_values) if x_values is not None else list(range(1, len(values) + 1))
+        x_vals = (list(x_values) if x_values is not None else list(range(1, len(values) + 1)))
         ax.scatter(x_vals, values, marker=".")
         ax.set_xlabel(x_label)
         ax.set_ylabel(ylabel)
@@ -118,14 +110,12 @@ def save_plot(
         raise ValueError(f"Unsupported plot type: {plot_type}")
 
     if plot_type != "hist" and secondary_x_values is not None:
-        add_secondary_x_axis(
+        add_secondary_time_x_axis(
             ax,
-            secondary_x_values,
-            x_positions=x_vals,
             axis_label=secondary_x_label,
         )
 
-    ax.set_title(title, loc='left', fontsize=15)
+    ax.set_title(title, loc="left", fontsize=15)
     fig.tight_layout()
     out_path = Path.cwd() / output_name
     fig.savefig(out_path)
@@ -143,10 +133,10 @@ def save_line_plot(
     secondary_x_values: Iterable[float] | None = None,
     secondary_x_label: str | None = None,
 ) -> None:
-    '''
+    """
     Save line plot assuming entry number as first x axis and
     Timestamp as secondary x axis
-    '''
+    """
     save_plot(
         values,
         output_name,
@@ -189,29 +179,7 @@ def save_histogram_plot(
     save_plot(values, output_name, title, xlabel, plot_type="hist", bins=bins, x_label=xlabel)
 
 
-def show_plots(
-    all_execs,
-    function_pointer_execs,
-    prog_exec_times,
-    job_times,
-    entry_hours: Iterable[float],
-):
-    save_line_plot(
-        [t / 3600 for t in job_times],
-        "job_duration_series.png",
-        "Job duration over time",
-        "Duration (Hours)",
-        secondary_x_values=entry_hours,
-        secondary_x_label="Hours since start"
-    )
-    save_line_plot(
-        [t / 3600 for t in prog_exec_times],
-        "prog_exec_duration_series.png",
-        "Prog execution duration over time",
-        "Duration (Hours)",
-        secondary_x_values=entry_hours,
-        secondary_x_label="Hours since start"
-    )
+def show_prog_exec_frecuency_plots(all_execs, function_pointer_execs):
     if all_execs is not None:
         save_scatter_plot(
             all_execs,
@@ -240,14 +208,75 @@ def show_plots(
         )
 
 
-def show_info(all_execs, function_pointer_execs, prog_exec_times_w_celiing, job_times):
+def show_job_over_time_plots(prog_exec_times: Iterable[float] | None, job_times: Iterable[float] | None, entry_hours, append_title:str):
+    append_file_name = '_'.join(append_title.split())
+    if job_times is not None:
+        save_line_plot(
+            [t / 3600 for t in job_times],
+            f"job_duration_series{append_file_name}.png",
+            "Job duration over time " + append_title,
+            "Duration (Hours)",
+            secondary_x_values=entry_hours,
+            secondary_x_label="Hours since start",
+        )
+    if prog_exec_times is not None:
+        save_line_plot(
+            [t / 3600 for t in prog_exec_times],
+            f"prog_exec_duration_series{append_file_name}.png",
+            "Prog execution duration over time " + append_title,
+            "Duration (Hours)",
+            secondary_x_values=entry_hours,
+            secondary_x_label="Hours since start",
+        )
+
+
+def show_progs_in_flight_plots(
+    in_flight_generic_progs_at, in_flight_fpointer_progs_at, start_time, end_time
+):
+    show_in_flight_timelapse(
+        in_flight_generic_progs_at,
+        start_time,
+        end_time,
+        output_name="all_progs_flight_timelapse.png",
+        title="In-flight prog executions over time",
+        ylabel="In-flight prog executions",
+    )
+    show_in_flight_timelapse(
+        in_flight_fpointer_progs_at,
+        start_time,
+        end_time,
+        output_name="fpointer_progs_in_flight_timelapse.png",
+        title="In-flight function-pointer prog executions over time",
+        ylabel="In-flight prog executions",
+    )
+
+
+def show_info(all_execs: list | None,
+              function_pointer_execs : list | None,
+              prog_exec_times_w_celiing : list,
+              prog_exec_times : list ,
+              job_times : list,
+              start_time : datetime,
+              end_time : datetime,
+              n_triages: int
+              ):
+    print("-------------------------------------")
+    print(f"Total campaign duration (seconds): {end_time - start_time}")
+    print("-------------------------------------")
+    print(f"Total triages during campaign: {n_triages}")
+    print("-------------------------------------")
+    print(f"Triages / hour during campaign: {n_triages / ((end_time - start_time).total_seconds() / 3600):.3f}")
     print("-------------------------------------")
     print(f"Total job execution time: {timedelta(seconds=sum(job_times))}")
     print("-------------------------------------")
     print(f"Total prog execution time during jobs: {timedelta(seconds=sum(prog_exec_times_w_celiing))}")
+    print("-------------------------------------")
+    print(f"Average prog execution time during jobs: {timedelta(seconds=sum(prog_exec_times)/len(prog_exec_times))}")
     if all_execs is not None:
         print("-------------------------------------")
         print(f"Total prog executions during jobs: {sum(all_execs)}")
+        print("-------------------------------------")
+        print(f"Average prog executions during jobs: {sum(all_execs) / len(all_execs):.3f}")
     if function_pointer_execs is not None:
         print("-------------------------------------")
         print(f"Total prog executions during jobs triggered due to our new coverage: {sum(function_pointer_execs)}")
@@ -285,7 +314,7 @@ def show_in_flight_timelapse(
         x_values=time_to_entry(numpy.asarray(relative_times)),
         x_label="Entry",
         secondary_x_values=relative_times,
-        secondary_x_label="Hours since start"
+        secondary_x_label="Hours since start",
     )
 
 
@@ -327,43 +356,51 @@ def process_time_profile_lines(lines: list[dict]):
 
     entry_timestamps = [entry[RESULT_KEYS.TIMESTAMP] for entry in unified_dict.values()]
     start_time = min(entry_timestamps)
-    entry_hours = [
-        (timestamp - start_time).total_seconds() / 3600 for timestamp in entry_timestamps
-    ]
-    initialize_convertion_functions(list(range(len(entry_hours))),entry_hours)
+    entry_hours = [(timestamp - start_time).total_seconds() / 3600 for timestamp in entry_timestamps]
+    initialize_convertion_functions(list(range(len(entry_hours))), entry_hours)
+    all_individual_durations = [entry[RESULT_KEYS.PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS] for entry in unified_dict.values()]
+    fpointer_individual_durations = [entry[RESULT_KEYS.PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS] for entry in unified_dict.values()]
 
-    in_flight_generic_progs_at, generic_start_time, generic_end_time = calculate_in_flight_progs([
-        entry[RESULT_KEYS.PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS]
-        for entry in unified_dict.values()
-        ])
-    in_flight_fpointer_progs_at, fpointer_start_time, fpointer_end_time = calculate_in_flight_progs([
-        entry[RESULT_KEYS.PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS]
-        for entry in unified_dict.values()
-        ])
+    in_flight_generic_progs_at, start_time, end_time = calculate_in_flight_progs(sum(all_individual_durations, start=[]))
+    in_flight_fpointer_progs_at, _, _ = calculate_in_flight_progs(sum(fpointer_individual_durations, start=[]))
 
-    show_in_flight_timelapse(
-        in_flight_generic_progs_at,
-        generic_start_time,
-        generic_end_time,
-        output_name="all_progs_flight_timelapse.png",
-        title="In-flight prog executions over time",
-        ylabel="In-flight prog executions",
-    )
-    show_in_flight_timelapse(
-        in_flight_fpointer_progs_at,
-        fpointer_start_time,
-        fpointer_end_time,
-        output_name="fpointer_progs_in_flight_timelapse.png",
-        title="In-flight function-pointer prog executions over time",
-        ylabel="In-flight prog executions",
-    )
+    per_job_all_durations = collapse_job_durations(all_individual_durations)
+    per_job_fpointer_durations = collapse_job_durations(fpointer_individual_durations)
 
-    show_plots(all_execs, function_pointer_execs, prog_exec_times, job_times, entry_hours)
-    show_info(all_execs, function_pointer_execs, prog_exec_times_w_celiing, job_times)
+    timestart_sorted_dur = [e["DurationSeconds"] for e in sorted(per_job_all_durations, key=lambda e:e["TimeStart"])]
+    timestart_sorted_fpointer_dur = [e["DurationSeconds"] for e in sorted(per_job_fpointer_durations, key=lambda e:e["TimeStart"])]
+
+    show_job_over_time_plots(prog_exec_times, job_times, entry_hours, 'sorted by finish time')
+    show_job_over_time_plots(timestart_sorted_dur, None, entry_hours, 'sorted by begin time')
+
+
+    show_progs_in_flight_plots(in_flight_generic_progs_at, in_flight_fpointer_progs_at, start_time, end_time)
+    show_prog_exec_frecuency_plots(all_execs, function_pointer_execs)
+    show_info(all_execs,
+              function_pointer_execs,
+              prog_exec_times_w_celiing,
+              prog_exec_times,
+              job_times,
+              min(entry_timestamps),
+              max(entry_timestamps),
+              len(unified_dict))
     return unified_dict
 
+def collapse_job_durations(per_job_individual_durations: Iterable[list[dict[str, datetime|str]]]) -> list[dict[str, float|datetime]]:
+    timestart_key = "TimeStart"
+    timeend_key = "TimeEnd"
+    duration_key = "DurationSeconds"
+    return [{
+        duration_key: sum((float(e[duration_key]) for e in job_durations)),
+        timeend_key: max(e[timeend_key] for e in job_durations),
+        timestart_key: max(e[timestart_key] for e in job_durations),}
+            for job_durations in per_job_individual_durations if job_durations]
 
-def calculate_in_flight_progs(unified: Iterable[list[dict[str, str]]]) -> tuple[Callable[[datetime], list[dict[str, str]]], datetime | None, datetime | None]:
+def calculate_in_flight_progs(
+    unified: Iterable[dict[str, str]],
+) -> tuple[
+    Callable[[datetime], list[dict[str, str]]], datetime | None, datetime | None
+]:
     """
 
     Receives a list of json entries in the following format:
@@ -376,14 +413,13 @@ def calculate_in_flight_progs(unified: Iterable[list[dict[str, str]]]) -> tuple[
         ...
       ]
     Returns:
-        A callable that calculates the entries that entries in-flight for any point in time
+        A callable that calculates the number of entries in-flight for any point in time
         The first point in time an entry started at
         The last point in time an entry ended at
     """
     timestart_key = "TimeStart"
     timeend_key = "TimeEnd"
     duration_key = "DurationSeconds"
-    flattened = sum(unified, start=[])
 
     def convert_timestamp(timestamp: str) -> datetime:
         return datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
@@ -394,22 +430,21 @@ def calculate_in_flight_progs(unified: Iterable[list[dict[str, str]]]) -> tuple[
             timeend_key: convert_timestamp(e[timeend_key]),
             duration_key: float(e[duration_key]),
         }
-        for e in flattened
+        for e in unified
     ]
-
-    if not converted:
-        def entries_in_flight(t: datetime) -> list[dict[str, str]]:
-            return []
-
-        return entries_in_flight, None, None
 
     intervals = [
         intervaltree.Interval(begin=e[timestart_key], end=e[timeend_key], data=e)
         for e in converted
     ]
     filtered_null = [i for i in intervals if not i.is_null()]
-    print(colored(f"[INFO] filtered {len(intervals) - len(filtered_null)}" +
-                  f" empty intervals out of {len(intervals)} total intervals", "light_red"))
+    print(
+        colored(
+            f"[INFO] filtered {len(intervals) - len(filtered_null)}"
+            + f" empty intervals out of {len(intervals)} total intervals",
+            "light_red",
+        )
+    )
     interval_tree = intervaltree.IntervalTree(filtered_null)
 
     def entries_in_flight(t: datetime) -> list[dict[str, str]]:
@@ -485,7 +520,8 @@ if __name__ == "__main__":
     unified_time_profile = process_time_profile_lines(time_profile_jsonl)
 
     out_str = "\n".join(
-        json.dumps(json_obj, indent=None, default=str) for json_obj in not_time_profile_jsonl
+        json.dumps(json_obj, indent=None, default=str)
+        for json_obj in not_time_profile_jsonl
     )
     with out_path.open("w") as f:
         f.write(out_str)

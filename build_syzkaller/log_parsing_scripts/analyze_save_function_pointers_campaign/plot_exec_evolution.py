@@ -16,11 +16,30 @@ from __future__ import annotations
 
 import re
 import argparse
+import numpy
 from pathlib import Path
 from typing import List, Optional, Tuple
 from datetime import datetime
 
 import matplotlib.pyplot as plt
+
+
+def entry_to_time(entry_n_array: numpy.ndarray) -> numpy.ndarray:
+    assert ENTRY_NUMBER_VALUES_GLOBAL is not None
+    assert TIMESTAMP_VALUES_GLOBAL is not None
+    return numpy.interp(entry_n_array, ENTRY_NUMBER_VALUES_GLOBAL, TIMESTAMP_VALUES_GLOBAL, left=0)
+
+
+def time_to_entry(timestamp_array: numpy.ndarray) -> numpy.ndarray:
+    assert ENTRY_NUMBER_VALUES_GLOBAL is not None
+    assert TIMESTAMP_VALUES_GLOBAL is not None
+    return numpy.interp(timestamp_array, TIMESTAMP_VALUES_GLOBAL, ENTRY_NUMBER_VALUES_GLOBAL, left=0)
+
+
+def initialize_convertion_functions(entry_values, timestamp_values):
+    global ENTRY_NUMBER_VALUES_GLOBAL, TIMESTAMP_VALUES_GLOBAL
+    ENTRY_NUMBER_VALUES_GLOBAL = entry_values
+    TIMESTAMP_VALUES_GLOBAL = timestamp_values
 
 
 def format_elapsed_time(seconds: float) -> str:
@@ -79,6 +98,7 @@ def parse_skip_time(value: str) -> int:
     return hours * 3600 + minutes * 60 + seconds
 
 
+
 def filter_by_elapsed_time(
     exec_totals: List[int],
     exec_rates: List[int],
@@ -112,35 +132,49 @@ def filter_by_elapsed_time(
 
 
 def save_time_series(
-    x: List[float],
-    y: List[int],
+    timestamps: List[float],
+    y_values: List[int],
     out_name: Path,
     title: str,
     ylabel: str,
 ) -> None:
-    if not y:
+    '''
+    timestamps is in seconds
+    y_values, out_name, ylabel, title can be whatever
+
+    Plot with two x_axes: entry number and timestamp on two modes:
+        If the total elapsed time in timestamps is less than 2 hours, use minutes as the time unit.
+        Else, use hours.
+    '''
+    s_in_h = 3600
+    s_in_m = 60
+    if not y_values:
         print(f"No data for {title}; skipping plot")
         return
 
-    plt.figure(figsize=(10, 4))
-    plt.plot(x, y, marker="o", linewidth=1)
-    plt.title(title)
-    plt.xlabel("Elapsed time since first sample")
-    plt.ylabel(ylabel)
+    time_unit = None
+    if timestamps[-1] - timestamps[0] > s_in_h * 2:
+        timestamps = [t / s_in_h for t in timestamps]
+        time_unit = "Hours"
+    else:
+        timestamps = [t / s_in_m for t in timestamps]
+        time_unit = "Minutes"
+    assert time_unit is not None
+    initialize_convertion_functions(list(range(len(timestamps))), timestamps)
 
-    if len(x) > 1:
-        step = max(1, len(x) // 8)
-        ticks_idx = list(range(0, len(x), step))
-        if ticks_idx[-1] != len(x) - 1:
-            ticks_idx.append(len(x) - 1)
-        tick_positions = [x[i] for i in ticks_idx]
-        tick_labels = [format_elapsed_time(pos) for pos in tick_positions]
-        plt.xticks(tick_positions, tick_labels, rotation=45, ha="right")
 
-    plt.xlim(left=0)
-    plt.tight_layout()
-    plt.savefig(out_name)
-    plt.close()
+    fig = plt.figure(figsize=(10, 4))
+    ax = fig.add_subplot(111)
+    ax.plot(range(len(timestamps)), y_values, marker=".", linewidth=0.2)
+    ax.set_title(title,loc="left",fontsize="15")
+    ax.set_xlabel("Number of sample")
+    ax.set_ylabel(ylabel)
+    ax2 = ax.secondary_xaxis("top",functions=(entry_to_time,time_to_entry))
+    ax2.set_xlabel(f"Elapsed time since first sample ({time_unit})")
+
+    fig.tight_layout()
+    fig.savefig(out_name)
+    plt.close(fig)
     print(f"Saved {out_name}")
 
 
