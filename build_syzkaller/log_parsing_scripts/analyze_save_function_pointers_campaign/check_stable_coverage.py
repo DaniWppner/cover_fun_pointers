@@ -729,15 +729,19 @@ def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict[str, A
     print("------------------------------------------------")    
     covered_fpointers_subdict = filter_many_cond(saved_because_skip_signal,
                                                  lambda e: any(
-                                                     fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] in covered_fpointer_locs
+                                                     # Each entry in FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC a list of locations.
+                                                     # The first one is the top-most function, where every other one is an "(inlined-by)" statement.
+                                                     # We are asking if a function pointer that was actually stored, was covered,
+                                                     # so the list of locations for the function pointer shouldn't have any entries besides the first one.
+                                                     fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC][0] in covered_fpointer_locs
                                                      for fPointer_entry in e.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, [])
                                                  ))
     uncovered_fpointers_subdict = filter_many_cond(saved_because_skip_signal,
                                                  lambda e: any(
-                                                     fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] in uncovered_fpointer_locs
+                                                     # see above
+                                                     fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC][0] in uncovered_fpointer_locs
                                                      for fPointer_entry in e.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, [])
                                                  ))
-    
     covered_fpointers_subdict_fout = Path.cwd() / "registered_covered_fpointers_saved_because_fpointer.json"
     with open(covered_fpointers_subdict_fout, "w") as f:
         json.dump(covered_fpointers_subdict, f, indent=2)
