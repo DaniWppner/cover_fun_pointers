@@ -56,6 +56,10 @@ class RESULT_KEYS(StrEnum):
     PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS = "prog_executions_individual_durations_because_of_fpcov"
     TAGS = "tags"
 
+class PC_VALUES(StrEnum):
+    PC_ADDRESS = "PC"
+    PC_LOCATION = "PCLocation"
+
 class TAG_RESULT_VALUES(StrEnum):
     FPOINTER_ORIGIN = "fpointer_origin"
 

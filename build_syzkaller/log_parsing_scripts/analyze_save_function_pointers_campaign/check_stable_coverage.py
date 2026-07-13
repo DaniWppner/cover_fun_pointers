@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Iterable, Any
 
-from logentry_keys import RESULT_KEYS, MINIMIZATION_RESULT_VALUES
+from logentry_keys import RESULT_KEYS, MINIMIZATION_RESULT_VALUES, PC_VALUES
 from termcolor import colored
 
 # First element represents file name and line number in the format file_name:lineno
@@ -570,9 +570,20 @@ def check_minimization_stats(prog2log: dict[str, dict]) -> None:
 
 
 def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict],
+                                              pcs_addr2loc: dict[str, list[locInfo]],
                                               fpointer_addr2loc: dict[str, list[locInfo]],
                                               storeinst_addr2loc: dict[str, list[locInfo]]) -> dict[str, dict]:
     for entry in prog2log.values():
+        if RESULT_KEYS.PC_COVER in entry:
+            pc_loc_entries = []
+            for pc_value in entry[RESULT_KEYS.PC_COVER]:
+                # hacky hack: we will not have a location for this "empty" pointer
+                pc_loc = pcs_addr2loc[pc_value][0] if pc_value != '0xffffffffffffffff' else ''
+                pc_entry = {PC_VALUES.PC_ADDRESS : pc_value,
+                            PC_VALUES.PC_LOCATION : pc_loc}
+                pc_loc_entries.append(pc_entry)
+            entry[RESULT_KEYS.PC_COVER] = pc_loc_entries
+
         for funcPointer_store_entry in entry.get(RESULT_KEYS.NEW_FPOINTERS_PAYLOAD, []):
             fPointer = funcPointer_store_entry["StoredValue"]
             storeInst = funcPointer_store_entry["PC"]
@@ -592,6 +603,56 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict],
     return prog2log
 
 
+def update_w_address_data(prog2log: dict[str, dict]) -> dict[str, dict]:
+    StoredValue_key = "StoredValue"
+    PC_key = "PC"
+    all_pcs = set()
+    all_fpointers_stores = set()
+    all_fpointers = set()
+
+    def _update_fpointers_and_stores(fp: dict[str, str]) -> None:
+        fpointer = fp[StoredValue_key]
+        storeinst = fp[PC_key]
+        all_fpointers.add(fpointer)
+        all_fpointers_stores.add(storeinst)
+
+    for entries in prog2log.values():
+        if RESULT_KEYS.PC_COVER in entries:
+            all_pcs.update(entries[RESULT_KEYS.PC_COVER])
+        if RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in entries:
+            for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
+                _update_fpointers_and_stores(fp)
+        if RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD in entries:
+            for fp in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD]:
+                _update_fpointers_and_stores(fp)
+
+    pcs_addr2loc, fpointer_addr2loc, storeinst_addr2loc = get_PCs_to_locs(all_pcs, all_fpointers_stores, all_fpointers)
+    prog2log = update_master_dict_with_fpointer_loc_data(prog2log, pcs_addr2loc, fpointer_addr2loc, storeinst_addr2loc)
+
+    return prog2log
+
+def get_PCs_to_locs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]) -> tuple[
+    dict[str, list[locInfo]], dict[str, list[locInfo]], dict[str, list[locInfo]]
+]:
+    """
+    Args:
+        all_pcs: Set of covered instruction addresses (hexadecimal strings).
+        all_fpointers_stores: Set of instructions that store a function pointer (hexadecimal strings).
+        all_fpointers: Set of function pointer values stored (hexadecimal strings).
+
+    Returns:
+        tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo], set[locInfo]]: A tuple with four elements:
+            fpointer_addr2location: dict mapping function pointer addresses all its source code locations, including inline resolutions.
+            storeinst_addr2location: dict mapping store instruction addresses all its source code locations, including inline resolutions.
+            stored_value_diff: set of source code locations for function pointers that were not covered.
+            stored_value_intersection: set of source code locations for function pointers that were covered.
+    """
+    allpcs_addr2location, _, _ = get_source_code_refs(all_pcs)
+    storeinst_addr2location, _, _ = get_source_code_refs(all_fpointers_stores)
+    fpointer_addr2location, _, _ = get_source_code_refs(all_fpointers)
+    return allpcs_addr2location, fpointer_addr2location, storeinst_addr2location
+
+
 def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]) -> None:
     all_pcs, all_fpointers_stores, all_fpointers, fpointer2storeinst = get_fpointer_store_info(prog2log)
 
@@ -604,7 +665,6 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]) -> None:
         covered_fpointer_locs,
     ) = check_source_code_diffs(all_pcs, all_fpointers_stores, all_fpointers)
 
-    prog2log = update_master_dict_with_fpointer_loc_data(prog2log, fpointer_addr2loc, storeinst_addr2loc)
     uncovered_fpointers_out, skip_count = get_fpointer2storeinst_as_source_locations(
         fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs,
     )
@@ -625,8 +685,6 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]) -> None:
 
     print(colored("################################################", "cyan"))
     check_saved_because_skip_signal_vs_fpointers(prog2log, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs, uncovered_fpointer_locs)
-    
-    return prog2log
 
 
 def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict],
@@ -706,7 +764,7 @@ def get_fpointer_store_info(prog2log: dict[str, dict], stable_only = False) -> t
     fpointer2storeinst: dict[str, set[str]] = {}
     for entries in prog2log.values():
         if RESULT_KEYS.PC_COVER in entries:
-            all_pcs.update(entries[RESULT_KEYS.PC_COVER])
+            all_pcs.update(pc_entry[PC_VALUES.PC_ADDRESS] for pc_entry in entries[RESULT_KEYS.PC_COVER])
         if not stable_only and RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in entries:
             for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
                 __update_collections(all_fpointers_stores, all_fpointers, fpointer2storeinst, fp)
@@ -1003,8 +1061,9 @@ if __name__ == "__main__":
 
     out_json = unify_per_prog(json_lines_path)
     cleanup_unified_json(out_json)
+    out_json = update_w_address_data(out_json)
     print(colored("################################################", "cyan"))
-    out_json = check_pc_cover_vs_fpointer(out_json)
+    check_pc_cover_vs_fpointer(out_json)
     print(colored("################################################", "cyan"))
     check_easy_stats(out_json)
     print(colored("################################################", "cyan"))
