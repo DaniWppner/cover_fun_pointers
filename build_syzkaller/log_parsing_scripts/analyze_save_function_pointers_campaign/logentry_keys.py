@@ -32,8 +32,6 @@ class RESULT_KEYS(StrEnum):
     STABLE_FPOINTERS = "stable_fpointers"
     NEW_STABLE_FPOINTERS = "new_stable_fpointers"
     NEW_STABLE_FPOINTERS_PAYLOAD = "new_stable_fpointers_json"
-    FPOINTER_PAYLOAD_FPOINTER_LOC_KEY = "StoredValueLocation"
-    FPOINTER_PAYLOAD_STOREINST_LOC_KEY = "PCLocation"
     STABLE_SIGNAL = "stable_signal"
     NEW_STABLE_SIGNAL = "new_stable_signal"
     CALL_NAME = "call"

@@ -17,7 +17,7 @@ from termcolor import colored
 type locInfo = tuple[str, str]
 
 
-def unify_per_prog(json_lines_file: Path) -> dict:
+def unify_per_prog(json_lines_file: Path) -> dict[str, dict[str, Any]]:
     """Parse a JSON lines file and merge entries by prog/call identity.
 
     The returned dictionary maps a combined key representing pairs of
@@ -28,7 +28,7 @@ def unify_per_prog(json_lines_file: Path) -> dict:
     If more than one repeated occurrence of a specific <prog, call> pair is
     found during different triages, all occurences after the first one are ignored.
     """
-    result_dict: dict[str, dict] = {}
+    result_dict: dict[str, dict[str, Any]] = {}
     curr_original_prog = None
     curr_prog_id = None
 
@@ -45,7 +45,7 @@ def unify_per_prog(json_lines_file: Path) -> dict:
     awaiting_pc_cover: dict[str, str] = {}
     with open(json_lines_file) as f:
         for line in f:
-            log_entry: dict = json.loads(line)
+            log_entry: dict[str, Any] = json.loads(line)
             prog_id = log_entry.pop(RESULT_KEYS.PROGID)
 
             if RESULT_KEYS.ORIGINAL_PROG in log_entry:
@@ -204,7 +204,7 @@ def unify_per_prog(json_lines_file: Path) -> dict:
         sys.exit(1)
     return result_dict
 
-def fix_buggy_awaiting_queue(result_dict: dict[str, dict], awaiting_corpus_entry: dict[str, str]) -> dict[str, str]:
+def fix_buggy_awaiting_queue(result_dict: dict[str, dict[str, Any]], awaiting_corpus_entry: dict[str, str]) -> dict[str, str]:
     '''
     Remove from result_dict and awaiting_corpus_entry
     all entries in awaiting_corpus_entry that have '(BADINDEX)'
@@ -226,10 +226,11 @@ def fix_buggy_awaiting_queue(result_dict: dict[str, dict], awaiting_corpus_entry
     return awaiting_corpus_entry
 
 
-def successful_minimize(minim_entry: dict) -> bool:
+def successful_minimize(minim_entry: list[dict[str, Any]]) -> bool:
     """
     Return true if this entry indicates that one of the minimization attempts produced something
     """
+    assert len(minim_entry) == 1
     return minim_entry[0][RESULT_KEYS.MINIMIZATION_RES_TYPE] in [
         MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_NODIFF,
         MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER,
@@ -243,7 +244,7 @@ def update_queues(
     prog_id: str,
     data_key: str,
     triage_id: str,
-    minim_entry: dict,
+    minim_entry: list[dict[str, Any]],
 ) -> None:
     """
     Store in awaiting_corpus_entry the data_key used for this prog_id, triage_id pair.
@@ -254,6 +255,7 @@ def update_queues(
 
     # additionally, if the prog is entering because of pointer coverage
     # we need to capture the raw pc coverage
+    assert len(minim_entry) == 1
     if minim_entry[0][RESULT_KEYS.MINIMIZATION_RES_TYPE] in [
         MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_NODIFF,
         MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER,
@@ -264,7 +266,7 @@ def update_queues(
 def override_if_awaiting(
     data_key: str,
     awaiting_queue: dict[str, str],
-    log_entry: dict[str, dict],
+    log_entry: dict[str, dict[str, Any]],
     prog_id: str,
     triage_id: str,
     RESULTKEY: str,
@@ -290,16 +292,17 @@ def get_ceq_key(prog_id: str, triage_id: str) -> str:
     return f"{triage_id}|{prog_id}"
 
 
-def minimization_would_overwrite(result_entry: dict, minim_entry: dict) -> bool:
+def minimization_would_overwrite(result_entry: dict[str, Any], minim_entry: list[dict[str, Any]]) -> bool:
     minim_key = RESULT_KEYS.MINIMIZATION_RESULT
     minim_t_key = RESULT_KEYS.MINIMIZATION_RES_TYPE
+    assert len(minim_entry) == 1
     return any(
         saved_res[minim_t_key] == minim_entry[0][minim_t_key]
         for saved_res in result_entry[minim_key]
     )
 
 
-def warn_overwrite(result_entry: dict, log_entry: dict, prog_id: str, conflicting_key: str) -> None:
+def warn_overwrite(result_entry: dict[str, Any], log_entry: dict[str, Any], prog_id: str, conflicting_key: str) -> None:
     result_container = {conflicting_key: result_entry}
     entry_container = {conflicting_key: log_entry}
     serialize_datetimes(result_container)
@@ -322,7 +325,7 @@ def cleanup_particular_fpointer(entries: dict[str, Any], key2json_entry: str) ->
     entries[key2json_entry] = fpointer_json
 
 
-def cleanup_fpointer_jsons(unified_json: dict) -> None:
+def cleanup_fpointer_jsons(unified_json: dict[str, dict[str, Any]]) -> None:
     for entries in unified_json.values():
         for key in (
             RESULT_KEYS.NEW_FPOINTERS_PAYLOAD,
@@ -332,7 +335,7 @@ def cleanup_fpointer_jsons(unified_json: dict) -> None:
                 cleanup_particular_fpointer(entries, key)
 
 
-def serialize_datetimes(unified_json: dict[str, dict]) -> None:
+def serialize_datetimes(unified_json: dict[str, dict[str, Any]]) -> None:
     '''
     Serializes datetimes in each entry up to the first level (does not look into nested json)
     '''
@@ -341,17 +344,19 @@ def serialize_datetimes(unified_json: dict[str, dict]) -> None:
             if isinstance(v, datetime):
                 entries[k] = str(v)
 
-def cleanup_unified_json(unified_json: dict) -> None:
+
+def cleanup_unified_json(unified_json: dict[str, dict[str, Any]]) -> None:
     cleanup_fpointer_jsons(unified_json)
     serialize_datetimes(unified_json)
 
-def count_cond(prog2log: dict[str, dict], condition: Callable[[dict], bool]) -> int:
+
+def count_cond(prog2log: dict[str, dict[str, Any]], condition: Callable[[dict[str, Any]], bool]) -> int:
     return len([entry for entry in prog2log.values() if condition(entry)])
 
 
 def filter_many_cond(
-    prog2log: dict[str, dict], *conditions: Callable[[dict], bool]
-) -> dict[str, dict]:
+    prog2log: dict[str, dict[str, Any]], *conditions: Callable[[dict[str, Any]], bool]
+) -> dict[str, dict[str, Any]]:
     return {
         key: val
         for key, val in prog2log.items()
@@ -359,7 +364,7 @@ def filter_many_cond(
     }
 
 
-def check_easy_stats(prog2log: dict[str, dict]) -> None:
+def check_easy_stats(prog2log: dict[str, dict[str, Any]]) -> None:
     n_duplicate_progs = count_cond(prog2log, lambda e: e[RESULT_KEYS.COUNT] > 1)
     n_saved_progs = count_cond(prog2log, lambda e: RESULT_KEYS.SAVED_PROG in e)
     multiple_saved_progs = filter_many_cond(
@@ -379,7 +384,7 @@ def check_easy_stats(prog2log: dict[str, dict]) -> None:
         json.dump(multiple_saved_progs, f, indent=2)
 
 
-def has_minimization_result(minimization_result_type: str) -> Callable[[dict], bool]:
+def has_minimization_result(minimization_result_type: str) -> Callable[[dict[str, Any]], bool]:
     '''
     Args:
         minimization_result_type: desired key in one of the minimization results in an entry
@@ -387,10 +392,10 @@ def has_minimization_result(minimization_result_type: str) -> Callable[[dict], b
     Returns:
         function that returns True for entries that have the specified minimization result type
     '''
-    def checker(prog_entry: dict) -> bool:
+    def checker(prog_entry: dict[str, Any]) -> bool:
         if RESULT_KEYS.MINIMIZATION_RESULT not in prog_entry:
             return False
-        minimization_result: list[dict] = prog_entry[RESULT_KEYS.MINIMIZATION_RESULT]
+        minimization_result: list[dict[str, Any]] = prog_entry[RESULT_KEYS.MINIMIZATION_RESULT]
         if type(minimization_result) != list:
             print(
                 colored(
@@ -410,7 +415,7 @@ def has_minimization_result(minimization_result_type: str) -> Callable[[dict], b
 
 
 def get_duplicate_progs(
-    prog2log: dict[str, dict],
+    prog2log: dict[str, dict[str, Any]],
 ) -> tuple[dict[int, list[str]], dict[int, list[str]]]:
     prog2_count = defaultdict(list)
     for key, entry in prog2log.items():
@@ -421,7 +426,10 @@ def get_duplicate_progs(
     return prog2_count, duplicate
 
 
-def deduplicate_saved_progs(prog2log: dict[str, dict]) -> tuple[dict, dict, int]:
+def deduplicate_saved_progs(prog2log: dict[str, dict[str, Any]]) -> tuple[
+    dict[str, dict[str, Any]],
+    dict[str, dict[str, Any]],
+    int]:
     """
     Args:
         prog2log: dictionary with the standard format for triage entries of each prog|call pair.
@@ -471,7 +479,7 @@ def deduplicate_saved_progs(prog2log: dict[str, dict]) -> tuple[dict, dict, int]
     return not_duplicate_dict, sorted_by_duplicates, len(duplicate)
 
 
-def get_saved_because_skip_signal(prog2log: dict[str, dict]) -> dict[str, dict]:
+def get_saved_because_skip_signal(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     '''
     Args:
         prog2log: dictionary with the standard format for triage entries of each prog|call pair.
@@ -486,13 +494,13 @@ def get_saved_because_skip_signal(prog2log: dict[str, dict]) -> dict[str, dict]:
     )
 
 
-def check_duplicated_progs(prog2log: dict[str, dict]) -> None:
+def check_duplicated_progs(prog2log: dict[str, dict[str, Any]]) -> None:
     prog2_count, duplicate = get_duplicate_progs(prog2log)
     print(f"Number of unique progs saved in corpus: {len(prog2_count)}")
     print(f"Number of progs saved more than once: {len(duplicate)}")
 
 
-def check_saved_because_fpointer(prog2log: dict[str, dict]) -> None:
+def check_saved_because_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
     saved_because_skip_signal = get_saved_because_skip_signal(prog2log)
     (
         deduplicate_interesting,
@@ -521,7 +529,7 @@ def check_saved_because_fpointer(prog2log: dict[str, dict]) -> None:
     print(f"Number of progs saved with fpointer and skip signal more than once: {count_duplicate_saved_interesting_progs}")
 
 
-def check_minimization_stats(prog2log: dict[str, dict]) -> None:
+def check_minimization_stats(prog2log: dict[str, dict[str, Any]]) -> None:
     n_skip_all = count_cond(
         prog2log, has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_SKIP)
     )
@@ -569,10 +577,10 @@ def check_minimization_stats(prog2log: dict[str, dict]) -> None:
         json.dump(unique_signal_and_fpointer, f, indent=2)
 
 
-def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict],
+def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict[str, Any]],
                                               pcs_addr2loc: dict[str, list[locInfo]],
                                               fpointer_addr2loc: dict[str, list[locInfo]],
-                                              storeinst_addr2loc: dict[str, list[locInfo]]) -> dict[str, dict]:
+                                              storeinst_addr2loc: dict[str, list[locInfo]]) -> dict[str, dict[str, Any]]:
     error_locInfo = ("err", "err")
     for entry in prog2log.values():
         if RESULT_KEYS.PC_COVER in entry:
@@ -586,34 +594,32 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict],
             entry[RESULT_KEYS.PC_COVER] = pc_loc_entries
 
         for funcPointer_store_entry in entry.get(RESULT_KEYS.NEW_FPOINTERS_PAYLOAD, []):
-            fPointer = funcPointer_store_entry["StoredValue"]
-            storeInst = funcPointer_store_entry["PC"]
+            fPointer = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
+            storeInst = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
             # hacky hack: we will not have a location for this "empty" pointer
             fPointer_loc = fpointer_addr2loc[fPointer][0] if fPointer != '0xffffffffffffffff' else error_locInfo
-            funcPointer_store_entry[RESULT_KEYS.FPOINTER_PAYLOAD_FPOINTER_LOC_KEY] = fPointer_loc
-            funcPointer_store_entry[RESULT_KEYS.FPOINTER_PAYLOAD_STOREINST_LOC_KEY] = storeinst_addr2loc[storeInst][0]
+            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] = fPointer_loc
+            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC] = storeinst_addr2loc[storeInst][0]
 
         for funcPointer_store_entry in entry.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, []):
-            fPointer = funcPointer_store_entry["StoredValue"]
-            storeInst = funcPointer_store_entry["PC"]
+            fPointer = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
+            storeInst = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
             #hacky hack: see above
             fPointer_loc = fpointer_addr2loc[fPointer][0] if fPointer != '0xffffffffffffffff' else error_locInfo
-            funcPointer_store_entry[RESULT_KEYS.FPOINTER_PAYLOAD_FPOINTER_LOC_KEY] = fPointer_loc
-            funcPointer_store_entry[RESULT_KEYS.FPOINTER_PAYLOAD_STOREINST_LOC_KEY] = storeinst_addr2loc[storeInst][0]
+            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] = fPointer_loc
+            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC] = storeinst_addr2loc[storeInst][0]
 
     return prog2log
 
 
-def update_w_address_data(prog2log: dict[str, dict]) -> dict[str, dict]:
-    StoredValue_key = "StoredValue"
-    PC_key = "PC"
+def update_w_address_data(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     all_pcs = set()
     all_fpointers_stores = set()
     all_fpointers = set()
 
     def _update_fpointers_and_stores(fp: dict[str, str]) -> None:
-        fpointer = fp[StoredValue_key]
-        storeinst = fp[PC_key]
+        fpointer = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
+        storeinst = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
         all_fpointers.add(fpointer)
         all_fpointers_stores.add(storeinst)
 
@@ -654,7 +660,7 @@ def get_PCs_to_locs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpoin
     return allpcs_addr2location, fpointer_addr2location, storeinst_addr2location
 
 
-def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]) -> None:
+def check_pc_cover_vs_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
     all_pcs, all_fpointers_stores, all_fpointers, fpointer2storeinst = get_fpointer_store_info(prog2log)
 
     check_PC_exec_funcStore_literal_diffs(all_pcs, all_fpointers_stores, all_fpointers)
@@ -688,7 +694,7 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]) -> None:
     check_saved_because_skip_signal_vs_fpointers(prog2log, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs, uncovered_fpointer_locs)
 
 
-def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict],
+def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict[str, Any]],
                                                 fpointer_addr2loc: dict[str, list[locInfo]],
                                                 storeinst_addr2loc:  dict[str, list[locInfo]],
                                                 covered_fpointer_locs:  set[locInfo],
@@ -723,12 +729,12 @@ def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict],
     print("------------------------------------------------")    
     covered_fpointers_subdict = filter_many_cond(saved_because_skip_signal,
                                                  lambda e: any(
-                                                     fPointer_entry[RESULT_KEYS.FPOINTER_PAYLOAD_FPOINTER_LOC_KEY] in covered_fpointer_locs
+                                                     fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] in covered_fpointer_locs
                                                      for fPointer_entry in e.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, [])
                                                  ))
     uncovered_fpointers_subdict = filter_many_cond(saved_because_skip_signal,
                                                  lambda e: any(
-                                                     fPointer_entry[RESULT_KEYS.FPOINTER_PAYLOAD_FPOINTER_LOC_KEY] in uncovered_fpointer_locs
+                                                     fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] in uncovered_fpointer_locs
                                                      for fPointer_entry in e.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, [])
                                                  ))
     
@@ -746,7 +752,7 @@ def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict],
          f"(count={len(uncovered_fpointers_subdict)}) saved to {uncovered_fpointers_subdict_fout.name}"
     )
 
-def get_fpointer_store_info(prog2log: dict[str, dict], stable_only = False) -> tuple[set[str], set[str], set[str], dict[str, set[str]]]:
+def get_fpointer_store_info(prog2log: dict[str, dict[str, Any]], stable_only: bool = False) -> tuple[set[str], set[str], set[str], dict[str, set[str]]]:
     '''
     Args:
         prog2log: dictionary with the standard format for triage entries of each prog|call pair.
@@ -799,8 +805,11 @@ def check_PC_exec_funcStore_literal_diffs(
     print(f"Stored function_pointers that don't show up in exec log: (count={len(stored_value_diff)})")
 
 
-def check_source_code_diffs(prog2log: dict[str, dict]) -> tuple[
-    dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo], set[locInfo]
+def check_source_code_diffs(prog2log: dict[str, dict[str, Any]]) -> tuple[
+    dict[str, list[locInfo]],
+    dict[str, list[locInfo]],
+    set[locInfo],
+    set[locInfo]
 ]:
     """
     Print differences between stored fpointer data and executed PCs using source code location data.
@@ -817,16 +826,16 @@ def check_source_code_diffs(prog2log: dict[str, dict]) -> tuple[
             stored_value_diff: set of source code locations for function pointers that were not covered.
             stored_value_intersection: set of source code locations for function pointers that were covered.
     """
-    storeinst_addr2location = dict()
-    fpointer_addr2location = dict()
-    storeinst_locs = set()
-    fpointer_locs = set()
+    storeinst_addr2location : dict[str, list[locInfo]] = dict()
+    fpointer_addr2location : dict[str, list[locInfo]] = dict()
+    storeinst_locs : set[locInfo] = set()
+    fpointer_locs : set[locInfo] = set()
 
-    def _fill_collections(fp: dict):
-        fp_loc = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC]
-        fp_addr = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
-        storeinst_loc = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC]
-        storeinst_addr = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
+    def _fill_collections(fp: dict[str, Any]) -> None:
+        fp_loc : locInfo = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC]
+        fp_addr : str = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
+        storeinst_loc : locInfo = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC]
+        storeinst_addr : str = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
 
         storeinst_addr2location[storeinst_addr] = storeinst_loc
         storeinst_locs.add(storeinst_loc)
@@ -966,7 +975,7 @@ def _get_source_code_refs_impl(offsets: Iterable[str]) -> dict[str, list[locInfo
             # hacky hack: if there's no address, we matched "(inlined by)" instead
             sourceInfo_data[current_addr].append((floc, fname))
         else:
-            current_addr = addr
+            current_addr : str = addr
             sourceInfo_data[addr] = [(floc, fname)]
 
     if len(sourceInfo_data) != len(offsets):
@@ -1030,8 +1039,8 @@ def __update_collections(
     fpointer2storeinst: dict[str, set[str]],
     fp: dict[str, str],
 ) -> None:
-    fpointer = fp["StoredValue"]
-    storeinst = fp["PC"]
+    fpointer = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
+    storeinst = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
     all_fpointers.add(fpointer)
     all_fpointers_stores.add(storeinst)
     if fpointer not in fpointer2storeinst:
