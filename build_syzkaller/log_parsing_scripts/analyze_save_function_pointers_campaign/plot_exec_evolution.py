@@ -14,16 +14,16 @@ X-axis is normalized time in seconds since the first timestamp in the file.
 """
 from __future__ import annotations
 
-import re
 import argparse
-import numpy
-from pathlib import Path
+import re
 from collections.abc import Sequence
-from typing import List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 import matplotlib.pyplot as plt
+import numpy
 
 
 @dataclass(init=False)

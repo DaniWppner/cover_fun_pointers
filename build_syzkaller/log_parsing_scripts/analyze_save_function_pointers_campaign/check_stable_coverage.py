@@ -7,10 +7,12 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Iterable, Any
+from typing import Any, Callable, Iterable
 
-from logentry_keys import RESULT_KEYS, MINIMIZATION_RESULT_VALUES, PC_VALUES, FPOINTERS_PAYLOAD_VALUES
 from termcolor import colored
+
+from logentry_keys import (FPOINTERS_PAYLOAD_VALUES,
+                           MINIMIZATION_RESULT_VALUES, PC_VALUES, RESULT_KEYS)
 
 # First element represents file name and line number in the format file_name:lineno
 # Second element represents function containing said line number

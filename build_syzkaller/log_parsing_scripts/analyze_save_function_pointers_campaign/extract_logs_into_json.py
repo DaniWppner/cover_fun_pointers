@@ -24,17 +24,21 @@ It takes the path to the syzkaller log and the path to the output JSON file as p
 FIXME
 """
 
-import re
-import json
 import argparse
-import sys
 import itertools
+import json
+import re
+import sys
 from datetime import datetime
-import tqdm.contrib as tcontrib
-from typing import Iterable
 from pathlib import Path
+from typing import Iterable
+
+import tqdm.contrib as tcontrib
 from termcolor import colored
-from logentry_keys import LOGENTRY_KEYS, RESULT_KEYS, MINIMIZATION_RESULT_VALUES, TAG_RESULT_VALUES
+
+from logentry_keys import (LOGENTRY_KEYS, MINIMIZATION_RESULT_VALUES,
+                           RESULT_KEYS, TAG_RESULT_VALUES)
+
 
 class InvalidTriageLine(Exception):
     pass

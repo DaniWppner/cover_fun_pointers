@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 import argparse
-import intervaltree
 import json
-import numpy
-import matplotlib.pyplot as plt
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from termcolor import colored
 from typing import Callable, Iterable
+
+import intervaltree
+import matplotlib.pyplot as plt
+import numpy
+from termcolor import colored
 
 from logentry_keys import RESULT_KEYS
 
