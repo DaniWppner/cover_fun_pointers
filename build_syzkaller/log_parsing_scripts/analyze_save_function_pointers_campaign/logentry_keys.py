@@ -1,5 +1,10 @@
 from enum import StrEnum
 
+
+# First element represents file name and line number in the format file_name:lineno
+# Second element represents function containing said line number
+type locInfo = tuple[str, str]
+
 class LOGENTRY_KEYS(StrEnum):
     NEW_FPOINTERS = "new_fpointers"
     NEW_SIGNAL = "new_signal"
