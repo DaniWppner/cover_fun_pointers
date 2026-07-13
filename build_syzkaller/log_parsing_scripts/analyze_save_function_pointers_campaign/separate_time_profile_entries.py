@@ -72,7 +72,7 @@ def add_secondary_time_x_axis(
 
 def save_plot(
     values: list[float],
-    output_name: str,
+    output_path: Path,
     title: str,
     ylabel: str,
     plot_type: str = "line",
@@ -117,15 +117,14 @@ def save_plot(
 
     ax.set_title(title, loc="left", fontsize=15)
     fig.tight_layout()
-    out_path = Path.cwd() / output_name
-    fig.savefig(out_path)
+    fig.savefig(output_path)
     plt.close(fig)
-    print(f"Saved plot to {out_path.name}")
+    print(f"Saved plot to {output_path.name}")
 
 
 def save_line_plot(
     values: list[float],
-    output_name: str,
+    output_path: Path,
     title: str,
     ylabel: str,
     x_values: Iterable[float | datetime] | None = None,
@@ -139,7 +138,7 @@ def save_line_plot(
     """
     save_plot(
         values,
-        output_name,
+        output_path,
         title,
         ylabel,
         plot_type="line",
@@ -152,7 +151,7 @@ def save_line_plot(
 
 def save_scatter_plot(
     values: list[float],
-    output_name: str,
+    output_path: Path,
     title: str,
     ylabel: str,
     x_values: Iterable[float | datetime] | None = None,
@@ -162,7 +161,7 @@ def save_scatter_plot(
 ) -> None:
     save_plot(
         values,
-        output_name,
+        output_path,
         title,
         ylabel,
         plot_type="scatter",
@@ -174,46 +173,46 @@ def save_scatter_plot(
 
 
 def save_histogram_plot(
-    values: list[float], output_name: str, title: str, xlabel: str, bins: int = 20
+    values: list[float], output_path: Path, title: str, xlabel: str, bins: int = 20
 ) -> None:
-    save_plot(values, output_name, title, xlabel, plot_type="hist", bins=bins, x_label=xlabel)
+    save_plot(values, output_path, title, xlabel, plot_type="hist", bins=bins, x_label=xlabel)
 
 
-def show_prog_exec_frecuency_plots(all_execs, function_pointer_execs):
+def show_prog_exec_frecuency_plots(all_execs, function_pointer_execs, out_dir: Path):
     if all_execs is not None:
         save_scatter_plot(
             all_execs,
-            "all_execs_series.png",
+            out_dir / "all_execs_series.png",
             "Prog executions per job over time",
             "",
         )
         save_histogram_plot(
             all_execs,
-            "all_execs_histogram.png",
+            out_dir / "all_execs_histogram.png",
             "Frequency of prog executions per job",
             "Number of prog executions in a single job",
         )
     if function_pointer_execs is not None:
         save_scatter_plot(
             function_pointer_execs,
-            "function_pointer_exec_series.png",
+            out_dir / "function_pointer_exec_series.png",
             "Prog executions per job over time triggered by new coverage",
             "",
         )
         save_histogram_plot(
             function_pointer_execs,
-            "function_pointer_histogram.png",
+            out_dir / "function_pointer_histogram.png",
             "Frequency of prog executions per job triggered by new coverage",
             "Number of prog executions in a single job",
         )
 
 
-def show_job_over_time_plots(prog_exec_times: Iterable[float] | None, job_times: Iterable[float] | None, entry_hours, append_title:str):
+def show_job_over_time_plots(prog_exec_times: Iterable[float] | None, job_times: Iterable[float] | None, entry_hours, append_title:str, out_dir: Path):
     append_file_name = '_'.join(append_title.split())
     if job_times is not None:
         save_line_plot(
             [t / 3600 for t in job_times],
-            f"job_duration_series{append_file_name}.png",
+            out_dir / f"job_duration_series_{append_file_name}.png",
             "Job duration over time " + append_title,
             "Duration (Hours)",
             secondary_x_values=entry_hours,
@@ -222,7 +221,7 @@ def show_job_over_time_plots(prog_exec_times: Iterable[float] | None, job_times:
     if prog_exec_times is not None:
         save_line_plot(
             [t / 3600 for t in prog_exec_times],
-            f"prog_exec_duration_series{append_file_name}.png",
+            out_dir / f"prog_exec_duration_series{append_file_name}.png",
             "Prog execution duration over time " + append_title,
             "Duration (Hours)",
             secondary_x_values=entry_hours,
@@ -231,13 +230,13 @@ def show_job_over_time_plots(prog_exec_times: Iterable[float] | None, job_times:
 
 
 def show_progs_in_flight_plots(
-    in_flight_generic_progs_at, in_flight_fpointer_progs_at, start_time, end_time
+    in_flight_generic_progs_at, in_flight_fpointer_progs_at, start_time, end_time, out_dir: Path
 ):
     show_in_flight_timelapse(
         in_flight_generic_progs_at,
         start_time,
         end_time,
-        output_name="all_progs_flight_timelapse.png",
+        output_path= out_dir / "all_progs_flight_timelapse.png",
         title="In-flight prog executions over time",
         ylabel="In-flight prog executions",
     )
@@ -245,7 +244,7 @@ def show_progs_in_flight_plots(
         in_flight_fpointer_progs_at,
         start_time,
         end_time,
-        output_name="fpointer_progs_in_flight_timelapse.png",
+        output_path= out_dir / "fpointer_progs_in_flight_timelapse.png",
         title="In-flight function-pointer prog executions over time",
         ylabel="In-flight prog executions",
     )
@@ -286,7 +285,7 @@ def show_in_flight_timelapse(
     in_flight_fn: Callable[[datetime], list[dict[str, str]]],
     start_time: datetime,
     end_time: datetime,
-    output_name: str,
+    output_path: Path,
     title: str = "In-flight prog executions over time",
     ylabel: str = "In-flight prog executions",
 ) -> None:
@@ -308,7 +307,7 @@ def show_in_flight_timelapse(
 
     save_line_plot(
         counts,
-        output_name,
+        output_path,
         title,
         ylabel,
         x_values=time_to_entry(numpy.asarray(relative_times)),
@@ -318,7 +317,7 @@ def show_in_flight_timelapse(
     )
 
 
-def process_time_profile_lines(lines: list[dict]):
+def process_time_profile_lines(lines: list[dict], out_dir: Path):
     unified_dict = unify_per_job(lines)
 
     all_execs, function_pointer_execs = None, None
@@ -370,12 +369,12 @@ def process_time_profile_lines(lines: list[dict]):
     timestart_sorted_dur = [e["DurationSeconds"] for e in sorted(per_job_all_durations, key=lambda e:e["TimeStart"])]
     timestart_sorted_fpointer_dur = [e["DurationSeconds"] for e in sorted(per_job_fpointer_durations, key=lambda e:e["TimeStart"])]
 
-    show_job_over_time_plots(prog_exec_times, job_times, entry_hours, 'sorted by finish time')
-    show_job_over_time_plots(timestart_sorted_dur, None, entry_hours, 'sorted by begin time')
+    show_job_over_time_plots(prog_exec_times, job_times, entry_hours, 'sorted by finish time', out_dir)
+    show_job_over_time_plots(timestart_sorted_dur, None, entry_hours, 'sorted by begin time', out_dir)
 
 
-    show_progs_in_flight_plots(in_flight_generic_progs_at, in_flight_fpointer_progs_at, start_time, end_time)
-    show_prog_exec_frecuency_plots(all_execs, function_pointer_execs)
+    show_progs_in_flight_plots(in_flight_generic_progs_at, in_flight_fpointer_progs_at, start_time, end_time, out_dir)
+    show_prog_exec_frecuency_plots(all_execs, function_pointer_execs, out_dir)
     show_info(all_execs,
               function_pointer_execs,
               prog_exec_times_w_celiing,
@@ -506,6 +505,8 @@ if __name__ == "__main__":
 
     json_lines_path = Path(args.json_lines_path)
     out_path = Path(args.out_path)
+    out_dir = out_path.parent / "time_profile_plots"
+    out_dir.mkdir(exist_ok=True)
     if not json_lines_path.exists():
         print(
             f"Error: The specified json lines file does not exist: {json_lines_path}",
@@ -517,7 +518,7 @@ if __name__ == "__main__":
         json_lines_path
     )
 
-    unified_time_profile = process_time_profile_lines(time_profile_jsonl)
+    unified_time_profile = process_time_profile_lines(time_profile_jsonl, out_dir)
 
     out_str = "\n".join(
         json.dumps(json_obj, indent=None, default=str)
