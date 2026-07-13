@@ -581,13 +581,13 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict[str, Any]
                                               pcs_addr2loc: dict[str, list[locInfo]],
                                               fpointer_addr2loc: dict[str, list[locInfo]],
                                               storeinst_addr2loc: dict[str, list[locInfo]]) -> dict[str, dict[str, Any]]:
-    error_locInfo = ("err", "err")
+    error_locInfo: list[locInfo] = [("err", "err")]
     for entry in prog2log.values():
         if RESULT_KEYS.PC_COVER in entry:
             pc_loc_entries = []
             for pc_value in entry[RESULT_KEYS.PC_COVER]:
                 # hacky hack: we will not have a location for this "empty" pointer
-                pc_loc = pcs_addr2loc[pc_value][0] if pc_value != '0xffffffffffffffff' else error_locInfo
+                pc_loc = pcs_addr2loc[pc_value] if pc_value != '0xffffffffffffffff' else error_locInfo
                 pc_entry = {PC_VALUES.PC_ADDRESS : pc_value,
                             PC_VALUES.PC_LOCATION : pc_loc}
                 pc_loc_entries.append(pc_entry)
@@ -597,17 +597,17 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict[str, Any]
             fPointer = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
             storeInst = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
             # hacky hack: we will not have a location for this "empty" pointer
-            fPointer_loc = fpointer_addr2loc[fPointer][0] if fPointer != '0xffffffffffffffff' else error_locInfo
+            fPointer_loc = fpointer_addr2loc[fPointer] if fPointer != '0xffffffffffffffff' else error_locInfo
             funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] = fPointer_loc
-            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC] = storeinst_addr2loc[storeInst][0]
+            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC] = storeinst_addr2loc[storeInst]
 
         for funcPointer_store_entry in entry.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, []):
             fPointer = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
             storeInst = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
             #hacky hack: see above
-            fPointer_loc = fpointer_addr2loc[fPointer][0] if fPointer != '0xffffffffffffffff' else error_locInfo
+            fPointer_loc = fpointer_addr2loc[fPointer] if fPointer != '0xffffffffffffffff' else error_locInfo
             funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] = fPointer_loc
-            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC] = storeinst_addr2loc[storeInst][0]
+            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC] = storeinst_addr2loc[storeInst]
 
     return prog2log
 
@@ -832,15 +832,15 @@ def check_source_code_diffs(prog2log: dict[str, dict[str, Any]]) -> tuple[
     fpointer_locs : set[locInfo] = set()
 
     def _fill_collections(fp: dict[str, Any]) -> None:
-        fp_loc : locInfo = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC]
+        fp_loc : list[locInfo] = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC]
         fp_addr : str = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
-        storeinst_loc : locInfo = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC]
+        storeinst_loc : list[locInfo] = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC]
         storeinst_addr : str = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
 
         storeinst_addr2location[storeinst_addr] = storeinst_loc
-        storeinst_locs.add(storeinst_loc)
+        storeinst_locs.update(storeinst_loc)
         fpointer_addr2location[fp_addr] = fp_loc
-        fpointer_locs.add(fp_loc)
+        fpointer_locs.update(fp_loc)
 
     for e in prog2log.values():
         if RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in e:
@@ -850,9 +850,11 @@ def check_source_code_diffs(prog2log: dict[str, dict[str, Any]]) -> tuple[
             for fp in e[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD]:
                 _fill_collections(fp)
 
-    all_pc_locs = set(pc_entry[PC_VALUES.PC_LOCATION] 
-                        for e in prog2log.values() 
-                            for pc_entry in e.get(RESULT_KEYS.PC_COVER, []))
+    all_pc_locs : set[locInfo] = set()
+    for e in prog2log.values():
+        for pc_entry in e.get(RESULT_KEYS.PC_COVER, []):
+            all_pc_locs.update(pc_entry[PC_VALUES.PC_LOCATION])
+
 
     print(f"Unique functions covered: (count={len(all_pc_locs)})")
     print("------------------------------------------------")
