@@ -60,6 +60,12 @@ class PC_VALUES(StrEnum):
     PC_ADDRESS = "PC"
     PC_LOCATION = "PCLocation"
 
+class FPOINTERS_PAYLOAD_VALUES(StrEnum):
+    FPOINTER_LOC = "StoredValueLocation"
+    FPOINTER_ADDR = "StoredValue"
+    STOREINST_LOC = "PCLocation"
+    STOREINST_ADDR = "PC"
+
 class TAG_RESULT_VALUES(StrEnum):
     FPOINTER_ORIGIN = "fpointer_origin"
 

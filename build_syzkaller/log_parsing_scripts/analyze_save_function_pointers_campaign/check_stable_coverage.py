@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Iterable, Any
 
-from logentry_keys import RESULT_KEYS, MINIMIZATION_RESULT_VALUES, PC_VALUES
+from logentry_keys import RESULT_KEYS, MINIMIZATION_RESULT_VALUES, PC_VALUES, FPOINTERS_PAYLOAD_VALUES
 from termcolor import colored
 
 # First element represents file name and line number in the format file_name:lineno
@@ -573,12 +573,13 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict],
                                               pcs_addr2loc: dict[str, list[locInfo]],
                                               fpointer_addr2loc: dict[str, list[locInfo]],
                                               storeinst_addr2loc: dict[str, list[locInfo]]) -> dict[str, dict]:
+    error_locInfo = ("err", "err")
     for entry in prog2log.values():
         if RESULT_KEYS.PC_COVER in entry:
             pc_loc_entries = []
             for pc_value in entry[RESULT_KEYS.PC_COVER]:
                 # hacky hack: we will not have a location for this "empty" pointer
-                pc_loc = pcs_addr2loc[pc_value][0] if pc_value != '0xffffffffffffffff' else ''
+                pc_loc = pcs_addr2loc[pc_value][0] if pc_value != '0xffffffffffffffff' else error_locInfo
                 pc_entry = {PC_VALUES.PC_ADDRESS : pc_value,
                             PC_VALUES.PC_LOCATION : pc_loc}
                 pc_loc_entries.append(pc_entry)
@@ -588,7 +589,7 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict],
             fPointer = funcPointer_store_entry["StoredValue"]
             storeInst = funcPointer_store_entry["PC"]
             # hacky hack: we will not have a location for this "empty" pointer
-            fPointer_loc = fpointer_addr2loc[fPointer][0] if fPointer != '0xffffffffffffffff' else ''
+            fPointer_loc = fpointer_addr2loc[fPointer][0] if fPointer != '0xffffffffffffffff' else error_locInfo
             funcPointer_store_entry[RESULT_KEYS.FPOINTER_PAYLOAD_FPOINTER_LOC_KEY] = fPointer_loc
             funcPointer_store_entry[RESULT_KEYS.FPOINTER_PAYLOAD_STOREINST_LOC_KEY] = storeinst_addr2loc[storeInst][0]
 
@@ -596,7 +597,7 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict],
             fPointer = funcPointer_store_entry["StoredValue"]
             storeInst = funcPointer_store_entry["PC"]
             #hacky hack: see above
-            fPointer_loc = fpointer_addr2loc[fPointer][0] if fPointer != '0xffffffffffffffff' else ''
+            fPointer_loc = fpointer_addr2loc[fPointer][0] if fPointer != '0xffffffffffffffff' else error_locInfo
             funcPointer_store_entry[RESULT_KEYS.FPOINTER_PAYLOAD_FPOINTER_LOC_KEY] = fPointer_loc
             funcPointer_store_entry[RESULT_KEYS.FPOINTER_PAYLOAD_STOREINST_LOC_KEY] = storeinst_addr2loc[storeInst][0]
 
@@ -663,7 +664,7 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict]) -> None:
         storeinst_addr2loc,
         uncovered_fpointer_locs,
         covered_fpointer_locs,
-    ) = check_source_code_diffs(all_pcs, all_fpointers_stores, all_fpointers)
+    ) = check_source_code_diffs(prog2log)
 
     uncovered_fpointers_out, skip_count = get_fpointer2storeinst_as_source_locations(
         fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs,
@@ -798,9 +799,7 @@ def check_PC_exec_funcStore_literal_diffs(
     print(f"Stored function_pointers that don't show up in exec log: (count={len(stored_value_diff)})")
 
 
-def check_source_code_diffs(
-    all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]
-) -> tuple[
+def check_source_code_diffs(prog2log: dict[str, dict]) -> tuple[
     dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo], set[locInfo]
 ]:
     """
@@ -818,42 +817,52 @@ def check_source_code_diffs(
             stored_value_diff: set of source code locations for function pointers that were not covered.
             stored_value_intersection: set of source code locations for function pointers that were covered.
     """
-    _, pc_locs_all, pc_locs_noinline = get_source_code_refs(all_pcs)
-    storeinst_addr2location, storeinst_locs_all, storeinst_locs_noinline = get_source_code_refs(all_fpointers_stores)
-    fpointer_addr2location, fpointer_locs, _ = get_source_code_refs(all_fpointers)
+    storeinst_addr2location = dict()
+    fpointer_addr2location = dict()
+    storeinst_locs = set()
+    fpointer_locs = set()
 
-    print(f"Unique functions covered: (count={len(pc_locs_all)})")
-    print(f"Unique functions covered excluding inlines: (count={len(pc_locs_noinline)})")
+    def _fill_collections(fp: dict):
+        fp_loc = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC]
+        fp_addr = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
+        storeinst_loc = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC]
+        storeinst_addr = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
+
+        storeinst_addr2location[storeinst_addr] = storeinst_loc
+        storeinst_locs.add(storeinst_loc)
+        fpointer_addr2location[fp_addr] = fp_loc
+        fpointer_locs.add(fp_loc)
+
+    for e in prog2log.values():
+        if RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in e:
+            for fp in e[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
+                _fill_collections(fp)
+        if RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD in e:
+            for fp in e[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD]:
+                _fill_collections(fp)
+
+    all_pc_locs = set(pc_entry[PC_VALUES.PC_LOCATION] 
+                        for e in prog2log.values() 
+                            for pc_entry in e.get(RESULT_KEYS.PC_COVER, []))
+
+    print(f"Unique functions covered: (count={len(all_pc_locs)})")
     print("------------------------------------------------")
     # First question:
     # How many of the reported instructions that store a value
     #  appear in a function that is not covered by any of the
     #  PCs in the general log of reported instructions?
-    store_inst_diff, _ = locInfo_fname_diff(storeinst_locs_all, pc_locs_all)
-    # this second one should be smaller
-    store_inst_diff_excluding_inlines, _ = locInfo_fname_diff(
-        storeinst_locs_noinline, pc_locs_noinline
-    )
-    print(f"Unique functions of fpointer stores: (count={len(storeinst_locs_all)})")
+    store_inst_diff, _ = locInfo_fname_diff(storeinst_locs, all_pc_locs)
+
+    print(f"Unique functions of fpointer stores: (count={len(storeinst_locs)})")
     print(
         f"Function pointer store instructions in funcions different than PCs: (count={len(store_inst_diff)}):",
         f"\n{sorted(store_inst_diff)}",
     )
-    print(
-        f"Function pointer store instructions in funcions different than PCs (ignoring inlines in both): (count={len(store_inst_diff_excluding_inlines)}):",
-        f"\n{sorted(store_inst_diff_excluding_inlines)}",
-    )
     print("------------------------------------------------")
-    stored_value_diff, stored_value_intersection = locInfo_fname_diff(fpointer_locs, pc_locs_all)
-    stored_value_diff_without_inlines, _ = locInfo_fname_diff(fpointer_locs, pc_locs_noinline)
+    stored_value_diff, stored_value_intersection = locInfo_fname_diff(fpointer_locs, all_pc_locs)
     print(colored(f"Unique stored functions: (count={len(fpointer_locs)})"))
     print(f"Stored functions that were not executed: (count={len(stored_value_diff)}):")
     print(f"Stored functions that did get executed: (count={len(stored_value_intersection)}):")
-
-    # this second one could be smaller but I expect it to be the same:
-    print(
-        f"Execution of functions does not depend on inlines: {'Yes' if stored_value_diff_without_inlines == stored_value_diff else 'No'}"
-    )
     return (
         fpointer_addr2location,
         storeinst_addr2location,
