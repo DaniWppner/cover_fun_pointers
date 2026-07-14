@@ -93,23 +93,98 @@ def normalize_timestamps(
     return normalized
 
 
-def choose_plot_time_unit(timestamps: list[float]) -> tuple[str, list[float]]:
+def choose_plot_time_unit(
+    timestamps_a: list[float],
+    timestamps_b: list[float] | None,
+) -> tuple[str, list[float], list[float] | None, list[float]]:
     s_in_h = 3600
     s_in_m = 60
-    if timestamps[-1] - timestamps[0] > s_in_h * 2:
-        result = "Hours"
-        ratio = s_in_h
+
+    duration_s = timestamps_a[-1] - timestamps_a[0]
+    largest_series = timestamps_a
+    if timestamps_b is not None and duration_s < timestamps_b[-1] - timestamps_b[0]:
+        duration_s = timestamps_b[-1] - timestamps_b[0]
+        largest_series = timestamps_b
+
+    time_unit = "Hours" if duration_s > s_in_h * 2 else "Minutes"
+
+    def apply_to_list(ts: list[float] | None):
+        if ts is None:
+            return None
+        ratio = s_in_h if time_unit == "Hours" else s_in_m
+        return [t / ratio for t in ts]
+
+    return (
+        time_unit,
+        apply_to_list(timestamps_a),
+        apply_to_list(timestamps_b),
+        apply_to_list(largest_series),
+    )
+
+
+def plot_single_coverage_series(
+    ax: plt.Axes,
+    coverage_values: list[int],
+    timestamps: list[float],
+    cutoff_point: int,
+    time_unit: str,
+    color: str,
+    label: str,
+    first_secondary_xaxis: bool,
+    largest_possible_timestamp: float,
+    largest_possible_entry_n: int,
+) -> None:
+    entry_ns = list(range(len(timestamps)))
+    plot_entry_ns = entry_ns[cutoff_point:]
+    coverage_values = coverage_values[cutoff_point:]
+
+    interploation_entries = entry_ns + [largest_possible_entry_n]
+    interploation_timestamps = timestamps + [largest_possible_timestamp]
+
+    def entry_to_time(entry_n_array: numpy.ndarray) -> numpy.ndarray:
+        return numpy.interp(
+            entry_n_array, interploation_entries, interploation_timestamps, left=0
+        )
+
+    def time_to_entry(timestamp_array: numpy.ndarray) -> numpy.ndarray:
+        return numpy.interp(
+            timestamp_array, interploation_timestamps, interploation_entries, left=0
+        )
+
+    ax.plot(
+        plot_entry_ns,
+        coverage_values,
+        marker=".",
+        linewidth=0.5,
+        color=color,
+        label=label,
+    )
+    ax2 = ax.secondary_xaxis("top", functions=(entry_to_time, time_to_entry))
+    ax2.tick_params(axis="x", colors=color)
+    ax2.spines["top"].set_color(color)
+    # make the top line disappear beyond the last timestamp
+    last_ts_view = timestamps[-1]
+    ax2.spines["top"].set_bounds(0, last_ts_view)
+    ax2.set_xlim(left=0, right=last_ts_view)
+    # remove the ticks beyond the last timestamp
+    auto_ticks = ax2.get_xticks()
+    filtered_ticks = [t for t in auto_ticks if t <= last_ts_view]
+    ax2.set_xticks(filtered_ticks + [round(last_ts_view)])
+
+    if first_secondary_xaxis:
+        ax2.set_xlabel(f"Elapsed time ({time_unit})")
+        ax2.spines["top"].set_position(("outward", 5))
     else:
-        result = "Minutes"
-        ratio = s_in_m
-    timestamps = [t / ratio for t in timestamps]
-    return result, timestamps
+        ax2.spines["top"].set_position(("outward", 40))
+    return ax2
 
 
 def save_coverage_time_series(
-    coverage_pairs: list[tuple[float, int]],
+    coverage_pairs_a: list[tuple[float, int]],
+    coverage_pairs_b: list[tuple[float, int]] | None,
     out_file: Path,
     title: str,
+    labels: tuple[str, str],
 ) -> None:
     """
     Plot coverage values over time.
@@ -119,37 +194,44 @@ def save_coverage_time_series(
         out_file: Output file path for the PNG
         title: Title for the plot
     """
-    ts, cvs = zip(*coverage_pairs)
-    timestamps = list(ts)
-    coverage_values = list(cvs)
-    entry_ns = list(range(len(timestamps)))
-    time_unit, timestamps = choose_plot_time_unit(timestamps)
-
+    CUT_FIRST_N_TRIAGES = 15
+    ts_series = []
+    cov_series = []
+    for pairs in coverage_pairs_a, coverage_pairs_b:
+        if pairs is None:
+            ts, cvs = None, None
+        else:
+            _ts, _cvs = zip(*pairs)
+            ts, cvs = list(_ts), list(_cvs)
+        ts_series.append(ts)
+        cov_series.append(cvs)
+    time_unit, ts_series[0], ts_series[1], largest_series = choose_plot_time_unit(
+        ts_series[0], ts_series[1]
+    )
     fig = plt.figure(figsize=(10, 4))
     ax = fig.add_subplot(111)
 
-    ax.plot(
-        entry_ns,
-        coverage_values,
-        marker=".",
-        linewidth=0.5,
-        color="tab:blue",
-        label="Coverage",
-    )
+    for series_idx in (0, 1):
+        if ts_series[series_idx] is None:
+            break
+        color = ("Blue", "Red")[series_idx]
+        first_plot = series_idx == 0
+        plot_single_coverage_series(
+            ax,
+            cov_series[series_idx],
+            ts_series[series_idx],
+            CUT_FIRST_N_TRIAGES,
+            time_unit,
+            color,
+            labels[series_idx],
+            first_secondary_xaxis=first_plot,
+            largest_possible_timestamp=largest_series[-1],
+            largest_possible_entry_n=len(largest_series) - 1,
+        )
 
     ax.set_title(title, loc="left", fontsize="15")
-    ax.set_xlabel("Triage job (sorted by finish time)")
+    ax.set_xlabel("Number of Triage Jobs finished")
     ax.set_ylabel("Coverage score")
-
-    def entry_to_time(entry_n_array: numpy.ndarray) -> numpy.ndarray:
-        return numpy.interp(entry_n_array, entry_ns, timestamps, left=0)
-
-    def time_to_entry(timestamp_array: numpy.ndarray) -> numpy.ndarray:
-        return numpy.interp(timestamp_array, timestamps, entry_ns, left=0)
-
-    ax2 = ax.secondary_xaxis("top", functions=(entry_to_time, time_to_entry))
-    ax2.set_xlabel(f"Elapsed time ({time_unit})")
-
     ax.legend(loc="best")
     fig.tight_layout()
     fig.savefig(out_file)
@@ -166,36 +248,10 @@ def check_file_exists(file_path: Path) -> None:
         sys.exit(1)
 
 
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(
-        description="Parse a json file to crosscheck triage job timestamp data with original log coverage information."
-    )
-    parser.add_argument(
-        "unified_json_path",
-        type=str,
-        nargs="?",
-        help="Json file outputted by unify_triage_lines.py",
-    )
-    parser.add_argument(
-        "syz_manager_log",
-        type=str,
-        nargs="?",
-        help="Log file outputted by syzkaller used in to generate the json",
-    )
-
-    args = parser.parse_args()
-
-    if not args.unified_json_path or not args.syz_manager_log:
-        parser.print_help()
-        sys.exit(1)
-
-    unified_json_path = Path(args.unified_json_path)
-    syz_manager_log = Path(args.syz_manager_log)
-    check_file_exists(unified_json_path)
-    check_file_exists(syz_manager_log)
-
-    with open(unified_json_path, "r") as f:
+def process_log_json_pair(
+    syz_manager_log: Path, triage_json_path: Path
+) -> list[tuple[float, int]]:
+    with open(triage_json_path, "r") as f:
         __contents = f.read()
     triage_json = json.loads(__contents)
     triage_json = convert_timestamps_nicely(triage_json)
@@ -204,11 +260,45 @@ if __name__ == "__main__":
     triage_timestamps = all_triage_timestamps(triage_json)
     coverage_pairs = closest_coverage_entries(triage_timestamps, timestamp_x_coverage)
     coverage_pairs = normalize_timestamps(coverage_pairs)
+    return coverage_pairs
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(
+        description="Parse a json file to crosscheck triage job timestamp data with original log coverage information."
+    )
+    parser.add_argument(
+        "input_pairs",
+        nargs="+",
+        help="One or two pairs of files: <unified_json_path> <syz_manager_log> [<unified_json_path_2> <syz_manager_log_2>]",
+    )
+
+    args = parser.parse_args()
+
+    if len(args.input_pairs) not in {2, 4}:
+        parser.error("Please provide one or two (json, log) file pairs")
+
+    pairs = [
+        (Path(args.input_pairs[i]), Path(args.input_pairs[i + 1]))
+        for i in range(0, len(args.input_pairs), 2)
+    ]
+    for unified_json_path, syz_manager_log in pairs:
+        check_file_exists(unified_json_path)
+        check_file_exists(syz_manager_log)
+
+    coverage_series_a = process_log_json_pair(pairs[0][1], pairs[0][0])
+    coverage_series_b = (
+        process_log_json_pair(pairs[1][1], pairs[1][0]) if len(pairs) > 1 else None
+    )
 
     out_dir = Path.cwd() / "coverage_over_time"
     out_dir.mkdir(parents=True, exist_ok=True)
+    labels = tuple(path.parent.absolute().name for path, _ in pairs)
     save_coverage_time_series(
-        coverage_pairs,
+        coverage_series_a,
+        coverage_series_b,
         out_dir / "coverage_evolution.png",
         "Coverage Evolution over Triages",
+        labels=labels,
     )
