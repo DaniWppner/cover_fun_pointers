@@ -155,7 +155,7 @@ def plot_single_coverage_series(
         plot_entry_ns,
         coverage_values,
         marker=".",
-        linewidth=0.5,
+        linewidth=0.1,
         color=color,
         label=label,
     )
