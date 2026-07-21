@@ -1,0 +1,73 @@
+0xffffffff83a9b593: netlink_sendmsg at /home/linux/net/netlink/af_netlink.c:1824
+0xffffffff83a9dd77: netlink_allowed at /home/linux/net/netlink/af_netlink.c:936
+0xffffffff83a9ddff: sock_net at /home/linux/net/netlink/af_netlink.c:?
+ (inlined by) netlink_allowed at /home/linux/net/netlink/af_netlink.c:938
+0xffffffff83a9bca0: netlink_sendmsg at /home/linux/net/netlink/af_netlink.c:1856
+0xffffffff83a9b9c7: netlink_sendmsg at /home/linux/net/netlink/af_netlink.c:1867
+0xffffffff83a9bac9: netlink_sendmsg at /home/linux/net/netlink/af_netlink.c:1873
+0xffffffff83a8de5d: netlink_alloc_large_skb at /home/linux/net/netlink/af_netlink.c:1204
+ (inlined by) netlink_alloc_large_skb at /home/linux/net/netlink/af_netlink.c:1210
+ (inlined by) netlink_sendmsg at /home/linux/net/netlink/af_netlink.c:1890
+0xffffffff83a9bcd2: netlink_sendmsg at /home/linux/net/netlink/af_netlink.c:1902
+0xffffffff83a8fdc7: netlink_broadcast_filtered at /home/linux/net/netlink/af_netlink.c:1518
+0xffffffff83a8f75a: netlink_trim at /home/linux/net/netlink/af_netlink.c:1301
+0xffffffff83a8f784: netlink_trim at /home/linux/net/netlink/af_netlink.c:1304
+0xffffffff83a8f82f: netlink_trim at /home/linux/net/netlink/af_netlink.c:1306
+0xffffffff83a90c7e: netlink_broadcast_filtered at /home/linux/net/netlink/af_netlink.c:1543
+0xffffffff83a90d00: netlink_broadcast_filtered at /home/linux/net/netlink/af_netlink.c:479
+0xffffffff83a90da2: netlink_broadcast_filtered at /home/linux/net/netlink/af_netlink.c:1556
+0xffffffff83a8ee46: netlink_unicast at /home/linux/net/netlink/af_netlink.c:1346
+0xffffffff83a8f75a: netlink_trim at /home/linux/net/netlink/af_netlink.c:1301
+0xffffffff83a8f784: netlink_trim at /home/linux/net/netlink/af_netlink.c:1304
+0xffffffff83a8f82f: netlink_trim at /home/linux/net/netlink/af_netlink.c:1306
+ (inlined by) netlink_unicast at /home/linux/net/netlink/af_netlink.c:1353
+0xffffffff83a94290: netlink_lookup at /home/linux/net/netlink/af_netlink.c:531
+ (inlined by) netlink_lookup at /home/linux/net/netlink/af_netlink.c:535
+0xffffffff83a9e6b1: __netlink_lookup at /home/linux/net/netlink/af_netlink.c:512
+ (inlined by) __netlink_lookup at /home/linux/net/netlink/af_netlink.c:516
+0xffffffff83a9eaee: __netlink_lookup at /home/linux/net/netlink/af_netlink.c:498
+ (inlined by) __netlink_lookup at /home/linux/net/netlink/af_netlink.c:516
+ (inlined by) netlink_lookup at /home/linux/net/netlink/af_netlink.c:539
+0xffffffff83a8effb: netlink_unicast at /home/linux/net/netlink/af_netlink.c:1179
+0xffffffff83a8f203: netlink_unicast at /home/linux/net/netlink/af_netlink.c:387
+0xffffffff83a8f559: netlink_deliver_tap_kernel at /home/linux/net/netlink/af_netlink.c:346
+ (inlined by) netlink_unicast_kernel at /home/linux/net/netlink/af_netlink.c:1334
+ (inlined by) netlink_unicast at /home/linux/net/netlink/af_netlink.c:1361
+0xffffffff83a96a5c: netlink_deliver_tap at /home/linux/net/netlink/af_netlink.c:332
+ (inlined by) netlink_deliver_tap at /home/linux/net/netlink/af_netlink.c:335
+0xffffffff83a96b44: netlink_deliver_tap at /home/linux/net/netlink/af_netlink.c:337
+ (inlined by) netlink_deliver_tap at /home/linux/net/netlink/af_netlink.c:340
+0xffffffff83aa9fe8: genl_rcv at /home/linux/net/netlink/genetlink.c:1217
+0xffffffff83a963b8: netlink_rcv_skb at /home/linux/net/netlink/af_netlink.c:2541
+0xffffffff83a964d2: netlink_rcv_skb at /home/linux/net/netlink/af_netlink.c:2557
+0xffffffff83a9658b: netlink_rcv_skb at /home/linux/net/netlink/af_netlink.c:2570
+0xffffffff83a9524e: netlink_ack at /home/linux/net/netlink/af_netlink.c:2479
+0xffffffff83a95300: netlink_ack at /home/linux/net/netlink/af_netlink.c:2492
+0xffffffff83a95c53: netlink_ack_tlv_len at /home/linux/net/netlink/af_netlink.c:2171
+0xffffffff83a95ca9: netlink_ack_tlv_len at /home/linux/net/netlink/af_netlink.c:2174
+0xffffffff83a95644: netlink_ack at /home/linux/net/netlink/af_netlink.c:2513
+0xffffffff83a95830: netlink_ack at /home/linux/net/netlink/af_netlink.c:2521
+0xffffffff83a8ee46: netlink_unicast at /home/linux/net/netlink/af_netlink.c:1346
+0xffffffff83a8f75a: netlink_trim at /home/linux/net/netlink/af_netlink.c:1301
+0xffffffff83a8f784: netlink_trim at /home/linux/net/netlink/af_netlink.c:1304
+0xffffffff83a8f82f: netlink_trim at /home/linux/net/netlink/af_netlink.c:1306
+ (inlined by) netlink_unicast at /home/linux/net/netlink/af_netlink.c:1353
+0xffffffff83a94290: netlink_lookup at /home/linux/net/netlink/af_netlink.c:531
+ (inlined by) netlink_lookup at /home/linux/net/netlink/af_netlink.c:535
+0xffffffff83a9e6b1: __netlink_lookup at /home/linux/net/netlink/af_netlink.c:512
+ (inlined by) __netlink_lookup at /home/linux/net/netlink/af_netlink.c:516
+ (inlined by) netlink_lookup at /home/linux/net/netlink/af_netlink.c:539
+0xffffffff83a8effb: netlink_unicast at /home/linux/net/netlink/af_netlink.c:1179
+0xffffffff83a8e172: netlink_attachskb at /home/linux/net/netlink/af_netlink.c:1237
+0xffffffff83a8e265: netlink_attachskb at /home/linux/net/netlink/af_netlink.c:387
+0xffffffff83a8f142: netlink_unicast at /home/linux/net/netlink/af_netlink.c:1376
+0xffffffff83a8ebac: netlink_sendskb at /home/linux/net/netlink/af_netlink.c:1287
+0xffffffff83a96a5c: netlink_deliver_tap at /home/linux/net/netlink/af_netlink.c:332
+ (inlined by) netlink_deliver_tap at /home/linux/net/netlink/af_netlink.c:335
+0xffffffff83a96b44: netlink_deliver_tap at /home/linux/net/netlink/af_netlink.c:337
+ (inlined by) netlink_deliver_tap at /home/linux/net/netlink/af_netlink.c:340
+0xffffffff83a96725: netlink_rcv_skb at /home/linux/net/netlink/af_netlink.c:2546
+0xffffffff83a8df7b: netlink_skb_destructor at /home/linux/net/netlink/af_netlink.c:373
+0xffffffff83a8e012: netlink_skb_destructor at /home/linux/net/netlink/af_netlink.c:374
+0xffffffff83a8e037: netlink_skb_destructor at /home/linux/net/netlink/af_netlink.c:382
+ (inlined by) netlink_sendmsg at /home/linux/net/netlink/af_netlink.c:1908

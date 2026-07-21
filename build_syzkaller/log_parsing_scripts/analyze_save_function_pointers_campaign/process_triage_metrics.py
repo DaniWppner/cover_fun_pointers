@@ -4,7 +4,7 @@ import json
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 from termcolor import colored
 
@@ -14,7 +14,7 @@ from logentry_keys import (FPOINTERS_PAYLOAD_VALUES,
 
 def convert_types_nicely(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
 
-    def convert_locations_list(dict_entry:dict[str,list[list,str]], key:str) -> list[locInfo]:
+    def convert_locations_list(dict_entry:dict[str,list[str]], key:str) -> list[locInfo]:
         neat: list[locInfo] = [(funct, line) for funct, line in dict_entry[key]]
         return neat
 
@@ -434,35 +434,9 @@ def check_source_code_diffs(prog2log: dict[str, dict[str, Any]]) -> tuple[
             stored_value_diff: set of source code locations for function pointers that were not covered.
             stored_value_intersection: set of source code locations for function pointers that were covered.
     """
-    storeinst_addr2location : dict[str, list[locInfo]] = dict()
-    fpointer_addr2location : dict[str, list[locInfo]] = dict()
-    storeinst_locs : set[locInfo] = set()
-    fpointer_locs : set[locInfo] = set()
+    storeinst_addr2location, fpointer_addr2location, storeinst_locs, fpointer_locs = get_fPointeStore_dicts_and_locs(prog2log)
 
-    def _fill_collections(fp: dict[str, Any]) -> None:
-        fp_loc : list[locInfo] = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC]
-        fp_addr : str = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
-        storeinst_loc : list[locInfo] = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC]
-        storeinst_addr : str = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
-
-        storeinst_addr2location[storeinst_addr] = storeinst_loc
-        storeinst_locs.update(storeinst_loc)
-        fpointer_addr2location[fp_addr] = fp_loc
-        fpointer_locs.update(fp_loc)
-
-    for e in prog2log.values():
-        if RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in e:
-            for fp in e[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
-                _fill_collections(fp)
-        if RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD in e:
-            for fp in e[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD]:
-                _fill_collections(fp)
-
-    all_pc_locs : set[locInfo] = set()
-    for e in prog2log.values():
-        for pc_entry in e.get(RESULT_KEYS.PC_COVER, []):
-            all_pc_locs.update(pc_entry[PC_VALUES.PC_LOCATION])
-
+    all_pc_locs = get_unique_covered_functions(prog2log)
 
     print(f"Unique functions covered: (count={len(all_pc_locs)})")
     print("------------------------------------------------")
@@ -489,9 +463,47 @@ def check_source_code_diffs(prog2log: dict[str, dict[str, Any]]) -> tuple[
         stored_value_intersection,
     )
 
+def get_fPointeStore_dicts_and_locs(prog2log: dict[str, dict[str, Any]]) -> tuple[
+    dict[str, list[locInfo]],
+    dict[str, list[locInfo]],
+    set[locInfo],
+    set[locInfo]
+]:
+    storeinst_addr2location : dict[str, list[locInfo]] = dict()
+    fpointer_addr2location : dict[str, list[locInfo]] = dict()
+    storeinst_locs : set[locInfo] = set()
+    fpointer_locs : set[locInfo] = set()
+
+    def _fill_collections(fp: dict[str, Any]) -> None:
+        fp_loc : list[locInfo] = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC]
+        fp_addr : str = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
+        storeinst_loc : list[locInfo] = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC]
+        storeinst_addr : str = fp[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
+
+        storeinst_addr2location[storeinst_addr] = storeinst_loc
+        storeinst_locs.update(storeinst_loc)
+        fpointer_addr2location[fp_addr] = fp_loc
+        fpointer_locs.update(fp_loc)
+
+    for e in prog2log.values():
+        if RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in e:
+            for fp in e[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
+                _fill_collections(fp)
+        if RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD in e:
+            for fp in e[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD]:
+                _fill_collections(fp)
+    return storeinst_addr2location,fpointer_addr2location,storeinst_locs,fpointer_locs
+
+def get_unique_covered_functions(prog2log: dict[str, dict[str, Any]]) -> set[locInfo]:
+    all_pc_locs: set[locInfo] = set()
+    for e in prog2log.values():
+        for pc_entry in e.get(RESULT_KEYS.PC_COVER, []):
+            all_pc_locs.update(pc_entry[PC_VALUES.PC_LOCATION])
+    return all_pc_locs
+
 
 def locInfo_fname_diff(
-    this: set[locInfo], other: set[locInfo]
+    this: Iterable[locInfo], other: Iterable[locInfo]
 ) -> tuple[set[locInfo], set[locInfo]]:
     """
     Returns two subsets of `this`, using the function name as equality criteria.

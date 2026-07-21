@@ -292,6 +292,14 @@ if __name__ == "__main__":
         process_log_json_pair(pairs[1][1], pairs[1][0]) if len(pairs) > 1 else None
     )
 
+    if coverage_series_b is not None and coverage_series_a and coverage_series_b:
+        max_time_a = coverage_series_a[-1][0]
+        max_time_b = coverage_series_b[-1][0]
+        if max_time_a > max_time_b:
+            coverage_series_a = [p for p in coverage_series_a if p[0] <= max_time_b]
+        elif max_time_b > max_time_a:
+            coverage_series_b = [p for p in coverage_series_b if p[0] <= max_time_a]
+
     out_dir = Path.cwd() / "coverage_over_time"
     out_dir.mkdir(parents=True, exist_ok=True)
     labels = tuple(path.parent.absolute().name for path, _ in pairs)
