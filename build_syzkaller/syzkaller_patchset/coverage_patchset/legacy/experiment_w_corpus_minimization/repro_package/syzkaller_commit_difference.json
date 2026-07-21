@@ -1,0 +1,12 @@
+{
+    "last_ancestor": {
+        "hash": "aff5d2801c7fbe493a43e9993012028825168d1c",
+        "message": "pkg/corpus, pkg/signal: move minimization logic to corpus, and consider funcPointerCover",
+        "branch": "handle_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 0,
+        "commits": []
+    }
+}

@@ -17,6 +17,19 @@ build_syzkaller/syz-executor-test/QEMU-debug-image/
 **/instance-*/
 **/instance-lock
 
+#Ignore output analysis files
+**/__uncovered*.py
+**/__covered*.py
+**/multiple_saved_corpus.json
+**/registered_covered_fpointers_saved_because_fpointer.json
+**/registered_uncovered_fpointers_saved_because_fpointer.json
+**/saved_because_fpointer.json
+**/saved_because_fpointer_w_duplicates.json
+**/unique_fpointer_and_signal_minimization_result.json
+**/time_profile_data.json
+**/*.png
+
+
 # Python ignores
 __pycache__/
 venv/

@@ -1,0 +1,2565 @@
+{
+    "last_ancestor": {
+        "hash": "ac6b06d0ef1799163caeb0a73d32ea502a843f6a",
+        "message": "pkg/fuzzer: skip function pointer generated smash queue half the time to allow more triages to complete",
+        "branch": "handle_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 638,
+        "commits": [
+            {
+                "hash": "bb63ae5971e3df6dc6c3cd8d01afdc9ed477bd77",
+                "message": "pkg/execbackend/local.go: add DebugFilter to localManager for compatibilty purposes"
+            },
+            {
+                "hash": "ad7dd18e7d21445d77f7cf245e42c85f714e6102",
+                "message": "Merge branch 'master' into handle_kcov_store_instructions"
+            },
+            {
+                "hash": "2130f682322a1c2ef698e3c27a2b97e89e96142f",
+                "message": "dashboard/app: migrate error page to bootstrap"
+            },
+            {
+                "hash": "21508ae2900be4bdd3d19e0dab04f2de512baa0e",
+                "message": ".github: ignore bot reviews when auto-assigning reviewers"
+            },
+            {
+                "hash": "cc4833d0aee8619c914bb1e958a8416baa7e05c6",
+                "message": "tools: check-html.sh: optimize tracked file listing"
+            },
+            {
+                "hash": "17c4f73b13e355551eceb830123e66d23818c85c",
+                "message": "vm/vmimpl: show kasan on openbsd"
+            },
+            {
+                "hash": "a870962ee4b7bbdd977c705b2d08c2e313479868",
+                "message": "pkg/bisect: document zero-value env test results"
+            },
+            {
+                "hash": "d78ea535f456172a095a6d211ee0a2de1d049968",
+                "message": "pkg/coveragedb: remove legacy migration code"
+            },
+            {
+                "hash": "23464ba0df4f27fdad91a250153de95c96f4e496",
+                "message": "report/openbsd: title KASAN faults by faulting function"
+            },
+            {
+                "hash": "99e643756a094413adb404dd52825e7034232325",
+                "message": "tools/docker: add lz4 to env and syzbot images"
+            },
+            {
+                "hash": "4167ee25a0dec079020d45a7428e22f2a6e987ae",
+                "message": "pkg/aflow/action/crash: add configure-runner action"
+            },
+            {
+                "hash": "e6df4c5c96c687af07b4ce1819282ecded5ee270",
+                "message": "pkg/codesearch: fix reference name interning"
+            },
+            {
+                "hash": "6e8eff307289ebfde71b7d9b21acd25fb1de7f6c",
+                "message": "tools/clang/codesearch: fix logical path resolution for symlinks"
+            },
+            {
+                "hash": "7265da5d042287b1e3998df736e36aa378ad23f7",
+                "message": "pkg/clangtool/tooltest: handle WalkDir errors to prevent panics"
+            },
+            {
+                "hash": "d5aae4ea2a16e64277ac126b1c94a4df80d7d126",
+                "message": "all: fix dead code and unused struct fields"
+            },
+            {
+                "hash": "1fa9434f14e6254fc15b06a1862f42e0d2567422",
+                "message": "pkg/vminfo: extract feature parsing logic from pkg/csource"
+            },
+            {
+                "hash": "bbb1503410070cbc673cfb5593b6461e9a79df9c",
+                "message": "tools/clang/codesearch: fix compilation database loading"
+            },
+            {
+                "hash": "98213d487d7b0b34ba095361ea666423cd2bdadb",
+                "message": "coveragedb: add sessions table to track active sessions for GC"
+            },
+            {
+                "hash": "a0c310a3e11cde5f0873c07ded31e667f0a586a0",
+                "message": "syz-cluster: add granular report levels to sessions"
+            },
+            {
+                "hash": "c7f971aeb8ccb97d8b7d9f72dcab66f1d1d0f481",
+                "message": "syz-cluster: provide on-demand patch testing"
+            },
+            {
+                "hash": "b9f1ceaac10e622b76611668305df298b1d0b9dc",
+                "message": "pkg/spanner: implement ReadRows using spanner.SelectAll"
+            },
+            {
+                "hash": "ca8831abe2a8cf83da6217f4824a9258753667f2",
+                "message": "all: move spanner readRow/readRows helpers"
+            },
+            {
+                "hash": "2bf76a77112d7daff9c575968e87c69d3f356a03",
+                "message": "github: assign random reviewer on ready_for_review"
+            },
+            {
+                "hash": "746ecf55900a3fa1b6b04f7293d00c2d2a3b9d90",
+                "message": "pkg/report: fix data loss in Fuchsia starnix panic shortening"
+            },
+            {
+                "hash": "489d0741e1518ba7aa9233646a6e94d4557a70a3",
+                "message": "pkg/aflow/backend: add Close() to Provider interface"
+            },
+            {
+                "hash": "f56b4159f96e2aadf5b455b6306c0765c1d27a1f",
+                "message": "pkg/fuzzer: use RWMutex for choice table"
+            },
+            {
+                "hash": "ab40da588520f57666defad7c6f0e2e75cd9b6c6",
+                "message": "sys/freebsd: add definitions for new procdesc syscalls"
+            },
+            {
+                "hash": "0630a55def901d7c7974542eef86a3d823010bc0",
+                "message": "pkg/clangtool: pass kernel object dir to clang tool"
+            },
+            {
+                "hash": "3957d16dad13f3cd935b619d24c38a73bbe01719",
+                "message": ".golangci.yml: enable ST1000 linter"
+            },
+            {
+                "hash": "537c26b17f3d4041084c7bb2413965b201bd8ef1",
+                "message": "vm: add package comments"
+            },
+            {
+                "hash": "6d1bad053f7d52b17a4ba563bd10bfd599b397a0",
+                "message": "tools: add package comments"
+            },
+            {
+                "hash": "a6f25fcdbbf03f137fa43fbbe0ea1b4ad71c78cb",
+                "message": "syz-hub: add package comments"
+            },
+            {
+                "hash": "7ffeb6339c110fdffe8dc1b760173f556be64432",
+                "message": "syz-cluster: add package comments"
+            },
+            {
+                "hash": "3772dab8df9ec4d3ecb2ef80278dabeeda0ae4c7",
+                "message": "sys: add package comments"
+            },
+            {
+                "hash": "ac2c4f6981a040d5ff9bcb9c596d94bae1789f35",
+                "message": "prog: add package comments"
+            },
+            {
+                "hash": "75ee508eb3b022c43d22ba449d04a86f6fd0b7fa",
+                "message": "pkg: add package comments"
+            },
+            {
+                "hash": "0d70707cf79a3dda0ea8da772b111ebcfc102613",
+                "message": "executor: add package comments"
+            },
+            {
+                "hash": "7f64d829792e5b07d3731cf9cfc808b324faf3e6",
+                "message": "dashboard: add package comments"
+            },
+            {
+                "hash": "88a4b44cfbe2284d78829e759139c02094fe9f8b",
+                "message": "pkg/aflow: fix tests for openbsd"
+            },
+            {
+                "hash": "d7643e9798767eda24177ec21e91fbca25bfb555",
+                "message": ".github: check if CHANGES_REQUESTED is addressed for well-shaped label"
+            },
+            {
+                "hash": "76cdc0c08b54a7f468cfd4443cdbf1f8081a6f6d",
+                "message": ".github/workflows: add well-shaped label management workflow"
+            },
+            {
+                "hash": "8e71ce95a6a620090dc52be3f4bad37d33a9172f",
+                "message": "pkg/coveragedb: clean up orphaned functions"
+            },
+            {
+                "hash": "88b240e4b36b29d601c73f9bbb5f9a5d5a6113d8",
+                "message": "dashboard/app: include Signed-off-by authors in To list"
+            },
+            {
+                "hash": "28e2807f4a6a6e73a75609843381795397b81dfb",
+                "message": "pkg/aflow: include Fixes author in patch recipients"
+            },
+            {
+                "hash": "75a1e0a67ad61d98fd6f6fbb0ecde42c5aba10b5",
+                "message": "dashboard/app: preserve Cc list during AI patch iterations"
+            },
+            {
+                "hash": "fcece630c57bf5ca85bc6ae6a3e8c6f4400dc209",
+                "message": "github: optimize stale.yml to process all open PRs ascending"
+            },
+            {
+                "hash": "8a96c0283a82f8e256b2ef3d85b82bde00d4a4cb",
+                "message": "github: add stale.yml workflow to label stale PRs"
+            },
+            {
+                "hash": "aa437a8a479299d8ddbdd0fa32149a09cb4e2d0d",
+                "message": "pkg/aflow: support debug flag"
+            },
+            {
+                "hash": "e0f26b8c18ee2f170d9e606e1c09d350e4a14c4c",
+                "message": "AUTHORS, CONTRIBUTORS: add Alhuda Khan"
+            },
+            {
+                "hash": "b877f0f5956aa74bfe8c1f747e2edb71925c4f9c",
+                "message": ".golangci.yml: enable ST1022 linter"
+            },
+            {
+                "hash": "54967f0a1ffc11be711fd7e0acc4a5c84998257f",
+                "message": "prog: fix ST1022 linter violations"
+            },
+            {
+                "hash": "31a0fbc27dc10dc94c51b03f1775e845142c090f",
+                "message": "pkg: fix ST1022 linter violations"
+            },
+            {
+                "hash": "fc18cd169cce20472bd21bd8990407bfb6993e78",
+                "message": "dashboard: fix ST1022 linter violations"
+            },
+            {
+                "hash": "58bf20964a3d3d824806e70ab8a2e7e053082c9e",
+                "message": ".golangci.yml: enable ST1021 linter"
+            },
+            {
+                "hash": "73433ca22c7fcee945d6aa5b44707c9a5d9fc009",
+                "message": "vm: fix ST1021 linter violations"
+            },
+            {
+                "hash": "3c9e31dbabd3e8c53b97e6eed3d7ce8de401df61",
+                "message": "tools: fix ST1021 linter violations"
+            },
+            {
+                "hash": "d0f790ac1774f0c56cff86ff49b8e96e00423dfa",
+                "message": "syz-cluster: fix ST1021 linter violations"
+            },
+            {
+                "hash": "49618c54248a2d7051ce17ad2b518d7ec78d5a22",
+                "message": "prog: fix ST1021 linter violations"
+            },
+            {
+                "hash": "ac8830388cf79b59c59c7b540d1e8041eb2df469",
+                "message": "pkg: fix ST1021 linter violations"
+            },
+            {
+                "hash": "84d041ce5e5f60aad878771573ea3351a86e9e85",
+                "message": "dashboard: fix ST1021 linter violations"
+            },
+            {
+                "hash": "fe3b31904aa856bf4b83a2f3f610d6445e28b6ba",
+                "message": "tools/clang/codesearch: fetch comments from any redeclaration"
+            },
+            {
+                "hash": "50997935ebc16eb3208b35eaae8407bfd5915e6d",
+                "message": "pkg/aflow: add persistent vm runner api"
+            },
+            {
+                "hash": "2b70b11534044130d6c535e56b6fef2c1f32b649",
+                "message": "mod: bump google.golang.org/genai from 1.58.0 to 1.62.0"
+            },
+            {
+                "hash": "2cb1d4d7bb08d49e6165c46b2e71e2e97c861435",
+                "message": "mod: bump google.golang.org/grpc from 1.81.1 to 1.82.0"
+            },
+            {
+                "hash": "4dfac99a1ad89efb4dd0559887e3806d75392ad5",
+                "message": "dashboard/config/linux: regenerate configs"
+            },
+            {
+                "hash": "96b110fa429ead4a45f65e65566edcc724ca3b60",
+                "message": "dashboard/config/linux: enable XFS_ONLINE_SCRUB and XFS_ONLINE_REPAIR"
+            },
+            {
+                "hash": "96d0474a145da3b5ed0425dab98cdfeffa3f5395",
+                "message": "dashboard/config/openbsd: propose new KASAN configuration"
+            },
+            {
+                "hash": "27192279868f7027c85197e80335f160406d6280",
+                "message": "mod: bump k8s.io/apimachinery from 0.36.1 to 0.36.2"
+            },
+            {
+                "hash": "5fb9973c390c43b029728cb1d8db24edbe4f3949",
+                "message": "mod: bump google.golang.org/api from 0.282.0 to 0.287.0"
+            },
+            {
+                "hash": "e1a1e9228c999970889b1bead29e23886dd6b3ea",
+                "message": "pkg/aflow: sandbox git log in getRecentCommits"
+            },
+            {
+                "hash": "00a5cf1ccaf2b64cb02d51b39f7476b51cd315b2",
+                "message": "sys/linux: add descriptions for mtd and tee subsystems"
+            },
+            {
+                "hash": "0212dbeeeb6b9d3292084cf7441f3ea838c9e4f2",
+                "message": "pkg/report: parse rcu_tasks output"
+            },
+            {
+                "hash": "d98588f5c6d3c4917b0b6fcfe4234226a8147503",
+                "message": ".golangci.yml: enable ST1020 linter"
+            },
+            {
+                "hash": "1d86acc53002d1c404f0ecf63d1b8062d96cdf18",
+                "message": "vm: fix ST1020 linter violations"
+            },
+            {
+                "hash": "2836eca33d99ca0a677e772172a8ef36cc333069",
+                "message": "tools: fix ST1020 linter violations"
+            },
+            {
+                "hash": "d64e1eb892c451f777ed03336bbf887bcc69c6a2",
+                "message": "syz-verifier: fix ST1020 linter violations"
+            },
+            {
+                "hash": "00c9c07a579254e9945ef41f3e126e46092d0ff9",
+                "message": "syz-cluster: fix ST1020 linter violations"
+            },
+            {
+                "hash": "87d702b79acdad7f0d4e66254833ccdf604a0691",
+                "message": "prog: fix ST1020 linter violations"
+            },
+            {
+                "hash": "0e6b3f96d3ac38482ceea81b5f3d2b6f519e3288",
+                "message": "pkg: fix ST1020 linter violations"
+            },
+            {
+                "hash": "2b3dde5649c6f79ed6289833e20a5cf55973a665",
+                "message": "dashboard: fix ST1020 linter violations"
+            },
+            {
+                "hash": "93f579545ae410f5bccfa141d2e7bf03178f036c",
+                "message": "tools/syz-aflow: introduce provider registry for custom backends"
+            },
+            {
+                "hash": "00e8b0fd0d17bb06fe23c0e743356351ada78c22",
+                "message": "syz-agent: support arm32 target"
+            },
+            {
+                "hash": "e5173a01426c08234e63410526af7e7d5c1d45cf",
+                "message": "dashboard/app/aidb: avoid overfetching large columns by introducing LoadNamespaceJobsSummary"
+            },
+            {
+                "hash": "fff8d0a0e302881e84edbe2230016e3bec252ec6",
+                "message": "syz-agent/k8s: configure repro-c to use vertex backend in deployment templates"
+            },
+            {
+                "hash": "3b1e58161f919d1b8522b1ea7e96f69be4c1925b",
+                "message": "tools/syz-aflow: support vertex AI provider option"
+            },
+            {
+                "hash": "0c9f90e3aadcde50f83d4116330be90a3f517527",
+                "message": "syz-agent: support config-driven Vertex AI routing"
+            },
+            {
+                "hash": "3620ef53e0b0543e24c36f177e229199e059dae6",
+                "message": "pkg/aflow/backend/gemini: support explicit credentials config"
+            },
+            {
+                "hash": "991b4a336166ba0cdcdb564caa190d082d85d727",
+                "message": "pkg/aflow: execute git revert with sandboxing in checkout"
+            },
+            {
+                "hash": "6a0c72dc19b6aed338462dcb11d299092801d530",
+                "message": "pkg/rpcserver: inject keepalive requests when VM is idle"
+            },
+            {
+                "hash": "fb92f11c4789d9647a75c09c983dbee5c8488ccf",
+                "message": "pkg/aflow: abstract LLM provider"
+            },
+            {
+                "hash": "7ff32d8bb9773a5f02d3db4c8207fc9251ebedc5",
+                "message": "pkg/aflow/tool/grepper: add instruction for syzlang"
+            },
+            {
+                "hash": "432fd51ab5a4ba9b2e892f55ae7e1e4c2d056026",
+                "message": "dashboard/app: fix missing nsChecked flag in apiSaveCoverage"
+            },
+            {
+                "hash": "cfa969bff9f3680ef7390f34e8af7b6f706deea5",
+                "message": "pkg/aflow, dashboard: support model pools with fallbacks and abstract tiers"
+            },
+            {
+                "hash": "02f4430e29f3e3cd9b105002e3393a649b115024",
+                "message": "pkg/aflow/tool/syzlang: extend coverage retrieval tools"
+            },
+            {
+                "hash": "f387f1bea3b2fd64d113619a1653f76f08172be0",
+                "message": "pkg/cover/backend, pkg/aflow: unify coverage PC offsets"
+            },
+            {
+                "hash": "2e5297c5126f27e51eeef9157f2111c5beb11e4f",
+                "message": "pkg/mgrconfig: validate experimental descriptions_mode"
+            },
+            {
+                "hash": "733394d80f7ebefc67f687c564b759110a3910ee",
+                "message": "pkg/aflow: support auto-generated syscalls during crash reproduction"
+            },
+            {
+                "hash": "a06ce3a99a62327594d19db212a79a8d74d7a6eb",
+                "message": "pkg/mgrconfig: export descriptions mode constants"
+            },
+            {
+                "hash": "b6ab7a56e645a007f58c804f9bea5e244fe6bc40",
+                "message": "pkg/csource: make reproducers exit if setup fails"
+            },
+            {
+                "hash": "c29d36b1067075f1929909ef84fa3721123c6bd9",
+                "message": "dashboard/app: limit global emails per hour"
+            },
+            {
+                "hash": "5a874a98406dfcda499d015696dd30801bf7cf7e",
+                "message": "dashboard/app: reduce AI jobs per page to 300"
+            },
+            {
+                "hash": "8910d0ff0e3aa4f9064d7163c1f8434467a7433d",
+                "message": "dashboard/app: use cached manager list on AI jobs page"
+            },
+            {
+                "hash": "302586aac8eb2d97d48f9f3562b98d4c182e75d0",
+                "message": "dashboard/app: refactor router to use Go 1.22 exact matches"
+            },
+            {
+                "hash": "41d336f1e924c0ab3c81b2b644e65a9d756190ee",
+                "message": "dashboard/app: remove legacy coverage redirect routes"
+            },
+            {
+                "hash": "c1da772e0d2df8f734dddb8332553b2e56e2d9d9",
+                "message": "syz-hub: use constant-time comparison for manager key"
+            },
+            {
+                "hash": "042555ffe14267d052b29fd8fea4f504d66e740a",
+                "message": "pkg/instance: support specific repeat count in ExecprogCmd"
+            },
+            {
+                "hash": "e30e5c89d137d970da183ffdc275130a55fdd832",
+                "message": "dashboard/app/aidb: add indexes to speed up AI job lists"
+            },
+            {
+                "hash": "ac0421d60633fc90c121eb027f43abea2db01a9e",
+                "message": "pkg/instance: retrieve coverage via SSH cat"
+            },
+            {
+                "hash": "4b1d8f01c9e0cf11ef8c62237b340925f957cd82",
+                "message": "pkg/execbackend: skip TestRPCBackendLocal when compiler is broken"
+            },
+            {
+                "hash": "36faab20efd417e2f41d35311544bebb8e3af80e",
+                "message": "pkg/aflow: query the historical context during bug patching"
+            },
+            {
+                "hash": "757cbda17c2398f10497729b818ff73078bb67c5",
+                "message": "pkg/aflow: add a since parameter to the git log tool"
+            },
+            {
+                "hash": "5a630be623a83f54a0e7a5a72d78827acdc85248",
+                "message": "dashboard/app: cache AI pending patches query"
+            },
+            {
+                "hash": "69b85378831ae25fc10bad0312c8ee12b0c0bc09",
+                "message": "syz-cluster/pkg/blob: handle gcs FileWriter Close errors"
+            },
+            {
+                "hash": "49edfe7354d377c18bb26b0006c913a68d32e85b",
+                "message": "syz-cluster/pkg/blob: add backward-compatible gzip compression for GCS blobs"
+            },
+            {
+                "hash": "72e4c589caf2279db929a06a8ee46e5e9070a657",
+                "message": "pkg/aflow: preserve recent chat history during compression"
+            },
+            {
+                "hash": "db2049fc9750d95d9f5515e2c12fa49b7fb90925",
+                "message": "pkg/aflow: remove summary window"
+            },
+            {
+                "hash": "2aa4d605a75c67f0e5e5c835ae7ddd9f4f02e694",
+                "message": "pkg/aflow: move compression prompt to a const"
+            },
+            {
+                "hash": "ab2703f0f926e53fddd80515fab219508edbcb4f",
+                "message": "tools/docker: update rust and bindgen"
+            },
+            {
+                "hash": "43bfcdb07c3552e4664e1029672054ac0924d543",
+                "message": "pkg/aflow: convert model configurations to ModelType enum"
+            },
+            {
+                "hash": "17ed995a85fa2bac92bcaf33a1738dfb8a6f8835",
+                "message": "pkg/aflow: validate Linux kernel config names"
+            },
+            {
+                "hash": "de47387f4f65a439a96d0c42ac78109429f05de2",
+                "message": "syz-cluster: take focus symbols and kernel configs from the AI workflow"
+            },
+            {
+                "hash": "bc8a0fa077a9a4be0feae06b8d0bd0358a70e77f",
+                "message": "syz-cluster: evaluate with AI during triage"
+            },
+            {
+                "hash": "e59d2b2976ab611f07cf16674724135e16f1e046",
+                "message": "syz-cluster/overlays: disable name suffix hashing for global config"
+            },
+            {
+                "hash": "cb27acd2c53fb26e04e7b38c1bcda93eb0ca93b6",
+                "message": "pkg/aflow/flow: implement a patch triage workflow"
+            },
+            {
+                "hash": "023e42b533e586523329e56d8cc833583d338ca9",
+                "message": "sys/linux: add Landlock quiet fields and flag"
+            },
+            {
+                "hash": "12d77ac4c6e1ea7dd2987a4834992199e8bc75cd",
+                "message": "sys/linux: add Landlock UDP access rights"
+            },
+            {
+                "hash": "570c59ee195f455b477427e5f8708fcd74e66b26",
+                "message": "vm/dispatcher: prevent launching jobs with canceled context"
+            },
+            {
+                "hash": "259b7ef274856e8db0c00b1b79b4041492e17370",
+                "message": "pkg/aflow: explicitly pass model to generateContent in llm_agent"
+            },
+            {
+                "hash": "d7ffd47b8f76bd5cf05ca432102140d6c277a065",
+                "message": "pkg/execbackend: delay instance creation until after VM setup"
+            },
+            {
+                "hash": "624a40ad89300a5e00c361d28d9254af7d34adf2",
+                "message": "pkg/spanner: unify Spanner client abstraction and switch to emulator-based testing"
+            },
+            {
+                "hash": "24486521e841016092c2967aa4c1f4c16238080e",
+                "message": "pkg/report: make guilty extraction conditions more precise"
+            },
+            {
+                "hash": "a776b0d0187ac8d9164ce8dd3cccef9d3284348a",
+                "message": "AUTHORS: add myself to authors"
+            },
+            {
+                "hash": "3454dfc642682784c69f20c40bb9989087bd8b67",
+                "message": "sys/linux: extend and improve io_uring syzkaller grammar"
+            },
+            {
+                "hash": "b62b3ded1759f79b37600c5ffe2b0a81b919b0b0",
+                "message": "executor: replace all SYZFAIL occurrences with NOTFAIL"
+            },
+            {
+                "hash": "9407e6c3c4eebb9abeac1eecd34a746e797617b8",
+                "message": "pkg/execbackend: add RunLocal testing helper and rpc test"
+            },
+            {
+                "hash": "fc63d12544ba035dfd34458dd43782f499d3aff0",
+                "message": "pkg/execbackend: add a common interface for execution backends"
+            },
+            {
+                "hash": "b9ded48f6b2d3a40bc5f85893ec36c196b4f17a6",
+                "message": "pkg/rpcserver: add SetSource and Features methods"
+            },
+            {
+                "hash": "62cc6db33feb828eeda65dcf8749b4674ccd5246",
+                "message": "Revert \"pkg/aflow: add defensive authorization context to prompts\""
+            },
+            {
+                "hash": "5079255ab08741f523d65dec2b2423c2f1dca5f0",
+                "message": "Makefile: add aflow target"
+            },
+            {
+                "hash": "0e4b3e40a4572a10f991eaf3b70977db43e1fa9b",
+                "message": "pkg/aflow: add defensive authorization context to prompts"
+            },
+            {
+                "hash": "f2ad6bb5fb4fa8036512050c9bd421c105bf65e6",
+                "message": "syz-agent: enable nested virtualization in prod QEMU args"
+            },
+            {
+                "hash": "75845eae53844909345156f494e5029313515357",
+                "message": "pkg/aflow: prevent repro-repairer from generating dummy code"
+            },
+            {
+                "hash": "a3998659b7708702d93947fbc3c1b063ab5fd82c",
+                "message": "tools/syz-aflow: add -output flag to save workflow results"
+            },
+            {
+                "hash": "50bb0618cd2f9cd819534368fff82367c1681dab",
+                "message": "dashboard, coveragedb: log deleted sessions and rows in batch_coverage_clean"
+            },
+            {
+                "hash": "96439b3b14ea6183f312f159417c736ebe964bc6",
+                "message": "github/workflows: update actions to fix Node 20 deprecation warnings"
+            },
+            {
+                "hash": "c700a26e3167d1fb6f7ba7a63bffe89404d3e888",
+                "message": "dashboard/app: unescape AI job error page in test"
+            },
+            {
+                "hash": "38e5db28b69d8d6ed071b967134811cf74880c68",
+                "message": "dashboard/app: remove redundant AI job error condition"
+            },
+            {
+                "hash": "e3a60c40385b516ece04da2aa54ccbc01ef4f6f8",
+                "message": "dashboard/app: keep AI job list errors summarized"
+            },
+            {
+                "hash": "b9ad189c74bab27d67088c50530a3bd09789e177",
+                "message": "dashboard/app: improve AI job error display"
+            },
+            {
+                "hash": "682d793afa6ad76c38481a558933fe7e8c47c934",
+                "message": "dashboard/app: bound AI job errors in list views"
+            },
+            {
+                "hash": "891458e733df02170b0fe36704901f90727bc7a9",
+                "message": "dashboard/app: store full AI job errors"
+            },
+            {
+                "hash": "4da592cab66c294f17912d0bcf60df9abf4fa193",
+                "message": "pkg/cover: normalize coverage paths during collection"
+            },
+            {
+                "hash": "4f06757f683a802254a4c8edbfe67ff801904c5e",
+                "message": "pkg/aflow/flow/assessment: classify info leaks as exploitable"
+            },
+            {
+                "hash": "1d2f35898f2e0325486423250d5303b6bc05adcd",
+                "message": "dashboard/app: remove Ext Bug ID column from the job list"
+            },
+            {
+                "hash": "7a10305784d41af449309db36632b233a6c1dd0c",
+                "message": "pkg/aflow: parameterize codeexpert to conditionally disable git tools"
+            },
+            {
+                "hash": "d1880c0fde5563a2927dd477bceabf692f714817",
+                "message": "dashboard/app/aidb: optimize slow spanner queries for ai jobs"
+            },
+            {
+                "hash": "8f6cdf3b0c5ccbe6d9b467d123a719ba8699cfe8",
+                "message": "dashboard/app: dynamically fill missing job args for agent polling"
+            },
+            {
+                "hash": "fd2237038409e56681b47ef725a4cef9de467ff4",
+                "message": "pkg/aflow: extract file-based code search tools"
+            },
+            {
+                "hash": "7be99fc0a8ea6ddd946d38efe8b8b34ae503e2b9",
+                "message": "tools/clang/declextract: fix enum extraction for clang-22"
+            },
+            {
+                "hash": "8f35b583c89064fd2cc7a8f2ac6d75273f17635d",
+                "message": "dashboard: add .gcloudignore to speed up App Engine deployments"
+            },
+            {
+                "hash": "e93da63ed6ba87a9ef8835f04db8cb56ef726d19",
+                "message": ".gitignore: ignore .agents directory"
+            },
+            {
+                "hash": "a19d6d0824f5e7a9dd2b90d90635306f7c8d4ee5",
+                "message": "tools/clang: support clang-22"
+            },
+            {
+                "hash": "137410f126fdb85b0c0a349ec9d5448456493e1a",
+                "message": "tools/docker: switch to clang-22"
+            },
+            {
+                "hash": "7bc2b845a2f03fbe714def53cf1de94ae5ba9057",
+                "message": "syz-cluster: compact the web interface"
+            },
+            {
+                "hash": "c2785bda6ac61bde2126961f0f9ac744cc9b53c7",
+                "message": "dashboard/app: add optional ExternalBugID to AI jobs"
+            },
+            {
+                "hash": "d93a6ab6ed29ab62226c0e5e77958854e7937415",
+                "message": "pkg/manager: validate redirect target in httpAction"
+            },
+            {
+                "hash": "b754d2d8e960366b9e215bebd742b433833628e1",
+                "message": "pkg/vcs: dynamically bound commit search by date"
+            },
+            {
+                "hash": "416ea548b956322d21a679fe8e300a65581814ce",
+                "message": "dashboard: add TargetArch dropdown for repro-c jobs"
+            },
+            {
+                "hash": "f79bac11032a7f8d1665ea9b593cdc3329e64064",
+                "message": "tools/clang/codesearch: fix tracking context for global variable initializers"
+            },
+            {
+                "hash": "34dab4be5c118c76aea929f2aa0c188548615110",
+                "message": "vm: fix blocking select on nil outc channel in instance.Run"
+            },
+            {
+                "hash": "c36c07f6c1f2230a36374cbd22235f635e8f9284",
+                "message": "pkg/aflow/action/crash: validate and propagate TargetArch in RunCRepro"
+            },
+            {
+                "hash": "656e94c64cf6d2cf6e13f9bbe93a03e73688e3ba",
+                "message": "pkg/aflow/flow/reproc: feed back C code and logs into generator prompt"
+            },
+            {
+                "hash": "13b890387c90b3b1b72c2476067f302e1df04eb5",
+                "message": "pkg/aflow/flow/reproc: prevent compiler checks and handle missing codebase files"
+            },
+            {
+                "hash": "df65c052de1c2e62e773d97ea49b9bcb94bfcab4",
+                "message": "pkg/aflow/tool/codeexpert: restrict filename guessing and broad searches"
+            },
+            {
+                "hash": "cc0956393c53a7771406d126236893fae27c3e27",
+                "message": "pkg/coveragedb: optimize DeleteGarbage via Go-side filtering"
+            },
+            {
+                "hash": "48b6c3fa84d531c185b32c61b398868ce5a90cde",
+                "message": "pkg/aflow: refactor coverage caching"
+            },
+            {
+                "hash": "197909be84fb372381af6fab3a7be03a06f9f7d1",
+                "message": ".github/workflows: suppress Python warnings globally"
+            },
+            {
+                "hash": "96463d10cbad8e13c54ac2bc9a9de2d7c5b14f2a",
+                "message": "dashboard: add button to restart failed AI workflows"
+            },
+            {
+                "hash": "be4246033da2cf2afe7e1cb710d33496687ef799",
+                "message": "pkg/instance: fix select race on context cancellation"
+            },
+            {
+                "hash": "79fa8e14eab3887cfdbd5df7f9ee145c0c1c17bb",
+                "message": "pkg/aflow: improve commit description instructions"
+            },
+            {
+                "hash": "08ab31164c55f20c7a2653de3186ae333470e2c1",
+                "message": "syz-cluster: fix local kernel fetcher SA permissions"
+            },
+            {
+                "hash": "effda7f9de25038cc08e68b6cd8ef1d9b02772aa",
+                "message": "pkg/fuzzer: use JobType constants for UI stat links"
+            },
+            {
+                "hash": "28a0e909a75bc2255460a4bdba5151efe5a7a2d1",
+                "message": "syz-manager: separate candidate triage jobs in the UI"
+            },
+            {
+                "hash": "13a480e4a3dea8bd1c83796b6552cd77813d46bb",
+                "message": "pkg/aflow: embed timezone data to prevent initialization panics"
+            },
+            {
+                "hash": "afebce35778881f61835e09b836fd9f01066ed6c",
+                "message": "pkg/instance: introduce runStreamAndCollectStdout helper"
+            },
+            {
+                "hash": "234057e589a07c3df6644ecb3a68a817d9aa6824",
+                "message": "pkt/flatrpc: avoid assuming we can connect to 0.0.0.0 or ::"
+            },
+            {
+                "hash": "6ee22bbd377e67eb22d5956735d3914fa7dba374",
+                "message": "tools: don't run check-syzos.sh when cross-building"
+            },
+            {
+                "hash": "767c5f2e09dc3ba17c175ff7fbd9fe1f221cd143",
+                "message": "pkg/aflow: make git log regex error checks less strict"
+            },
+            {
+                "hash": "57956ce05fe6335c65be5a65a39c4f548328cb07",
+                "message": "pkg/image: check for errors from osutil.SandboxChown()"
+            },
+            {
+                "hash": "4c5ff20718e221501c9aeb397a0d1a76c8447400",
+                "message": "pkg/kcov: mark cdefs.go as linux-only"
+            },
+            {
+                "hash": "8dd01ae4742e8108ac73e0575bd681347eae7c92",
+                "message": "tools/check-html.sh: avoid depending on wc(1) output formatting"
+            },
+            {
+                "hash": "505b6863dd31043d0de5eff4b08c6650c4e9b3c6",
+                "message": "tools/syz-imagegen: only build on Linux"
+            },
+            {
+                "hash": "61938c7772ef0835015f094002013044ffa3d5a0",
+                "message": "executor: placate clang analysis"
+            },
+            {
+                "hash": "c069a1c852a31f18af1a1869261c64b0785529bb",
+                "message": "tools: run check-k8s.sh only on Linux"
+            },
+            {
+                "hash": "1623904fcd191d68e71ddb1088bc1d506ec74d01",
+                "message": "tools: add a script to create freebsd GCE images"
+            },
+            {
+                "hash": "199971f4d1f8167bfdbe6370c340d4752b829826",
+                "message": "dashboard/app: avoid syzbot context-addressed email replies"
+            },
+            {
+                "hash": "3c0d21318d6dfab26815664c8ad20eaac007b3f3",
+                "message": "pkg/aflow: embed images for gce"
+            },
+            {
+                "hash": "1712ec0dfd02a2c14ef8a3b72329dd8bbf1f480f",
+                "message": "syz-agent: mount /dev for the agent pod"
+            },
+            {
+                "hash": "07f562ebfb34a23a8c9856148adf23ad034624ea",
+                "message": "pkg/aflow: append necessary boot parameters for arm64 on GCE"
+            },
+            {
+                "hash": "60ef66e8001c5678f2b9469641427ac1686e7ae1",
+                "message": "pkg/aflow: enforce gzip for amd64 kernel builds"
+            },
+            {
+                "hash": "3b7f8244aca191508be7957db627e33beddd9b67",
+                "message": "pkg/aflow: sandbox git commit operations"
+            },
+            {
+                "hash": "aa094161169165b9374ba889b0089dd578820bbd",
+                "message": "syz-agent: support multiple target architectures"
+            },
+            {
+                "hash": "7984ece27b99cbfd7d0adf99672fc1a277b62b7f",
+                "message": "pkg/aflow: propagate AgentName to reproduction environments"
+            },
+            {
+                "hash": "aff979495a811d63a438e2f159dea63d48d6776a",
+                "message": "pkg/aflow: support dynamic target architectures"
+            },
+            {
+                "hash": "df01873fe2c3c7f1801498630c966d94088fb2ce",
+                "message": "syz-agent: enforce target config and validate jobs"
+            },
+            {
+                "hash": "af94a9378f880010de87de3cf4f0f236b8da35b7",
+                "message": "pkg/aflow: document new state variables in GEMINI.md"
+            },
+            {
+                "hash": "0211d64cbf0d7f0eec9c0077127ddc52044418c1",
+                "message": "pkg/aflow/flow/reproc: fix runaway reproducer loop"
+            },
+            {
+                "hash": "62fe15281f5011cd203d8845b8767b10e7443aa5",
+                "message": "pkg/email: fix SMTP envelope recipient syntax"
+            },
+            {
+                "hash": "ae6ecad1f3c10664c0839786b67fad4c2d56af4b",
+                "message": "pkg/email: fix SMTP header injection vulnerability"
+            },
+            {
+                "hash": "1095583bae1d2729a3b4be301cb6ddc85ced9e38",
+                "message": "pkg/report: parse int3 oops reports"
+            },
+            {
+                "hash": "386cc6dacdf7e3ebce9507beed6755d7e999554d",
+                "message": "vm/vmimpl: rename Boot/InfraError methods to Details"
+            },
+            {
+                "hash": "14befbc895c5b0a73d91436d0b19fc6cd5e09e82",
+                "message": "all: apply modernize linter"
+            },
+            {
+                "hash": "cd2e08e1e4068c56b927ac6fca7d3b913de0c4b0",
+                "message": "vm: remove Boot/InfraErrorer interfaces"
+            },
+            {
+                "hash": "80722e52c71b4c4eb1aaf68bc912fc2e916b247c",
+                "message": "tools/syz-linter: enable few more standard linters"
+            },
+            {
+                "hash": "e969730f016d8525435bd5c7aa52fc14f638d8b4",
+                "message": "vm: preserve raw stdout streams"
+            },
+            {
+                "hash": "1b6d1710d13b61fd94f666d6e24a6c7f51aca488",
+                "message": "mod: bump github.com/modelcontextprotocol/go-sdk from 1.6.0 to 1.6.1"
+            },
+            {
+                "hash": "33613e1daf8f7237ba1cc23f4958675bf7791bbc",
+                "message": "mod: bump google.golang.org/genai from 1.57.0 to 1.58.0"
+            },
+            {
+                "hash": "abc2c75f37cb3c3443cb76c5d51fe15ce95bfc0a",
+                "message": "Makefile: add deadcode tool"
+            },
+            {
+                "hash": "d4aa7d189f1e9fcece45cb4bb8fc10be5b572146",
+                "message": "all: remove deadcode"
+            },
+            {
+                "hash": "06348f16ee32ed9b7f1800507234979ce3034bd0",
+                "message": "dashboard/app: enforce authorization for AI commands"
+            },
+            {
+                "hash": "8d8eeb3a2696f534b6c5303e0280062d2d68152b",
+                "message": "mod: bump google.golang.org/api from 0.280.0 to 0.282.0"
+            },
+            {
+                "hash": "6b4a844333e83556da95d61d7f207e7ef5cd4bc6",
+                "message": "pkg/lore-relay: ignore commands on DKIM failure"
+            },
+            {
+                "hash": "a3d70215e2696bdbb35676a7e84ed3a0befaa799",
+                "message": "pkg/aflow/flow/assessment: move moderation instruction to markdown file"
+            },
+            {
+                "hash": "ddbf737565174c7fbe9e8aeda2fea6c68ddc5177",
+                "message": "pkg/aflow/flow/assessment: move security instruction to markdown file"
+            },
+            {
+                "hash": "abbf955f407d7a03f16ec12fb3d856eda6cbc832",
+                "message": "pkg/aflow/flow/assessment: move kcsan instruction to markdown file"
+            },
+            {
+                "hash": "7369daad2c64fd5ba80e17fa41ec9f7d45d6dab4",
+                "message": "pkg/aflow/flow/common: add Prompt helper for centralized prompt management"
+            },
+            {
+                "hash": "4624854e8e4b89837c88de7c05b77b349fed11e2",
+                "message": "vm/bhyve: enable running as an unprivileged user"
+            },
+            {
+                "hash": "d3fdcbcec233ac628c73de8b5d62eb26e178521a",
+                "message": "sys/syz-extract: improve extraction of FreeBSD definitions"
+            },
+            {
+                "hash": "e0451e7caa5a0c83ef434ab105a0ce25014acfbd",
+                "message": "sys/freebsd: avoid referring to kernel constants"
+            },
+            {
+                "hash": "a8a9b22d76f5c0a06dc8539769eeff9b0d8118c0",
+                "message": "sys/freebsd: add definitions for compat group syscalls"
+            },
+            {
+                "hash": "8c4c9c077288de5518ba1e69802efb496df63c2c",
+                "message": "sys/freebsd: remove unneeded definitions from dev_pass.txt"
+            },
+            {
+                "hash": "8573be0d3f7ed712fe750cae21699aef34e298a4",
+                "message": "sys/freebsd: don't include sys/ksem.h"
+            },
+            {
+                "hash": "e192f79d62ceb39a3a86a202dca794ef3859235d",
+                "message": "sys/freebsd: remove SF_SYNC as it is gone upstream"
+            },
+            {
+                "hash": "f18e420da56570016b73a332ea416c1bd055ab84",
+                "message": "sys/freebsd: update constants"
+            },
+            {
+                "hash": "627ea74c4e49ddfb1dc5acdc34d2b6dbede1e850",
+                "message": "sys/freebsd: add definitions for procdescs"
+            },
+            {
+                "hash": "0fdf6192c4a400a44b6b736a292b032ba93e5ae6",
+                "message": "dashboard/app: prevent infinite email loops and spurious errors"
+            },
+            {
+                "hash": "f258cf74ffe66dd2ad265413fe138dc66c53a363",
+                "message": "dashboard/app: include target os and arch in ai jobs"
+            },
+            {
+                "hash": "789f4dd7b4fa8f5458d4125f030564f02720d877",
+                "message": "pkg/aflow: cherry-pick one more fix commit"
+            },
+            {
+                "hash": "681715f74bb0336b03b19c4f49b801377b513113",
+                "message": "dashboard/app: allow manual triggering of AI patch iterations"
+            },
+            {
+                "hash": "9a5a7e5e39ff36e3d755c5122d89fa8d83e03542",
+                "message": "all: add Gemini instructions for commit tags and lowercase descriptions"
+            },
+            {
+                "hash": "12e1b29a2558e77ee490b9e3c62abb5ab92f9863",
+                "message": "pkg/aflow: reset tool history counters when context is compressed"
+            },
+            {
+                "hash": "45fe9f93814549a954c1bb9ad2e24bb8f92c95c5",
+                "message": "pkg/aflow: implement loop prevention with hard limits and visible warnings"
+            },
+            {
+                "hash": "2763dbe3babdc31934bb693d82edab18c7693c89",
+                "message": "pkg/aflow: explicitly fetch tags for RC base commit"
+            },
+            {
+                "hash": "b6985d9ce25d5a87e8d07cb0c9c20ac3dcd00a76",
+                "message": "pkg/aflow: replace Poll with CheckoutBranch in base commit resolution"
+            },
+            {
+                "hash": "086c700e7f40b66c9187b532a2bf43f40195ef0c",
+                "message": "pkg/aflow: refine compression prompt"
+            },
+            {
+                "hash": "6490ad0158eb0683c3819cf79e770f932fc313a0",
+                "message": "pkg/aflow: reduce LLM compression limit"
+            },
+            {
+                "hash": "4c36e7e5af0b44526488f2f06f10f4aca224e6d6",
+                "message": "pkg/aflow: gracefully handle null elements in slices"
+            },
+            {
+                "hash": "6a297da6fac17576e8b6fb7bdea1af73e18ef8e1",
+                "message": "pkg/aflow: fix error types for maps and slices"
+            },
+            {
+                "hash": "33d8a07b060838ca0508e1f0b50b7919286e757f",
+                "message": "sys/linux: fix Mali KCPU queue pointer type"
+            },
+            {
+                "hash": "74160f14eddd87b4a032390ba42753033232d227",
+                "message": "AUTHORS, CONTRIBUTORS: add kiwigitops"
+            },
+            {
+                "hash": "56a3c3e4824eb1acd5fbec1e02523000ceea6fb8",
+                "message": "syz-agent: use a short ai doc link"
+            },
+            {
+                "hash": "87a9cde3ff368b3252ba335a0bd28b9f08a8f953",
+                "message": "sys/linux: add specialized munmap calls"
+            },
+            {
+                "hash": "26b7fc22a8a1e2dc3d720673b9eb74aeeadfe55a",
+                "message": "pkg/report: add tests for special cases of hung task output"
+            },
+            {
+                "hash": "35ef8bf9d1d53324efb179712c83fae411f21040",
+                "message": "pkg/report: allow newlines in task name"
+            },
+            {
+                "hash": "ab431fdbf802614963f4817a39313774967256a6",
+                "message": "pkg/report: optionally capture I/O wait string in hung task output"
+            },
+            {
+                "hash": "e562d1a1a07a1b64dc24202d83a6b2e099d925ea",
+                "message": "pkg/report: ignore oopses followed by printk replay"
+            },
+            {
+                "hash": "8536b40b1cb9f8a9ceb44fd3766e699d58e4d59a",
+                "message": "pkg/aflow/tool/grepper: cap matched lines to 200 characters"
+            },
+            {
+                "hash": "32c9e46451e1ff0441a818d63acb6e81a08b0a44",
+                "message": "pkg/aflow/tool/grepper: support PathPrefix argument"
+            },
+            {
+                "hash": "ab27540e270e9ad3b32051bbbf87b9f0dbe83bb7",
+                "message": "pkg/aflow/tool/gitlog: return soft errors in git-show"
+            },
+            {
+                "hash": "6655173c8f8f5b80748830c46ea8f7a44ff1bd88",
+                "message": "pkg/aflow/tool/gitlog: extract runGit helper for executing git commands"
+            },
+            {
+                "hash": "8777bdc366ea6046a90c68a04596a131c29e8c29",
+                "message": "pkg/aflow: commit backports before shallow clone"
+            },
+            {
+                "hash": "9f1b3d735f8bdf89fe5a6a1726fa90bd0be77eb1",
+                "message": "pkg/vcs: fetch missing backport commits dynamically"
+            },
+            {
+                "hash": "ea13f1c0760b676aab65738cc33552d091e27ecd",
+                "message": "pkg/aflow: apply essential linux backports during checkout"
+            },
+            {
+                "hash": "28ae5c030a1cb092b758fc1ddc2eec3e0528f9b2",
+                "message": "pkg/vcs: export BackportCommits for external use"
+            },
+            {
+                "hash": "4c96d2aea8ced262d48f5132b3fc8d58aba29ed6",
+                "message": "pkg/vcs: fetch backport commit titles dynamically"
+            },
+            {
+                "hash": "769cbc61c319c0a8a96be11623a7b362e2290b35",
+                "message": "dashboard/config/linux: enable BLK_DEV_UBLK"
+            },
+            {
+                "hash": "6d21840b4f5df254b21174f770a4a3af34b81b91",
+                "message": "tools/syz-kconf: print verbose error messages"
+            },
+            {
+                "hash": "cd9726afaaf191439d1e1e434c9e499d1b96f46a",
+                "message": "pkg/aflow/tool/gitlog: fix handling of invalid grep expressions"
+            },
+            {
+                "hash": "cb4e87ff75dba55de534689f81ff0e642486f80e",
+                "message": "pkg/aflow: make LLM tool reply after reaching max iter limit"
+            },
+            {
+                "hash": "66c5273acaf703a3edf99db76bea37984c0b1c15",
+                "message": "pkg/aflow: improve DoWhile error message"
+            },
+            {
+                "hash": "2b01f00eb6f21b4f227c78c2e10ecec55f5e7d76",
+                "message": "dashboard/app: simplify autoCreatePatchIterationJobs"
+            },
+            {
+                "hash": "73d439903718e6d2ecd9eff1d69ecf75496d6b5b",
+                "message": "pkg/vcs: extend output when tag parsing failed"
+            },
+            {
+                "hash": "de7daf20713a93383cd8d89448818073bdfaf22f",
+                "message": "sys/linux/dev_uinput: improve descriptions"
+            },
+            {
+                "hash": "d2728b3612feba02600f5577d5e83b59aa6745a3",
+                "message": "AUTHORS, CONTRIBUTORS: add Peiyang He"
+            },
+            {
+                "hash": "108117b68d3bbbfa8f7c19f6c3f2bb2a4d8a2250",
+                "message": "dashboard: organize AI job outputs in a table"
+            },
+            {
+                "hash": "76d4b4b1b168407cf701ec594f642e93a00ce699",
+                "message": "dashboard/app: prioritize AI patch iteration jobs"
+            },
+            {
+                "hash": "d1038cd5a546fa3cbd865e43c022a319f5bb85c5",
+                "message": "sys/linux/namespaces: describe listns"
+            },
+            {
+                "hash": "06f19017bfb9afabf59d5478a7b47ee43cfce3bd",
+                "message": "dashboard/config/linux: update generated configs"
+            },
+            {
+                "hash": "8f3eb7b7e7659eb04053fb6800a4f3e68ecf5def",
+                "message": "dashboard/config/linux: enable more configs"
+            },
+            {
+                "hash": "ba4f9a2d6ea862282ee5d1a63ec9b7be3db3660d",
+                "message": "dashboard/config/linux: enforce BOOTPARAM_SOFTLOCKUP_PANIC and extract to lockup.yml"
+            },
+            {
+                "hash": "fb7661db575ccb552e8f60fadd1abadc80dbd81c",
+                "message": "dashboard/config/linux: update tags and config fragments for v7.1"
+            },
+            {
+                "hash": "3e7b7db211c822f673d8ea2175c657604fc1dfb1",
+                "message": "parser: support 'y' property in syz-kconf"
+            },
+            {
+                "hash": "924d77bbaa6148cad4e40e98317efa8f4ae6075d",
+                "message": "pkg/kconfig: support 'if' in 'depends on' statements"
+            },
+            {
+                "hash": "7fc0b26aece2d812db12d14571c73ad4a8ed4d59",
+                "message": "docs: add guidelines for kernel config updates"
+            },
+            {
+                "hash": "a3e4727697ee625e3000e7bfefe9cbbe71bcd13c",
+                "message": "pkg/aflow/action/crash: refactor TestPatch to support multiple steps"
+            },
+            {
+                "hash": "2b0043b47f46a6826d6099cbb2c9f46bb4271709",
+                "message": "dashboard/app: refactor repetitive AI job setup and completion in tests"
+            },
+            {
+                "hash": "132583654a419a232c1dd267a586abc5706de018",
+                "message": "pkg/aflow: use default values for testFlow"
+            },
+            {
+                "hash": "e85786239600958a6d41dc9dec0e9fd76243d4a8",
+                "message": "pkg/aflow/flow/patching: increase patch description length to 75 columns"
+            },
+            {
+                "hash": "99493f702448b3e78e64367ea99bda568eae2e86",
+                "message": "pkg/aflow/flow/patching: use validated LLM reply to format patch description"
+            },
+            {
+                "hash": "070e86f6509b058f4f86fcea1e81eee6d0bbeecd",
+                "message": "pkg/aflow: allow to validate/fixup LLM replies"
+            },
+            {
+                "hash": "6f82eb5db759f99da2c000baf4c0880f56a611f5",
+                "message": "pkg/aflow/tool/codesearcher: always include line numbers"
+            },
+            {
+                "hash": "209680db720185131dd5cd799dcaf292b731b473",
+                "message": "pkg/aflow/tool/codesearcher: make read-file return only up to 100 lines"
+            },
+            {
+                "hash": "c69befb30ac10e158cc9d1557b508ee3f0eca1de",
+                "message": "pkg/aflow: don't ValidatedLLMOutputs State generic arg"
+            },
+            {
+                "hash": "0f6738b581721d84468ce9b24b696e4d3539a333",
+                "message": "dashboard/app: make AI patch iteration debounce configurable per stage"
+            },
+            {
+                "hash": "d8215110b4cce9818d615df7a1f9a8e3eefe4265",
+                "message": "dashboard/app: refactor SetAIConfig test helper"
+            },
+            {
+                "hash": "dc084f9fd2d0d28195e44a8c5f80a83d69f37ffb",
+                "message": "dashboard/app: stop AI job patch iterations for rejected jobs"
+            },
+            {
+                "hash": "df8ac09c914d5408499c5695877a3e0e31969e6f",
+                "message": "dashboard/app: display AI job chain on per-job pages"
+            },
+            {
+                "hash": "4e20e72f8ce74e89ab83e371c8eeb304da93be42",
+                "message": "pkg/aflow/flow/patching: use Consts instead of a custom action"
+            },
+            {
+                "hash": "d7722bbab93a41cfa9e281ee467545a7cdea88cb",
+                "message": "pkg/aflow/flow/common: add package with common helpers"
+            },
+            {
+                "hash": "dc2f21658d8729228ae6d965e6c986be5f8bb7ca",
+                "message": "pkg/aflow/flow/patching: refine description instruction based on checkpatch recommendations"
+            },
+            {
+                "hash": "2106b0b8f7fd15425eb263c6429bbe02d07956f1",
+                "message": "pkg/aflow: support explicitly resending unchanged patches"
+            },
+            {
+                "hash": "5f091fcc8b11f7567d71ed9c0b61fce2c281e033",
+                "message": "pkg/aflow: add generic auditing and diagnostic guidelines to reproc"
+            },
+            {
+                "hash": "ac1d1134ec9081a01a610b5dd7296d14023b5875",
+                "message": "k8s: fix kustomize deprecations"
+            },
+            {
+                "hash": "6060b323c1d4dde348c76067e23caeab1b2995bc",
+                "message": "dashboard/app: implement bidirectional cursor-based pagination for AI jobs"
+            },
+            {
+                "hash": "e16cf9f3e7b34e065349e4e51d3f1bea684100a1",
+                "message": "vm/gce: check if instance is running after a failed copy"
+            },
+            {
+                "hash": "70287cd76c7bd5762893a20990df5e9aa8a8e348",
+                "message": "vm/gce: avoid deleting preempted instances"
+            },
+            {
+                "hash": "92f60af370dd3b875b39b249c0540cccf31aa54a",
+                "message": "pkg/gce, vm/gce: dynamically prioritize zones based on preemption stats"
+            },
+            {
+                "hash": "f1b41fd45b361c007981a4d6c444b757668ab9d4",
+                "message": "pkg/repro: retry execution on infrastructure errors"
+            },
+            {
+                "hash": "4e51b861799e7e141692aaa5cd629a8f4a2d9b3f",
+                "message": "syz-manager: log when VM is preempted"
+            },
+            {
+                "hash": "60d190e735d65d88b8ce47a1d8e4da2193d31f23",
+                "message": "vm: introduce ErrPreempted to handle preempted instances"
+            },
+            {
+                "hash": "fbbd21af55c5ad571f5fe14e9b4f9cc191225819",
+                "message": "pkg/aflow: prevent agents from interrupting human discussions"
+            },
+            {
+                "hash": "95d902552bd6262a6e7223f9c515471cfa5bf200",
+                "message": "syz-cluster: add copyright header to Dockerfile.test"
+            },
+            {
+                "hash": "b9eae6d53a26f2eac9b657583eb93ee775aa5523",
+                "message": "all: fix Python SyntaxWarning in check_links.py"
+            },
+            {
+                "hash": "5c62f975b75a0dfb12e60216c085bfdd7af36efb",
+                "message": "all: optimize check scripts to only scan git-tracked files"
+            },
+            {
+                "hash": "b3c45c12efff98dd6fadcafb559097275e897808",
+                "message": "pkg/aflow: propagate and save equivalence analysis on successful reproduction"
+            },
+            {
+                "hash": "70ae9b0332c954c7a2e9754a431bc021385efca3",
+                "message": "go.mod: update dependencies"
+            },
+            {
+                "hash": "4b5906ec355a63c4d1b2facbdd19ebeb2e2915f7",
+                "message": "pkg/aflow: unset INITRAMFS_SOURCE during kernel build"
+            },
+            {
+                "hash": "cff6f55b16345198175135895867ff88d0076054",
+                "message": "pkg/lore-relay: fix up Assisted-by"
+            },
+            {
+                "hash": "262c7314a80d36083a9a9144b19e4091f8ede043",
+                "message": "pkg/email: unconditionally include syzbot in Assisted-by tag"
+            },
+            {
+                "hash": "d8b58b88cf9104902a28afbfa7916745642f61ac",
+                "message": "pkg/lore-relay: add From header to patch emails"
+            },
+            {
+                "hash": "b5d4cf9e8156cdc4de6a5d76af90f1574a389972",
+                "message": "sys/linux: hardcode headers removed in linux v7.1"
+            },
+            {
+                "hash": "33d09f2e3d6ca7b67596243cdcf204a0ee012ff8",
+                "message": "CONTRIBUTORS: add Chuyang Wang"
+            },
+            {
+                "hash": "d57425845dbe663f86e1e54a4997e95bd557b624",
+                "message": "pkg/lore-relay/templates: improve footer"
+            },
+            {
+                "hash": "e195359d6991300694b71515a13ced6fcda44851",
+                "message": "dashboard/app: remember reporting ID for reject and unreject"
+            },
+            {
+                "hash": "1585f7e27d7e77583e38d8f36b5ecef29f53072a",
+                "message": "docs: document the #syz unreject command"
+            },
+            {
+                "hash": "4a960b4340bdbbbcfe52b251e50f9cde8ac578cb",
+                "message": "all: introduce #syz unreject command"
+            },
+            {
+                "hash": "c7e903e7e95263ea390cfb719281d7a85edf3d07",
+                "message": "dashboard/app: prohibit rejecting an already rejected patch"
+            },
+            {
+                "hash": "8022396155466f29c586804549ab8359e864fb1b",
+                "message": "dashboard/app: prohibit upstreaming rejected patches"
+            },
+            {
+                "hash": "747d777daea78cce4e10e82652e668a24d1858d3",
+                "message": "pkg/aflow: make LLMAgent stateless by localizing toolHistory and session state"
+            },
+            {
+                "hash": "aeb7ca985b7c89bd2b7a7798f6b4fb1693477138",
+                "message": "pkg/aflow: add regression test for sequential toolHistory leak"
+            },
+            {
+                "hash": "2f8af71c926fad8eeacd313af741b1b588cc6622",
+                "message": "pkg/aflow: refactor TestToolLoopDetection to use testify/require"
+            },
+            {
+                "hash": "a30716ba440add673742baa3327258fd6f5fcbc4",
+                "message": "pkg/aflow/toolkit: limit C toolkit test to Linux"
+            },
+            {
+                "hash": "41b8c833cfec24e2ddcc4ade2c2a333d1554cc0f",
+                "message": "Makefile: move fast static analysis checks to lint target"
+            },
+            {
+                "hash": "29381e2e94cef7d1ff43d79b4320fdc0a339fba5",
+                "message": "dashboard/app: deduplicate Reported-by tags using email matching"
+            },
+            {
+                "hash": "843c7d51bcc694b04355d6d3ec310dbfa300248f",
+                "message": "pkg/aflow: match patch tags by email address instead of exact string"
+            },
+            {
+                "hash": "cf874a1cf36318c06202027159ddac14acf00db7",
+                "message": "syz-agent/k8s: increase the number of syz-agent instances"
+            },
+            {
+                "hash": "6cf2b42c10a85a91a09526b560ca3fa2bb70a41c",
+                "message": "pkg/aflow: simplify SummaryWindow/CompressTokens"
+            },
+            {
+                "hash": "5771545a42e9afa54ce9d14cf0e50a854a83b2a7",
+                "message": "pkg/aflow: enforce strict probe generation on first attempt"
+            },
+            {
+                "hash": "c7976bec5a769cbf8e103fb4b1cb31f441cdaeb4",
+                "message": "pkg/instance: report explicit timeout in VM run output"
+            },
+            {
+                "hash": "f71d754d7289f3811620fd5dfd0e2602b3a15db2",
+                "message": "pkg/aflow: extract patch history exploration into a tool"
+            },
+            {
+                "hash": "65e800ba70eb434e37ee4c19caf7f484c4d5fa73",
+                "message": "dashboard/app: provide full history to patch-iteration"
+            },
+            {
+                "hash": "29fdbb89ebf6b451fe29b2246b33a4344096fd3d",
+                "message": "pkg/lore-relay: use full names in To/Cc tags"
+            },
+            {
+                "hash": "7ca7a6fe9cfcd2c0aead5d95cfaa882f4336127c",
+                "message": "pkg/vcs: fix maintainers role parsing"
+            },
+            {
+                "hash": "968bdc8f3b6d69cae74eb7f5fe4787182f734d60",
+                "message": "pkg/vcs: extend TestParseMaintainersLinux test"
+            },
+            {
+                "hash": "feae313e365db1539b4d0af6443c5cedc31cc50b",
+                "message": "pkg/vcs: convert TestParseMaintainersLinux to proper table test"
+            },
+            {
+                "hash": "62fb93a255739705450473a63391e4b93a0c5545",
+                "message": "docs/c-repro: update documentation to reflect IsProbe and loop limits"
+            },
+            {
+                "hash": "00a3fa295425215282eaa9abaf1a343aefdf4909",
+                "message": "pkg/aflow: add structured IsProbe flag to guide Oracle classification"
+            },
+            {
+                "hash": "b74269fa66720806b28ac9c502ebd51cad755194",
+                "message": "pkg/aflow/flow/patching: fix maintainers extraction"
+            },
+            {
+                "hash": "83681a5a2a5a67abb1429163a887da6609b438f1",
+                "message": "pkg/aflow: do not extract review tags from citations"
+            },
+            {
+                "hash": "3fb97b287952d68a6dcbff5cd73f6335269fe106",
+                "message": "pkg/aflow: split code and text triage in patch iteration"
+            },
+            {
+                "hash": "ca3e09169285f0098fccc3022485a3a261fa40d0",
+                "message": "pkg/aflow: add more If tests"
+            },
+            {
+                "hash": "1a4dfa9fc54a1a29e0e661b6028c6f7009072d18",
+                "message": "pkg/aflow: add Else branch support to If component"
+            },
+            {
+                "hash": "8ccd679d15ca95e36403f7f95f8f92b97cefaa28",
+                "message": "pkg/aflow: change patch-iteration models"
+            },
+            {
+                "hash": "585486f803da724f2eed363fc2add206bc848be5",
+                "message": "dashboard/app: add export=1 parameter to export AI job inputs"
+            },
+            {
+                "hash": "d6bba87fc8a9b8c7c847775e1cf180bf97d50448",
+                "message": "pkg/email: add support for Closes tag"
+            },
+            {
+                "hash": "270d7aa3623b0914c4d213d16e1dbfa3a5c20b22",
+                "message": "pkg/aflow: bump maximum workflow iterations to 20 for c-repro"
+            },
+            {
+                "hash": "50faec11fe42983be46948ee49a83acc5e1d9844",
+                "message": "pkg/aflow: add robust monotonic timing primitives to race toolkit"
+            },
+            {
+                "hash": "0909d65fc692e54fa1900b68b476e89207bc7f34",
+                "message": "dashboard/app: only forward emails if syzbot is directly CC'd"
+            },
+            {
+                "hash": "2b641d31806399e28354f9d785acbb0012e3a840",
+                "message": "dashboard/app: move bisection info above AI blocks on bug page"
+            },
+            {
+                "hash": "6cd1a940760dcfc88df01e616b1e4fe22ac2e3e5",
+                "message": "pkg/aflow/flow/patching: improve and dedup prompts"
+            },
+            {
+                "hash": "8e1c15172f6ef17377fb7620dd985ae25d6faba8",
+                "message": "dashboard/app: journal failed commands"
+            },
+            {
+                "hash": "1d9407ad5a662c921fc0d659cf022b438c0bde91",
+                "message": "dashboard/app: say \"default\" instead of \"latest RC\" for patch creation"
+            },
+            {
+                "hash": "960f364cff7c17886045c00412a8035d81342a38",
+                "message": "pkg/aflow: update GEMINI.md with recent features"
+            },
+            {
+                "hash": "223544dc3097d6233a385835bc8dba2b716cc5f0",
+                "message": "lore-relay: include a link to the documentation"
+            },
+            {
+                "hash": "5f4daf26ba89eff13021fa84fece12aaffe195bf",
+                "message": "docs: add AI patches documentation"
+            },
+            {
+                "hash": "cdcf5354b95f4baa8559d790520f24ceba1d9b15",
+                "message": "all: partially enable gocritic"
+            },
+            {
+                "hash": "d016e189f60d41bf5b81c88f5104719df79d934e",
+                "message": "dashboard/app: hide reply-only AI patch iterations from bug page"
+            },
+            {
+                "hash": "9303eaa86275c0cb1e15a5759222f9077ad141f5",
+                "message": "pkg/email: limit Fixes tag commit hash to 12 characters"
+            },
+            {
+                "hash": "2aa09d96420c1f0991362a596a2d09104cd3504a",
+                "message": "syz-agent: use bigger and more VMs"
+            },
+            {
+                "hash": "0166e24952072f7d09ae06dd93e282fa82eea681",
+                "message": "dashboard/app: add repro-c to bug landing page manual workflows"
+            },
+            {
+                "hash": "9f74d39908454b73546eaf1b8211b48b66e5c0fe",
+                "message": "pkg/aflow: do context compression by default for patching jobs"
+            },
+            {
+                "hash": "3f7aa560a9a5fe31f2052ff31808aef0d4419806",
+                "message": "dashboard/app: ignore commands if not explicitly addressed"
+            },
+            {
+                "hash": "73a5278fc47101786fcce29507164fb59ac8afe3",
+                "message": "tools/syz-linter: enforce one-field-per-line for multi-line struct layout"
+            },
+            {
+                "hash": "d77e94325d4257b6d46f84ec600c478b4f1b6a3d",
+                "message": "pkg/aflow: restrict strace usage to c-repro workflow"
+            },
+            {
+                "hash": "8e20b3c98fcf8cd640db8d50f0bee03e7db713d7",
+                "message": "syz-cluster: unconditionally ignore unknown polled emails"
+            },
+            {
+                "hash": "55156e845761fb36809c4b3701a920dddce23332",
+                "message": "pkg/aflow: support reviewer tags in patch iterations"
+            },
+            {
+                "hash": "143ffb882cd0d4a7111c4749fe18e2366016eba5",
+                "message": "pkg/lore-relay: implement DKIM verification for incoming emails"
+            },
+            {
+                "hash": "1c15ab5d03ac42b8675896d20f9695d55bac38d4",
+                "message": "dashboard/app: add DKIM boolean flag to job comments"
+            },
+            {
+                "hash": "1ab9ba92b44d7544c9a69cfef5a6d1e34461221c",
+                "message": "pkg/email/lore: expose raw email bytes during parsing"
+            },
+            {
+                "hash": "de5aae85e5f28e2fa1c7deefcc24fe286abe5140",
+                "message": "docs/syz_testbed: fix step 6 not rendering in the example list"
+            },
+            {
+                "hash": "927dfd751917c0d0e6d1021127cd1daf8ce0c674",
+                "message": "pkg/aflow: harden llm_agent context compression mode"
+            },
+            {
+                "hash": "4df5680b122c9a5da0c486b78325bc60a4883e2a",
+                "message": "pkg/aflow/flow/patching: don't do passive-aggressive"
+            },
+            {
+                "hash": "58d6166a6ddc4aa311e630294e974ffa421afa34",
+                "message": "syz-agent: pass strace_bin to AI jobs"
+            },
+            {
+                "hash": "bccc1e4cfc08abce15de8b74287eef494a3f6e5e",
+                "message": "syz-agent: supply StraceBin to AI workflows"
+            },
+            {
+                "hash": "a15a64a66dd37b7f9c31f5c3efb1524bb9863162",
+                "message": "dashboard/app: add with_repro and with_ai_patch filters"
+            },
+            {
+                "hash": "81fb92f382d05aa9fb9878696840b9711b38ba20",
+                "message": "pkg/email: don't add empty strings to BugIDs"
+            },
+            {
+                "hash": "5afa1cd7c5b7dd704f60c6fd7699cbee73bd9164",
+                "message": "pkg/osutil: fix DiskUsage to report actual disk usage"
+            },
+            {
+                "hash": "efdaf0f9b8bfc56ea6d17bea15a64f4591cc712d",
+                "message": "dashboard/app: fix an incorrect AI job link"
+            },
+            {
+                "hash": "129cb62eef8df4e1296845992bdcf59fe30cf5fc",
+                "message": "sys/netbsd: update descriptions of hdaudio and wscons"
+            },
+            {
+                "hash": "b3bd41ab77bfba6580da73660c6f6fd40c204080",
+                "message": "sys/netbsd: add descriptions for acpi, agp, amr, atabus, and audio"
+            },
+            {
+                "hash": "8504ae9554f11800f82b03264f832c42c03fdd69",
+                "message": "syz-agent: use a smaller disk cache size"
+            },
+            {
+                "hash": "ab5131733acb8d6b2b326ac573a44d909d4f11a3",
+                "message": "pkg/aflow: encourage iterative approach and shorter reasoning in reproc flow"
+            },
+            {
+                "hash": "c554a040b95a24af835a7e4bda1c615d700110b2",
+                "message": "pkg/aflow: enable CompressTokens for agents in reproc flow"
+            },
+            {
+                "hash": "6cf13c2a384c07d90d70b2346eeaa8c34b5ceadc",
+                "message": "pkg/aflow: add strace support to c-repro flow"
+            },
+            {
+                "hash": "3dc8fead2519f1d7c2cea98842b9238d761c6224",
+                "message": "syzbot: build and install static strace v7.0"
+            },
+            {
+                "hash": "a8f5cb5ebcb50c8f23a0b0914d6f5503bf436c4e",
+                "message": "dashboard/app: fix idempotency bug in AI report commands"
+            },
+            {
+                "hash": "d7ff1328aab68ef634cc7573f4a7dad178c7c5ca",
+                "message": "dashboard/app: make JobComment.Subject nullable"
+            },
+            {
+                "hash": "9cd3beaadf14b3a22d15fd97a0bf081ee41ebe01",
+                "message": "dashboard/app: set Signed-off-by for AI patches"
+            },
+            {
+                "hash": "c5a75610731bbebba663257186503f5d9db2950f",
+                "message": "pkg/email: extract AuthorName"
+            },
+            {
+                "hash": "6ccb967e465e832a7bfd7a116ad00d52a0923a5d",
+                "message": "pkg/aflow: clean up loadModelList"
+            },
+            {
+                "hash": "e8909b293883355d8338b2f8ce255cb9a9eb7c2e",
+                "message": "sys/linux: add pathname UNIX socket support for Landlock"
+            },
+            {
+                "hash": "ddcf86e4b434809214af1ee9d3f1cd3fae94fecc",
+                "message": "pkg/lore-relay: use original thread subject for comment replies"
+            },
+            {
+                "hash": "59bb317ef46445b3ae16d15d21b29ed7f2a74377",
+                "message": "dashboard/app: save incoming comment subjects in the database"
+            },
+            {
+                "hash": "43f9a88019f7080a2b38d1a75b9528f51598fef1",
+                "message": "tools: add a linter to check trailing newlines in .sql files"
+            },
+            {
+                "hash": "71153e5d9da49247dc7f1194a9cc04fb90c64f9c",
+                "message": "syz-agent: return to Gemini API"
+            },
+            {
+                "hash": "27fc6496ea1c19fb3950ccc5df3b557ab02eb4de",
+                "message": "pkg/aflow: handle Vertex AI specific 429 quota errors"
+            },
+            {
+                "hash": "d3ecef46ced1151c0ce914035cba3ddcae10de42",
+                "message": "pkg/aflow/action/actionsyzlang: truncate large hex arrays in C repros"
+            },
+            {
+                "hash": "c862420e238e41265ce7d5bfb4d9677f26b4b2c0",
+                "message": "syz-agent: configure Vertex AI authentication via cloud_project"
+            },
+            {
+                "hash": "b862a9c7a7322bfb2a5aa183d30e808504a02629",
+                "message": "pkg/aflow: support Vertex AI backend"
+            },
+            {
+                "hash": "bc4126d81d20dac5ef51b83a6036224d22f88fb1",
+                "message": "pkg/aflow: extract quotes of comments we reply to"
+            },
+            {
+                "hash": "bfbc5c5a9471f3d33998861602c95865b8ea2203",
+                "message": "pkg/aflow/flow/patching: word-wrap replies under comments"
+            },
+            {
+                "hash": "fec2a7ee1d4f109a1c346571a9a43b32c568e770",
+                "message": "pkg/aflow/tool/gitlog: handle out-of-bounds lines in git blame"
+            },
+            {
+                "hash": "a0949470b6a66f5eb685a5f70be7c66daf726d2b",
+                "message": "pkg/aflow: do multiple reproducer runs"
+            },
+            {
+                "hash": "933e37478aa2d13944f9eb9f29ee8f49cb8adc36",
+                "message": "pkg/aflow: support range iterations in template verifier"
+            },
+            {
+                "hash": "76cabd5af785dde1d290a9a8f769ffe5397dc7ca",
+                "message": "pkg/instance: introduce execution collection logic"
+            },
+            {
+                "hash": "ac1aeadbb84e4988133fcdf26ca80803a538fe09",
+                "message": "pkg/gce: distribute instances across available zones"
+            },
+            {
+                "hash": "0df244dc579869217f008ae005a7eff1056e5e16",
+                "message": "pkg/gce: track instances zones dynamically"
+            },
+            {
+                "hash": "951bb0e91d6ff9f6f3e8706624bd253cdd91f988",
+                "message": "pkg/gce: pass zone explicitly to wait completion methods"
+            },
+            {
+                "hash": "2994d63f92979a74b10d7334bbb980cb3f5326ca",
+                "message": "pkg/build: implement shell builder support"
+            },
+            {
+                "hash": "e7422b541f62b660fc40ca99bf21e3a502af5d54",
+                "message": "pkg/aflow: add patch-diff tool"
+            },
+            {
+                "hash": "573182fb3740dcb865bc80f50bd7aa3cf5ffc1d9",
+                "message": "dashboard/app: hide manual correctness for stage-reported AI jobs"
+            },
+            {
+                "hash": "2a7fc741b0c39b503672a2d9436f44e5975a9c5e",
+                "message": "executor: support preloaded crash kernels"
+            },
+            {
+                "hash": "226199942c5d118f825d7e6b035ded53bfd9fbc5",
+                "message": "dashboard/app: fix patch subject duplication in report body"
+            },
+            {
+                "hash": "d5b1a17d9298180a22d250cd80056009a13f65e5",
+                "message": "dashboard/app: fix 500 error on duplicate AI report comments"
+            },
+            {
+                "hash": "83ab502fb0b6bd98caa590726e138e6e5d00ad87",
+                "message": "dashboard/app: skip empty AI reports for patch iterations"
+            },
+            {
+                "hash": "07aeade527a4cf049c391b7f131ccd468ef22f04",
+                "message": "dashboard/app: include Reported-by tag in AI-generated patches"
+            },
+            {
+                "hash": "a7ce68cb2d4abab0ab90b15b981d9d1fe0164a76",
+                "message": "pkg/email: support Reported-By in patch.go"
+            },
+            {
+                "hash": "d168f2605715ec7b7ab6840d636f69c758e424d9",
+                "message": "pkg/aflow: make BaseFixes optional in PatchIterationInputs"
+            },
+            {
+                "hash": "21ec2cd675f4b8796aa0f2c0e1289dac72beea1c",
+                "message": "pkg/aflow: integrate Fixes tag processing into patch iteration"
+            },
+            {
+                "hash": "e1e07a1793447a361eb4c9473e530479f4374463",
+                "message": "pkg/aflow: extract checkFinalReply"
+            },
+            {
+                "hash": "ccca39ee7fc02b50c00031be0a4670cf859bbe0d",
+                "message": "pkg/aflow: add iteration limit to LLMAgent"
+            },
+            {
+                "hash": "71c3652c8daa6c71afdd85f3c2d15463dccf2421",
+                "message": "pkg/aflow: preserve system instructions in context compression"
+            },
+            {
+                "hash": "e2dc272d9d21219f6257ea7a4a11c57783a2369f",
+                "message": "dashboard/app: include bug and AI job links in generated patches"
+            },
+            {
+                "hash": "b44bfab2c02581195dced63c1f7136fc4c5df9b1",
+                "message": "pkg/email: include Links to the generated patch"
+            },
+            {
+                "hash": "0f2214337d27a9375dd7860b4fc63f8a73ef5679",
+                "message": "pkg/aflow: ask not to format the description"
+            },
+            {
+                "hash": "60fbed2f0305b55920768afe266a53dc406a83af",
+                "message": "dashboard/app: ignore commands on mailing lists if syzbot is not CC'd"
+            },
+            {
+                "hash": "243d3f70496d763505b33b5fadcff7cd2dc6e0b7",
+                "message": "dashboard/app: extract bugInfoWithoutBugID function"
+            },
+            {
+                "hash": "dc7ddcbec04be43cb43058c13557c8be674bb453",
+                "message": "aflow/reproc: refine probe program instructions"
+            },
+            {
+                "hash": "410c41b15dbe80db27536213acf6a3f250fc0e9a",
+                "message": "aflow/reproc: bump MaxIterations to 10"
+            },
+            {
+                "hash": "fc6e6eac62ee224ed1276afaf24df37313ad0a0c",
+                "message": "Revert \"pkg/aflow: use vcs git apply helper\""
+            },
+            {
+                "hash": "c41a11fd5a817bb12e5960db9b46a0ae53c3e468",
+                "message": "pkg/aflow: explicitly set thinking level in compressContext"
+            },
+            {
+                "hash": "c0c3a7e54adf55e8a710dfa9a8e16b6cd19682ab",
+                "message": "pkg/aflow: fix rate limit retry logic in context compression"
+            },
+            {
+                "hash": "e6eb7c0be91ea241058eadb1acd2b1e06debcae6",
+                "message": "pkg/aflow: wrap git-log and git-blame path errors as BadCallError"
+            },
+            {
+                "hash": "ad5854a4bd6c9738b83d9eaba9c2ccc1b78f667d",
+                "message": "pkg/aflow: expect BadCallError in TestTool"
+            },
+            {
+                "hash": "845acb1c843085de5e90ddf8edbd555a20c9745e",
+                "message": "dashboard/app: pass on Fixes tag"
+            },
+            {
+                "hash": "29233ece713919081e9069c2a18be92526041f39",
+                "message": "pkg/aflow: implement token-based context compression"
+            },
+            {
+                "hash": "3c3c38add0251b4319dd9a2dbf2c8a570c14a118",
+                "message": "pkg/aflow: fix git-log crash when both SymbolName and PathPrefix are provided"
+            },
+            {
+                "hash": "aebba483bb0538eb655ef62561c504c89d39ef8c",
+                "message": "pkg/aflow: handle timeout errors in gitlog gracefully"
+            },
+            {
+                "hash": "eda2fdad3dc33aa053bc00b85036972d54128b90",
+                "message": "pkg/aflow: fix gitlog tools on shallow checkout and simplify validation"
+            },
+            {
+                "hash": "2ab1aacfd182bd1fbb0a1f94db554c8afddb1273",
+                "message": "pkg/vcs: export ContainsIn"
+            },
+            {
+                "hash": "b09ea9df3d95c21ecaf04e8423f52421c8094283",
+                "message": "pkg/aflow: use vcs git apply helper"
+            },
+            {
+                "hash": "0c5a8d8f3deaa340c244d6d79ffd42930f92eb25",
+                "message": "pkg/aflow: fix schema unmarshaling for primitive slices"
+            },
+            {
+                "hash": "04e3cfe80d8d1595bcb750e55868b0ba3c416767",
+                "message": "Makefile: simplify lore-relay build"
+            },
+            {
+                "hash": "64b8ff51afa30321524d371f1ec661e2940a8327",
+                "message": "dashboard/app: auto-create security assessment jobs"
+            },
+            {
+                "hash": "a6689a70fde29840bd15aed6e405e7fe95e0a6aa",
+                "message": "dashboard/app: fix condition when AI job correctness is shown"
+            },
+            {
+                "hash": "957998906fcd85fa884c83b0f011a452a167df44",
+                "message": "dashboard/app: don't require manual confirmation for assessment jobs"
+            },
+            {
+                "hash": "07b1b51bb958e24614eea72a0c1710b7ee2b2bbd",
+                "message": "pkg/aflow/flow/assessment: remove Confident output"
+            },
+            {
+                "hash": "3313c7a196dee3b889b493ba1cf6bf56105b19ae",
+                "message": "pkg/email/sender: add implicit TLS support for port 465"
+            },
+            {
+                "hash": "b2988c170875122bc250b755f3cfcd730933eb8c",
+                "message": "aflow: show tool names in trajectory tooltips"
+            },
+            {
+                "hash": "ff940bdf86508c3bfe1232795722ed01d7249dac",
+                "message": "dashboard/app: prevent JobReporting creation for non-patching AI jobs"
+            },
+            {
+                "hash": "2889928e6aac5f2ce4079d7288007bbf3120fab5",
+                "message": "pkg/aflow: increase LLM backoff duration"
+            },
+            {
+                "hash": "861a024a29a08be2e241fcd74b2eda610b505fc4",
+                "message": "syz-agent/lore-relat: add a test send mode"
+            },
+            {
+                "hash": "5633175ac55a168bed206a2b9955326db0abf0fc",
+                "message": "dashboard/app: allow resizing the 'Sample crash report' block"
+            },
+            {
+                "hash": "e358bca52f2b56a343b3b1c70e23fcabd449f8b3",
+                "message": "dashboard/app: prioritize aborted AI jobs during polling"
+            },
+            {
+                "hash": "06a6ee865c1ddbbe04beddc5a2bf68cc0e8aa03c",
+                "message": "dashboard/app: allow manual push of AI jobs to reporting"
+            },
+            {
+                "hash": "cbf9e0fc03c872a2b429ee433e66c3d6f2e43086",
+                "message": "syz-agent: increase the number of replicas"
+            },
+            {
+                "hash": "1c2ff3f985f46c14d19fdadaf02516787d3f5449",
+                "message": "pkg/aflow: fix panic when tool names are used in agent prompts"
+            },
+            {
+                "hash": "55d5486e60dc291e1198da1b80992fa7ea09d02d",
+                "message": "dashboard/app: display patch versions on the bug page"
+            },
+            {
+                "hash": "42dfa5559e52de8278048a1e1c2903a1d95ea70d",
+                "message": "dashboard/app: rename iteration jobs"
+            },
+            {
+                "hash": "bba3b893df7de98d718a094a65f12cc7c0adc7a6",
+                "message": "dashboard/app: query changelog bits"
+            },
+            {
+                "hash": "18039a9c76565d123e28e06d0b71c8b1c89559df",
+                "message": "dashboard/app: make comment addressing configurable"
+            },
+            {
+                "hash": "c6893354ebd1f26fec76a7d7061c9cc5d739de7f",
+                "message": "dashboard/app: use original base commit for the iteration job"
+            },
+            {
+                "hash": "c40ea1fcd4a31c98d32f968df4611953f114842d",
+                "message": "dashboard/app: react to user comments under AI patches"
+            },
+            {
+                "hash": "608969ce0b99d97f0a2f8f4c90a9bb26e303d99f",
+                "message": "dashboard/app: remember more job comment details"
+            },
+            {
+                "hash": "ef199365a5842f370ac24a8d92e26b0bfd54ac0f",
+                "message": "pkg/lore-relay: add detailed logging for sent emails"
+            },
+            {
+                "hash": "c94b2e4ff520d42f304cd3428fe5600bd06535d7",
+                "message": "pkg/lore-relay: stay silent on unsupported/multiple commands"
+            },
+            {
+                "hash": "0211be7bbaf9ae6ee7785739519f88cea30a0379",
+                "message": "pkg/aflow/flow/reproc: update agent persona in instructions"
+            },
+            {
+                "hash": "822fe5fd4014163db7ac2e2b3284a84bc40b097c",
+                "message": "docs: update C reproducer workflow documentation"
+            },
+            {
+                "hash": "e4c25b20580696a0ebe8bbfc965da2f9b05776b0",
+                "message": "pkg/aflow/flow/reproc: add repair-c-prog action with internal loop"
+            },
+            {
+                "hash": "233b3ee392da796e2aa8f23444d609bc40c97d69",
+                "message": "pkg/aflow: support nested DoWhile loops by allowing redefinition of loop variables"
+            },
+            {
+                "hash": "2d02beca6f5898d01c5d130004f1c2be983f62b4",
+                "message": "pkg/instance: fail fast on compilation errors in Test"
+            },
+            {
+                "hash": "787e944fa698e33ef76e7a5ed5a2967eba0676ea",
+                "message": "aflow: update LLM instructions for C reproducers"
+            },
+            {
+                "hash": "fdabd8b6c3e4e649d17189aa4f669d3d91a88b5a",
+                "message": "aflow: do not swallow compilation errors in RunCRepro"
+            },
+            {
+                "hash": "e0a64563890245a202eeab55afdfca0775c51c45",
+                "message": "pkg/aflow/flow/reproc: remove LLM control over reproduction loop"
+            },
+            {
+                "hash": "f250db59430dfb0102692e53ab92e84e82178c3e",
+                "message": "pkg/vcs: disable gc.auto in test repositories"
+            },
+            {
+                "hash": "72005a604ab1bdf4c43003dd52e4183b807bf696",
+                "message": "syz-agent: disable CGO for lore-relay container build"
+            },
+            {
+                "hash": "cbcd9ea0cda2829cdba614a2b5501f7a29c03677",
+                "message": "pkg/aflow/flow: add fixes-finder agent to the patching workflow"
+            },
+            {
+                "hash": "39563dcba74dc521a5713f966c96538556669d64",
+                "message": "pkg/aflow: add ValidatedLLMOutputs for structured LLM outputs"
+            },
+            {
+                "hash": "14de0d28fd4e68b1483ad7827d05fc929048b709",
+                "message": "pkg/aflow/flow: use git tools during patch generation"
+            },
+            {
+                "hash": "681ee7d7570d96b288b2c71371e1b30f08861f46",
+                "message": "pkg/aflow/tool/gitlog: add git history tools"
+            },
+            {
+                "hash": "b8db9b7e0383031086b50aea46d517224ac93828",
+                "message": "all: check k8s descriptions"
+            },
+            {
+                "hash": "237e2dd6741d49e618eab7e233660bc8eb15edf3",
+                "message": "all: enable pipefail in k8s Makefiles"
+            },
+            {
+                "hash": "cd4ac471d3b5797863f6d88041dc62a0eeb199da",
+                "message": "all: make kustomize configurable"
+            },
+            {
+                "hash": "04221a7d71338603cb0f5bb03414fd47e051ae57",
+                "message": "syz-agent: keep lore-relay in a separate namespace"
+            },
+            {
+                "hash": "dddd4ad21fb8bc4280655383fd808d2c92c40f98",
+                "message": ".github: upgrade dependency-review-action to v4.8.2"
+            },
+            {
+                "hash": "ee1367c4b7bc15f1d115926f6a370ca6fd0235f9",
+                "message": "syz-agnet: fix lore-relay configuration"
+            },
+            {
+                "hash": "cc9feb7006cde00206ba5ed23a5c07573ea3ce68",
+                "message": "pkg/vcs: extend test util logging"
+            },
+            {
+                "hash": "978345d366f8e8c6447c15b38c1bab528385bfe1",
+                "message": "syz-agent: add missing lore-relay-pvc"
+            },
+            {
+                "hash": "1dddfd3d226713b9e24bf82efd2ee7d31e1c727f",
+                "message": "pkg/db: also bound decompressed value size to prevent decompression bomb"
+            },
+            {
+                "hash": "9e40d969cf74f13c61469454480cd6a78e4eb66c",
+                "message": "pkg/db: reject oversized keyLen in deserializeRecord to prevent OOM"
+            },
+            {
+                "hash": "4795fc4404ec3ff12e5928fe19a24b03d6942f35",
+                "message": "mod: bump k8s.io/apimachinery from 0.35.3 to 0.36.0"
+            },
+            {
+                "hash": "16f680377db27e718eb4897baa77d4200f11dbce",
+                "message": "mod: bump cloud.google.com/go/spanner from 1.88.0 to 1.91.0"
+            },
+            {
+                "hash": "23ad3581d162728720256cdd0a99f8702ec9c4c5",
+                "message": "mod: bump google.golang.org/genai from 1.48.0 to 1.55.0"
+            },
+            {
+                "hash": "f3f844deb672aa443c473d377d19f8093fdbc73f",
+                "message": "pkg/vcs: use git apply"
+            },
+            {
+                "hash": "ea76c839a8da5f92586706480e6ec847bebb2fb6",
+                "message": "dashboard/config/linux: move DEBUG_VFS to debug.yml"
+            },
+            {
+                "hash": "0537ff4686f0210ae5e7713d9b64deab4e189e1c",
+                "message": "dashboard/config/linux: reduce arm64 gce config"
+            },
+            {
+                "hash": "26da2c6603bcf76ab7d96bee30f110140de68ea2",
+                "message": "pkg/aflow: make race condition toolkit's macro WAIT_ON() arch-independent"
+            },
+            {
+                "hash": "3582e34bccbc5e96d009db4a6bd6c5dcf5159327",
+                "message": "mod: bump the go_modules group across 1 directory with 6 updates"
+            },
+            {
+                "hash": "86be46f5d8061f7a0fdcdd9b343a2ddbc2a36607",
+                "message": "all: update github.com/ianlancetaylor/demangle"
+            },
+            {
+                "hash": "1c23f15dd4bbcc28f7b2e162be6760a1f2597c9d",
+                "message": "dashboard: query AI model info for patches"
+            },
+            {
+                "hash": "db72e3c35cb6343544b0bec738d7d9e111814b03",
+                "message": "pkg/lore-relay: use email.FormatPatchDescription"
+            },
+            {
+                "hash": "f0b14531248ace8ac8bc77feca0689359d5f1edd",
+                "message": "pkg/aflow: handle output token overflows"
+            },
+            {
+                "hash": "7d8760b46c07ea6db22f1ebeefa2ddbffb3bea61",
+                "message": "pkg/aflow: prepare for handling output token overflows"
+            },
+            {
+                "hash": "06e69a27013be3f67beda4d9fe542532d4040cb6",
+                "message": "pkg/codesearch: fix find-references for static functions"
+            },
+            {
+                "hash": "365c487e636d7f6cafa7aad0ca30d5379abc63c9",
+                "message": "pkg/vcs: disable git hooks"
+            },
+            {
+                "hash": "114c483e412256e37405acfe7db4b08e5fa65027",
+                "message": "pkg/aflow/flow/patching: use more reliable way to reference tools"
+            },
+            {
+                "hash": "fa5a86dca0881d4cedc8b8017ccee5c166f0c875",
+                "message": "pkg/aflow: allow to reliably reference tools in prompts"
+            },
+            {
+                "hash": "a898ba9c6c8c17ec9041bb55f68cac381058afda",
+                "message": "dashboard/config/linux: further shrink arm64 gce"
+            },
+            {
+                "hash": "0de4b93ad560beaf366d99396b490affa0370641",
+                "message": "vm/vmimpl: default to legacy scp protocol"
+            },
+            {
+                "hash": "fb79c7648187955b4a207be44fe337d66e9538e9",
+                "message": "pkg/bisect: fix test panic caused by cross-goroutine t.Fatal"
+            },
+            {
+                "hash": "63759741f075fab093a63aee8eba81b701b04005",
+                "message": "pkg/vcs: surface verbose error output for test repo git commands"
+            },
+            {
+                "hash": "df74ae4c877d80c59c160a2f3ccac1b3e94f2c6e",
+                "message": "pkg/email: fully parse own emails"
+            },
+            {
+                "hash": "72c36cdab676b80c7f9b3f2c1e80958913533251",
+                "message": "pkg/lore-relay: configure emails for replies"
+            },
+            {
+                "hash": "f8b8c5371efb4cfb5db2f89c0fb919ce7e4d8b7b",
+                "message": "pkg/lore-relay: report own emails as such"
+            },
+            {
+                "hash": "787c81563061f59fd843e6baca1540e7201f5ec7",
+                "message": "pkg/lore-relay: include changelog into the templates"
+            },
+            {
+                "hash": "5d2d2a990afa5af4d175658f0bc6b472ee48dc32",
+                "message": "dashboard/app: limit ai result column width"
+            },
+            {
+                "hash": "85f1bcf2a1fd3095d2e9d7e4ac9ff77ae54be605",
+                "message": "dashboard/app: allow manual creation of patching jobs"
+            },
+            {
+                "hash": "e37641336f98c565862c92dbf14114703f870a18",
+                "message": "pkg/aflow/action/actionsyzlang: support patching with C repro"
+            },
+            {
+                "hash": "a0d91488fc4a789de6e559c15c02b0633b053c1d",
+                "message": "pkg/aflow: pass fault injection into patch iteration"
+            },
+            {
+                "hash": "1f0c9f4f13eff161c50740aa35b467be5e117365",
+                "message": "pkg/report: reuse report parsing for fault injection info"
+            },
+            {
+                "hash": "02653d9871731635e83c446b8b0544bd07f483b9",
+                "message": "pkg/aflow: pass fault injection info to LLM"
+            },
+            {
+                "hash": "753c55b9fb3983f31c253085b34a2be4a0022d54",
+                "message": "dashboard/config/linux: add an arm64-gce config"
+            },
+            {
+                "hash": "a7464baf70c43ea5c1e2c452c1367cfc28592bd4",
+                "message": "syz-cluster/controller: fix rare TestProcessor timeout"
+            },
+            {
+                "hash": "8431404634abc41da9c68037a8123b213059f188",
+                "message": "vm/gce: copy files to instance-specific directory"
+            },
+            {
+                "hash": "d926feac3678c259e5a0e0170bac4ffd58230bf8",
+                "message": "vm/qemu: include process status in hmp command errors"
+            },
+            {
+                "hash": "005438fcbda13a7d244e9d155c2150fc79e9f734",
+                "message": "tools/syz-linter: don't allow grouping of declarations of different types"
+            },
+            {
+                "hash": "64d697c490a7d67f7167c518e0f9154c97157291",
+                "message": "tools/syz-linter: enforce empty line rules for consts/vars too"
+            },
+            {
+                "hash": "c7c0409e05f8a0c8fc0c176676bd702b1cfdcb36",
+                "message": "pkg/email/lore: fix tests when default branch is not master"
+            },
+            {
+                "hash": "804ea88f04c93135cfb4cfaf486a32eed3bb42d3",
+                "message": "pkg/email: use Assisted-by tag for LLMs"
+            },
+            {
+                "hash": "7ca9e4d8b92a1a30e8c3a5ea80211a3933d833f3",
+                "message": "pkg/aflow/flow/patching: allow to configure base repo"
+            },
+            {
+                "hash": "95008c030835c4879528388a94859e825cd16d84",
+                "message": "tools/extract_workflows: extract only finished workflows by default"
+            },
+            {
+                "hash": "18380a5586749c001a137b310be7a96cc319ec95",
+                "message": "dashboard/app: allow creation of patching jobs w/o C repro"
+            },
+            {
+                "hash": "5f81e509a04663efbb140025d5fc600907c84f43",
+                "message": "pkg/aflow: implement Race Condition Toolkit for C reproducers"
+            },
+            {
+                "hash": "f889d5e4409ae30eafa88c545e4977a4e6b39f9e",
+                "message": "dashboard/app: support aflow workflow extraction"
+            },
+            {
+                "hash": "1d4855dc69e5b1ba0c1bbab82a9cac2fe6689b11",
+                "message": "executor, sys/linux: add SYZOS_API_MEMOP for riscv64"
+            },
+            {
+                "hash": "051dd8ea17f3b5861c43ef480c4413191a8f8182",
+                "message": "docs: introduce code review guidelines"
+            },
+            {
+                "hash": "15d8aa183145def9509f4d5d9d43374961427a1c",
+                "message": "pkg/aflow/flow/patching: switch iteration to JSON escaping"
+            },
+            {
+                "hash": "f2bf1216b11e13db80a20acf92f34d4f298a7158",
+                "message": "pkg/aflow: add patch iteration workflow"
+            },
+            {
+                "hash": "0154ae3c52fdf7371d7bf6166732c5c433abe847",
+                "message": "pkg/aflow: support time.Time unmarshalling"
+            },
+            {
+                "hash": "184d19a290cb8dbdc51a32da10edbf3ad5fe04ea",
+                "message": "pkg/aflow: support nested variables"
+            },
+            {
+                "hash": "29fe71690701aca833b11ea3fea4e35becf667a0",
+                "message": "pkg/aflow: add a ForEeach operator"
+            },
+            {
+                "hash": "c6f96e9b0a1ea97afe46f16b93fc47eb31ffa83a",
+                "message": "pkg/aflow: extend If condition"
+            },
+            {
+                "hash": "6d91b118a650c3631a0ae497f406ba3c822d35b5",
+                "message": "syz-agent: fix k8s deployment with numeric env variables"
+            },
+            {
+                "hash": "9ce6511c968d5852e25ee1ab14c7d916bd4bcf78",
+                "message": "pkg/vcs: check for local commit presence before fetching"
+            },
+            {
+                "hash": "9a626f5e3913d7a993d9a5148836c5f0a5282360",
+                "message": "dashboard/app: auto-moderate subsystem reminders"
+            },
+            {
+                "hash": "20f869f6eb0665522a83da66d505c0d8dd1ab5f4",
+                "message": "syz-agent/agent: resolve dashboard_client secret"
+            },
+            {
+                "hash": "ec82b7d6e46b949b526ec053517c3e93acd030a1",
+                "message": "dashboard/app: switch TestAILore tests to t.Context()"
+            },
+            {
+                "hash": "ca50d0a9f59625ce7459cf04eb2616a01267a5c6",
+                "message": "pkg/lore-relay: react to unknown/invalid commands"
+            },
+            {
+                "hash": "afd1026affd6abf78eb7020d36bccc6b4fbd5723",
+                "message": "pkg/lore-relay: report comments to dashboard"
+            },
+            {
+                "hash": "29cfc71035a8c3fa0b5f3acfc8cf23d79044479f",
+                "message": "syz-agent: add lore-relay"
+            },
+            {
+                "hash": "af1e6f5c70f83a29cbf61495fd12e5c07bfc9789",
+                "message": "pkg/lore-relay: initial implementation"
+            },
+            {
+                "hash": "a11c588b4d20798dbf409f081ac768318fb64efa",
+                "message": "pkg/email: add reject command"
+            },
+            {
+                "hash": "b42097437d40f0ee1dff68ee7be79fdc4506d8d5",
+                "message": "syz-agent: add git cookie authdaemon"
+            },
+            {
+                "hash": "340bcdf0745e0d8215ce1370566df6f30dabdca7",
+                "message": "syz-agent: make the prod config more flexible"
+            },
+            {
+                "hash": "ce741359ce23515704db594be00c4c776239ee22",
+                "message": "pkg/lore-relay: add initial templates for AI jobs"
+            },
+            {
+                "hash": "38e3f3c6ce426e0e8e17989e4a66597af93aab91",
+                "message": "pkg/aflow: add security assessment flow"
+            },
+            {
+                "hash": "8db0407b278f14b1d8bf4df8c9680b9db04f1a59",
+                "message": "dashboard/app: reply with error for #syz unfix on fixed bugs"
+            },
+            {
+                "hash": "90adbfd9b804a74c808381033f20630765d0fc9d",
+                "message": "dashboard/app: replace alert by an html block"
+            },
+            {
+                "hash": "dbbdc50b55e5cf2a31b6c5d32a7aa4fcfc1ba14d",
+                "message": "dashboard/app: manually submit AI jobs"
+            },
+            {
+                "hash": "1ddc85d17df78db2accad6d70d4ac76e726e6db8",
+                "message": "dashboard/app: display job arguments"
+            },
+            {
+                "hash": "30ac5a1a1f5d0940407bee1ab0ec908e9f805c8d",
+                "message": "all: fix linter errors"
+            },
+            {
+                "hash": "3b89e995ab97abadd62c8966e38c9d38550cc297",
+                "message": "tools/syz-linter: ensure one empty line between top-level defs"
+            },
+            {
+                "hash": "14dd0f7401443cde27bad106676958f5d139f8fb",
+                "message": ".github/commands: remove gemini files"
+            },
+            {
+                "hash": "c2182ef46fd503a47b57c18d4bbe6efd0913dd1e",
+                "message": "pkg/aflow: implement tool call loop detection"
+            },
+            {
+                "hash": "0f7005959478c8c65bcf29f49ca297e48f7839cd",
+                "message": "pkg/clangtool: support binary in PATH"
+            },
+            {
+                "hash": "567791334ee51343fd8ecfc1ea9990287c28d0a7",
+                "message": "pkg/vcs: prevent leaking background git processes"
+            },
+            {
+                "hash": "670ad3a213906ddf40dcaf93b289e3c0f67375ce",
+                "message": "pkg/osutil: add process group cleanup on CommandContext cancel"
+            },
+            {
+                "hash": "9c2d0995bb06e7518555bd3b755e327c89b59823",
+                "message": "syz-cluster: user a longer window of new messages"
+            },
+            {
+                "hash": "683aaf0fd71e40448d60e2a1b881c11a4bebead1",
+                "message": "syz-cluster/email-reporter: retry message processing"
+            },
+            {
+                "hash": "9944e21342a3ba117bc52beaa84e5547be231310",
+                "message": "syz-cluster: don't ignore record reply errors"
+            },
+            {
+                "hash": "652e5ff36b0796c40583e83088d7d9c62dc6c130",
+                "message": "syz-cluster: remove the last processed email querying API"
+            },
+            {
+                "hash": "41b7aa584f47c49510eef28b6c2cd1f955115afd",
+                "message": "pkg/email/sender: new package for email sending logic"
+            },
+            {
+                "hash": "32ae90f6d64c71512be5db0a7048ce0afa16e19d",
+                "message": "syz-cluster: integrate with lore.Poller"
+            },
+            {
+                "hash": "ad0ed6c0b7f263b90b64e3d18e4e91836b40774e",
+                "message": "pkg/email/lore: add a generic poller implementation"
+            },
+            {
+                "hash": "1c2b929100f5465bbe3bebeba1caf612ec1631a0",
+                "message": "vm/gce: wait for instance deletion in Close()"
+            },
+            {
+                "hash": "6188ad93a4caa0a76c1db812ceb28319bd8059bb",
+                "message": ".github/workflows: fix unsupported gh flag in upload-coverage"
+            },
+            {
+                "hash": "9cfb3ca710b61b2f1e2032fa6d94d4a00f81ab36",
+                "message": "sys/linux: replace io_uring header with struct definitions"
+            },
+            {
+                "hash": "aee9e85a8842e5f58997c074f6448bc1486cb6e6",
+                "message": "sys/linux: replace ublk_cmd header with struct definitions used"
+            },
+            {
+                "hash": "c5f9d079bd595c3a7dfe3662945b6471942b85b4",
+                "message": "sys/linux: add a test to verify ublk works"
+            },
+            {
+                "hash": "165d0ef4cb11280da2b0d89120b753b8e9f4aeb6",
+                "message": "sys/linux: replace uring and ublk structs with header imports"
+            },
+            {
+                "hash": "b6c77d2081e585e496350e9c765d7bb6deb2dfca",
+                "message": "pkg/vminfo: allow ublk syzcalls only when ublk control dev is present"
+            },
+            {
+                "hash": "0d1f19076a3616be0bf3a456930b275eebe86254",
+                "message": "pkg/subsystem: mechanical changes around new syzcalls"
+            },
+            {
+                "hash": "8b0cbd7d19b80c3f535fb0ea5b61ecbec82aea28",
+                "message": "sys/linux: generate ublk const values"
+            },
+            {
+                "hash": "20b58cc34cd93de8dcf84964c24e18846b9d4178",
+                "message": "sys/linux: add ublk syzkaller definitions for IO cmds"
+            },
+            {
+                "hash": "acd03c0fbe79a188fe8899da6eda5095a79ab33e",
+                "message": "sys/linux: add syzcalls to do file IO on ublk char and block devs"
+            },
+            {
+                "hash": "325b59812c70f3e14e994a5c942ae81aaa46fc5e",
+                "message": "sys/linux: add ublk syzkaller definitions for control commands"
+            },
+            {
+                "hash": "bc2d49993e4d884166511008c44e9bb58c7f8fd9",
+                "message": "sys/linux: add custom syz call to add a ublk device"
+            },
+            {
+                "hash": "d4e52be282519b00bce82ba2513357906809df54",
+                "message": "sys/linux: add custom syz call to create io uring for ublk"
+            },
+            {
+                "hash": "52a39577b5c1cd3da50358af5f9d95522237174e",
+                "message": "sys/linux: add large io uring sqe type for uring cmd ops"
+            },
+            {
+                "hash": "c3ed5f4f5433e287b308132d6d88d6e5014bf3be",
+                "message": "pkg/aflow: implement MVP for C reproducer generation"
+            },
+            {
+                "hash": "7e9964dbc9097541039c56e9a1c6e20d37646fd2",
+                "message": "pkg/aflow/docs: add C reproducer from description design document"
+            },
+            {
+                "hash": "ec6a0b175035f1f5f0659a828219fbff6ec7b8e0",
+                "message": "syz-ci: log git checkout errors"
+            },
+            {
+                "hash": "ed0c02370bed47c829c5f73ce9821bb6ecf32239",
+                "message": "vm/isolated: use strings.Cut"
+            },
+            {
+                "hash": "65327d1ea9890524458fc88ba4e46bf97600e657",
+                "message": "prog: use strings.Cut"
+            },
+            {
+                "hash": "830f0db706f2b49693163c6d4c86c07c0ad5db59",
+                "message": "pkg/vminfo: use strings.Cut"
+            },
+            {
+                "hash": "f24d2132f1db475fa63a0cb5e306d9a729aa5826",
+                "message": "pkg/vcs: reuse Split from pkg/email"
+            },
+            {
+                "hash": "432374b3aebfe5efd582664bdfdeba8bf7975f3e",
+                "message": "pkg/ifuzz/x86/gen: use strings.Cut"
+            },
+            {
+                "hash": "a5dd6bba3815364607381a36638000ed1cbcc0e9",
+                "message": "pkg/email: use strings.Cut and export Split"
+            },
+            {
+                "hash": "6fdb30c1d013c96170d201ac896b2792e9ead536",
+                "message": "pkg/compiler: use strings.Cut"
+            },
+            {
+                "hash": "183a0e85aa4f2ddbe7155f22f5ef6fc7777934cb",
+                "message": "dashboard/app: use strings.Cut"
+            },
+            {
+                "hash": "e1883524a6eeba637576984a547c0aeaf170b952",
+                "message": "tools/syz-linter: add strings.Cut rule"
+            },
+            {
+                "hash": "629ff21a2358bd38f4dbede12a995fb52356ed72",
+                "message": "vm/gce: attempt vm creation before deletion"
+            },
+            {
+                "hash": "4c3406dcb7532a40c27b01ca073cca0025fefd2c",
+                "message": "pkg/aflow/trajectory: add expand/collapse all link"
+            },
+            {
+                "hash": "7666cd1ee975e7a6598566646773f9586e8a31c8",
+                "message": ".github/workflows: dynamically fetch PR number for fork coverage reporting"
+            },
+            {
+                "hash": "25ffe85c7057840b7641ce6110b9e41d14859aa1",
+                "message": ".github/workflows: disable dynamic coverage file search in codecov"
+            },
+            {
+                "hash": "6309cc434f063a4153eaf9e878e94a0771eaa4ed",
+                "message": "pkg/aflow: remove SyzkallerCommit from ReproCOutputs and ReproCInputs"
+            },
+            {
+                "hash": "b10da5ec66a755e57e73801e716c78a16443611f",
+                "message": "sys/syz-sysgen: modernize map key extraction"
+            },
+            {
+                "hash": "097ace78524841bd7247d64a2c0cc05d31087538",
+                "message": "prog: modernize map key extraction"
+            },
+            {
+                "hash": "47192ba4f5280a924d6fa69eecf604727b07775e",
+                "message": "pkg/vcs: modernize map key extraction"
+            },
+            {
+                "hash": "942b57ebff82e7e8541e503aeeb2fc50a5fd33e5",
+                "message": "pkg/runtest: modernize map key extraction"
+            },
+            {
+                "hash": "57c40624aedc541af539451f37c04a871226dce2",
+                "message": "pkg/db: modernize map key extraction"
+            },
+            {
+                "hash": "f212489a611022c0fb1a71f476f8278d3e5d3813",
+                "message": "pkg/csource: modernize map key extraction"
+            },
+            {
+                "hash": "dff8a54915071bb8306436d3f70eb2bef3635ba0",
+                "message": "pkg/compiler: modernize map key extraction"
+            },
+            {
+                "hash": "00e8283f94d6458458400b36bc236c22524604e9",
+                "message": "syz-cluster: modernize map key extraction"
+            },
+            {
+                "hash": "77d29e16b9efb4ddd1f0e2d9d6cc934f8533acec",
+                "message": "dashboard/app: modernize map key extraction"
+            },
+            {
+                "hash": "09075c4425c01adefef6732dfaa76b4b305f0726",
+                "message": "tools/syz-linter: add map keys extraction rule"
+            },
+            {
+                "hash": "0e869ba2e16b70e06e4ce21768d6a249e4e16c17",
+                "message": "pkg/aflow: mention crash-to-repro.md in aflow GEMINI.md"
+            },
+            {
+                "hash": "e79ff8f88991f715ed15981b7182ad539ca05cb1",
+                "message": "pkg/aflow/docs: update crash-to-repro design document"
+            },
+            {
+                "hash": "e6e503f153d50f70373080935d783939286fa02e",
+                "message": "dashboard/app: collect comments under AI patches"
+            },
+            {
+                "hash": "dd555049408639f776ff846997aa7fde1f2281fc",
+                "message": "dashboard/dashapi: make AIJobSource enum"
+            },
+            {
+                "hash": "ab0cbe75cf4dce40c0f3dda8365e88d2126a1612",
+                "message": "dashboard/app/aidb: introduce a readRow helper"
+            },
+            {
+                "hash": "aec0c73b26bbef4ce9cebc677338348507fcb784",
+                "message": "dashboard/app: journal all AI commands"
+            },
+            {
+                "hash": "455866d52ab2bb39edc8c235e15515417fa26e16",
+                "message": "dashboard/app: extract aidb.SetJobDone"
+            },
+            {
+                "hash": "78c10781c31d044b2efeb02a479fd8afc1f4fc14",
+                "message": "dashboard/app: introduce AI job reporting API"
+            },
+            {
+                "hash": "eee0e6bd51bdc44332875a0e591f0bd2a0d0605b",
+                "message": "pkg/flatrpc: fix a test failure on FreeBSD"
+            },
+            {
+                "hash": "f42ae9b8d68dcd64a163026fcabc35cba17ff764",
+                "message": "pkg/aflow: add repro-c workflow skeleton"
+            },
+            {
+                "hash": "4595e35325904a096977cf0d3f9e7648e3198280",
+                "message": ".github/workflows: fix Codecov checkout and secure upload-coverage"
+            },
+            {
+                "hash": "3d48343585e60c95cc7993775ddd151f3c7bea87",
+                "message": ".github/workflows: remove Gemini CLI workflows"
+            }
+        ]
+    }
+}

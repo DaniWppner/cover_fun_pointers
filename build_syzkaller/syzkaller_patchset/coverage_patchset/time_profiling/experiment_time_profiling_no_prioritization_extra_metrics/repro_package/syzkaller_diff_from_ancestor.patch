@@ -1,0 +1,234 @@
+diff --git a/pkg/fuzzer/fuzzer.go b/pkg/fuzzer/fuzzer.go
+index a3302bdc7..8bee7b888 100644
+--- a/pkg/fuzzer/fuzzer.go
++++ b/pkg/fuzzer/fuzzer.go
+@@ -83,8 +83,8 @@ func (fuzzer *Fuzzer) RecommendedCalls() int {
+ type execQueues struct {
+ 	triageCandidateQueue *queue.DynamicOrderer
+ 	candidateQueue       *queue.PlainQueue
+-	fPCovSmashQueue      *queue.PlainQueue
+ 	triageQueue          *queue.DynamicOrderer
++	fPCovSmashQueue      *queue.PlainQueue
+ 	smashQueue           *queue.PlainQueue
+ 	source               queue.Source
+ }
+@@ -93,8 +93,8 @@ func newExecQueues(fuzzer *Fuzzer) execQueues {
+ 	ret := execQueues{
+ 		triageCandidateQueue: queue.DynamicOrder(),
+ 		candidateQueue:       queue.Plain(),
+-		fPCovSmashQueue:      queue.Plain(),
+ 		triageQueue:          queue.DynamicOrder(),
++		fPCovSmashQueue:      queue.Plain(),
+ 		smashQueue:           queue.Plain(),
+ 	}
+ 	// Alternate smash jobs with exec/fuzz to spread attention to the wider area.
+@@ -109,8 +109,8 @@ func newExecQueues(fuzzer *Fuzzer) execQueues {
+ 	ret.source = queue.Order(
+ 		ret.triageCandidateQueue,
+ 		ret.candidateQueue,
+-		ret.fPCovSmashQueue,
+ 		ret.triageQueue,
++		queue.Alternate(ret.fPCovSmashQueue, skipQueue),
+ 		queue.Alternate(ret.smashQueue, skipQueue),
+ 		queue.Callback(fuzzer.genFuzz),
+ 	)
+@@ -232,7 +232,8 @@ type Config struct {
+ }
+ 
+ func (fuzzer *Fuzzer) logFuncPointerCoverOperationTime(p string, duration time.Duration) {
+-	fuzzer.Logf(5, "[prog-%s] function pointer calculation %d seconds", p, duration.Seconds())
++	//fuzzer.Logf(5, "[prog-%s] function pointer calculation %f seconds", p, duration.Seconds())
++	return
+ }
+ 
+ func (fuzzer *Fuzzer) triageProgCall(p *prog.Prog, info *flatrpc.CallInfo, call int, triage *map[int]*triageCall) {
+@@ -351,24 +352,47 @@ func (fuzzer *Fuzzer) startJob(stat *stat.Val, newJob job) {
+ 		jobStart := time.Now()
+ 		newJob.run(fuzzer)
+ 		jobDuration := time.Since(jobStart)
+-		if job_obj, ok := newJob.(jobIntrospector); ok {
+-			jobInfo := job_obj.getInfo()
+-			jobInfo.Logf("total job duration: %d seconds", jobDuration.Seconds())
+-			if jobInfo.ExecRequestTotal.Load() > 0 {
+-				jobInfo.Logf("%d total test case executions", jobInfo.ExecRequestTotal.Load())
+-				jobInfo.Logf("%d new test case executions because of function pointer coverage", jobInfo.ExecRequestBecauseOfFPCov.Load())
+-			}
+-			if jobInfo.ExecTime.Load() > 0 {
+-				jobInfo.Logf("test executions job duration: %d seconds", jobInfo.ExecTime.Load())
+-			}
+-			if jobInfo.FPCovCalculationsTime.Load() > 0 {
+-				fuzzer.logFuncPointerCoverOperationTime(jobInfo.ProgId, time.Duration(jobInfo.FPCovCalculationsTime.Load()))
+-			}
+-			fuzzer.Logf(5, "%s", jobInfo.Bytes())
++		if jobObj, ok := newJob.(jobIntrospector); ok {
++			fuzzer.logJobResults(jobObj.getInfo(), jobDuration)
+ 		}
+ 	}()
+ }
+ 
++func (fuzzer *Fuzzer) logJobResults(jobInfo *JobInfo, jobDuration time.Duration) {
++	jobInfo.Logf("total job duration: %f seconds", jobDuration.Seconds())
++
++	if jobInfo.ExecRequestTotal.Load() > 0 {
++		jobInfo.Logf("%d total test case executions", jobInfo.ExecRequestTotal.Load())
++		jobInfo.Logf("%d new test case executions because of function pointer coverage", jobInfo.ExecRequestBecauseOfFPCov.Load())
++	}
++	if jobInfo.ExecTimeTotal.Load() > 0 {
++		_execTime := time.Duration(jobInfo.ExecTimeTotal.Load())
++		_execTimeFPCov := time.Duration(jobInfo.ExecTimeBecauseOfFPCov.Load())
++		jobInfo.Logf("test executions (total) job duration: %f seconds", _execTime.Seconds())
++		jobInfo.Logf("test executions (function pointer coverage) job duration: %f seconds", _execTimeFPCov.Seconds())
++	}
++
++	if len(jobInfo.ExecsTimeLapses.arr) > 0 {
++		jsonData, err := jobInfo.ExecsTimeLapses.AsJson()
++		if err != nil {
++			panic(fmt.Sprintf("failed to format time lapses as json %v", jobInfo.ExecsTimeLapses.arr))
++		}
++		jsonDataFPCov, err := jobInfo.ExecsTimeLapsesFPCov.AsJson()
++		if err != nil {
++			panic(fmt.Sprintf("failed to format time lapses as json %v", jobInfo.ExecsTimeLapsesFPCov.arr))
++		}
++		jobInfo.Logf("test executions (total) individual durations: %s", jsonData)
++		jobInfo.Logf("test executions (function pointer coverage) individual durations: %s", jsonDataFPCov)
++	}
++
++	if jobInfo.FPCovCalculationsTime.Load() > 0 {
++		_fPCovCalculationsTime := time.Duration(jobInfo.FPCovCalculationsTime.Load())
++		fuzzer.logFuncPointerCoverOperationTime(jobInfo.ProgId, _fPCovCalculationsTime)
++	}
++	fuzzer.Logf(5, "%s", jobInfo.Bytes())
++
++}
++
+ func (fuzzer *Fuzzer) Next() *queue.Request {
+ 	req := fuzzer.source.Next()
+ 	if req == nil {
+diff --git a/pkg/fuzzer/job.go b/pkg/fuzzer/job.go
+index 86740524a..0bc9a90a0 100644
+--- a/pkg/fuzzer/job.go
++++ b/pkg/fuzzer/job.go
+@@ -5,6 +5,7 @@ package fuzzer
+ 
+ import (
+ 	"bytes"
++	"encoding/json"
+ 	"fmt"
+ 	"math/rand"
+ 	"runtime"
+@@ -29,19 +30,24 @@ type jobIntrospector interface {
+ }
+ 
+ type JobInfo struct {
+-	Name     string
+-	Calls    []string
+-	Type     string
+-	Execs    atomic.Int32
+-	ExecTime atomic.Int64
+-	ProgId   string
++	Name   string
++	Calls  []string
++	Type   string
++	Execs  atomic.Int32
++	ProgId string
+ 	// debug counter of the amount of times a testcase execution was triggered
+ 	// due to functionPointerCoverage and in general.
+ 	// This is slightly duplicate with job.info.Execs
+ 	ExecRequestBecauseOfFPCov atomic.Int32
+ 	ExecRequestTotal          atomic.Int32
+-	FPCovCalculationsTime     atomic.Int64
+-	FromFPCovOrigin           bool
++
++	ExecTimeTotal          atomic.Int64
++	ExecTimeBecauseOfFPCov atomic.Int64
++	ExecsTimeLapses        syncTimePairArray
++	ExecsTimeLapsesFPCov   syncTimePairArray
++
++	FPCovCalculationsTime atomic.Int64
++	FromFPCovOrigin       bool
+ 
+ 	syncBuffer
+ }
+@@ -159,9 +165,23 @@ const (
+ func (job *triageJob) execute(req *queue.Request, flags ProgFlags) *queue.Result {
+ 	defer job.info.Execs.Add(1)
+ 	req.Important = true // All triage executions are important.
++	// Make sure to spread the fromFPCovOrigin taint into the requests
++	if job.info.FromFPCovOrigin {
++		req.FromFPCovOrigin = true
++	}
++
+ 	execStart := time.Now()
+ 	execResult := job.fuzzer.executeWithFlags(job.queue, req, flags)
+-	job.info.ExecTime.Add(int64(time.Since(execStart)))
++	execEnd := time.Now()
++	execTime := execEnd.Sub(execStart)
++
++	job.info.ExecTimeTotal.Add(int64(execTime))
++	job.info.ExecsTimeLapses.AppendAtomic(execStart, execEnd)
++	if req.FromFPCovOrigin {
++		job.info.ExecTimeBecauseOfFPCov.Add(int64(execTime))
++		job.info.ExecsTimeLapsesFPCov.AppendAtomic(execStart, execEnd)
++	}
++
+ 	return execResult
+ }
+ 
+@@ -606,16 +626,18 @@ func (job *triageJob) minimize(call int, info *triageCall) ([2]*prog.Prog, [2]in
+ 			var successFuncPointer bool
+ 
+ 			for range minimizeAttempts {
+-				if doFuncPointer && !doSignal {
+-					job.info.ExecRequestBecauseOfFPCov.Add(1)
+-				}
+-				job.info.ExecRequestTotal.Add(1)
+-				result := job.execute(&queue.Request{
++				nextRequest := queue.Request{
+ 					Prog:            p1,
+ 					ExecOpts:        setFlags(flatrpc.ExecFlagCollectSignal),
+ 					ReturnAllSignal: []int{call1},
+ 					Stat:            job.fuzzer.statExecMinimize,
+-				}, 0)
++				}
++				if doFuncPointer && !doSignal {
++					job.info.ExecRequestBecauseOfFPCov.Add(1)
++					nextRequest.FromFPCovOrigin = true
++				}
++				job.info.ExecRequestTotal.Add(1)
++				result := job.execute(&nextRequest, 0)
+ 				if result.Stop() {
+ 					stop = true
+ 					return false
+@@ -889,6 +911,32 @@ func (job *hintsJob) getInfo() *JobInfo {
+ 	return job.info
+ }
+ 
++type syncTimePairArray struct {
++	mu  sync.RWMutex
++	arr [][2]time.Time
++}
++
++func (stpa *syncTimePairArray) AppendAtomic(start time.Time, end time.Time) {
++	stpa.mu.Lock()
++	defer stpa.mu.Unlock()
++	stpa.arr = append(stpa.arr, [2]time.Time{start, end})
++}
++
++func (stpa *syncTimePairArray) AsJson() ([]byte, error) {
++	stpa.mu.RLock()
++	defer stpa.mu.RUnlock()
++	// array where each position has 2 maps from string to string
++	mapFormatted := []map[string]string{}
++	for _, startEnd := range stpa.arr {
++		entry := map[string]string{}
++		entry["TimeStart"] = startEnd[0].Format(time.DateTime)
++		entry["TimeEnd"] = startEnd[1].Format(time.DateTime)
++		entry["DurationSeconds"] = fmt.Sprintf("%f", startEnd[1].Sub(startEnd[0]).Seconds())
++		mapFormatted = append(mapFormatted, entry)
++	}
++	return json.Marshal(mapFormatted)
++}
++
+ type syncBuffer struct {
+ 	mu  sync.Mutex
+ 	buf bytes.Buffer

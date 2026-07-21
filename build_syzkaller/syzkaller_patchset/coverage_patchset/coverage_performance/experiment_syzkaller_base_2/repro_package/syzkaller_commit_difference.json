@@ -1,0 +1,21 @@
+{
+    "last_ancestor": {
+        "hash": "2f26d9373e3b66a96951dc390493bb275fdd87c1",
+        "message": "pkg/signal/signal.go: format json output of covered function pointers accordingly",
+        "branch": "WIP-unify_minimization_criteria_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 2,
+        "commits": [
+            {
+                "hash": "c39fc59c3ab34ffe0afad6a5d1b9e226c5b0135d",
+                "message": "pkg/fuzzer/fuzzer.go: fix logging by passing job log LogF arg instead of formatted string"
+            },
+            {
+                "hash": "05f37a349202739d834aa787916ad35176887bd2",
+                "message": "pkg/fuzzer/job.go: add logging of PC coverage when saving prog"
+            }
+        ]
+    }
+}

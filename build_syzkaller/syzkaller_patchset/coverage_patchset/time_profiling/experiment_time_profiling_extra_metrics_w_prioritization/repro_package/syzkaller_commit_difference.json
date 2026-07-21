@@ -1,0 +1,29 @@
+{
+    "last_ancestor": {
+        "hash": "e091baf08e02edd84e22d5a3e074bef39c5d07f4",
+        "message": "pkg/fuzzer: prioritize and track smashJobs from function pointer coverage origin",
+        "branch": "handle_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 4,
+        "commits": [
+            {
+                "hash": "ac6b06d0ef1799163caeb0a73d32ea502a843f6a",
+                "message": "pkg/fuzzer: skip function pointer generated smash queue half the time to allow more triages to complete"
+            },
+            {
+                "hash": "5ed5e1ec17487c93e2fc10119e7905cf0dd75502",
+                "message": "pkg/fuzzer: track time cost and start/end of individual prog requests during triage jobs"
+            },
+            {
+                "hash": "50cc2d42874655c477ceb377480d43cca70708f0",
+                "message": "pkg/fuzzer: turn off FPCover operation logging"
+            },
+            {
+                "hash": "ad052f9471f349c1c851a6721f22f0a0ccd0978f",
+                "message": "pkg/fuzzer: fix formatting of time-profiling debug logs"
+            }
+        ]
+    }
+}
