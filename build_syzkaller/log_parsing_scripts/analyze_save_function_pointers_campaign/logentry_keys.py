@@ -50,6 +50,8 @@ class RESULT_KEYS(StrEnum):
     COUNT = "count"
     PC_COVER = "PC_COVER"
     TIMESTAMP = "timestamp"
+    TIMESTAMP_BEGIN = "timestamp_begin"
+    TIMESTAMP_END = "timestamp_end"
     TOTAL_JOB_DURATION = "job_duration"
     TOTAL_PROG_EXECUTIONS = "prog_executions"
     FPOINTER_PROG_EXECUTIONS = "prog_executions_because_of_fpcov"

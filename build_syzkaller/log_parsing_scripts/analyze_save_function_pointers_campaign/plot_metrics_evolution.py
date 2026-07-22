@@ -52,14 +52,14 @@ def convert_timestamps_nicely(
 ) -> dict[str, dict[str, Any]]:
 
     for prog_key, entries in prog2log.items():
-        entries[RESULT_KEYS.TIMESTAMP] = datetime.strptime(
-            entries[RESULT_KEYS.TIMESTAMP], "%Y-%m-%d %H:%M:%S"
+        entries[RESULT_KEYS.TIMESTAMP_END] = datetime.strptime(
+            entries[RESULT_KEYS.TIMESTAMP_END], "%Y-%m-%d %H:%M:%S"
         )
     return prog2log
 
 
 def all_triage_timestamps(prog2log: dict[str, dict[str, Any]]) -> list[datetime]:
-    timestamps = [entry[RESULT_KEYS.TIMESTAMP] for entry in prog2log.values()]
+    timestamps = [entry[RESULT_KEYS.TIMESTAMP_END] for entry in prog2log.values()]
     return sorted(timestamps)
 
 

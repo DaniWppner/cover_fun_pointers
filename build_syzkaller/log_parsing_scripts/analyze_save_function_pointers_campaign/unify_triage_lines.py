@@ -155,16 +155,20 @@ def unify_per_prog(json_lines_file: Path) -> dict[str, dict[str, Any]]:
                     log_entry[RESULT_KEYS.SAVED_PROG] = [saved_prog]
 
             # timestamp needs to be joined accross entries for the same triage.
-            # we keep the latest timestamp instead of a range.
+            # we keep the first and latest timestamps.
             if RESULT_KEYS.TIMESTAMP in log_entry:
                 timestamp_entry = log_entry.pop(RESULT_KEYS.TIMESTAMP)
                 timestamp_value = datetime.strptime(timestamp_entry, '%Y-%m-%d %H:%M:%S')
                 if no_new:
-                    assert RESULT_KEYS.TIMESTAMP in result_dict[data_key]
-                    old_ts = result_dict[data_key][RESULT_KEYS.TIMESTAMP]
-                    result_dict[data_key][RESULT_KEYS.TIMESTAMP] = max(timestamp_value, old_ts)
+                    assert RESULT_KEYS.TIMESTAMP_END in result_dict[data_key]
+                    assert RESULT_KEYS.TIMESTAMP_BEGIN in result_dict[data_key]
+                    old_ts_end = result_dict[data_key][RESULT_KEYS.TIMESTAMP_END]
+                    old_ts_begin = result_dict[data_key][RESULT_KEYS.TIMESTAMP_BEGIN]
+                    result_dict[data_key][RESULT_KEYS.TIMESTAMP_END] = max(timestamp_value, old_ts_end)
+                    result_dict[data_key][RESULT_KEYS.TIMESTAMP_BEGIN] = min(timestamp_value, old_ts_begin)
                 else:
-                    log_entry[RESULT_KEYS.TIMESTAMP] = timestamp_value
+                    log_entry[RESULT_KEYS.TIMESTAMP_END] = timestamp_value
+                    log_entry[RESULT_KEYS.TIMESTAMP_BEGIN] = timestamp_value
 
             # tags also needs to be joined accross entries for the same triage.
             # we keep an union of tags and assume they are incremental.

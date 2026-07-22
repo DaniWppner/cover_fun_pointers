@@ -466,7 +466,7 @@ def print_source_code_diffs(
     #  PCs in the general log of reported instructions?
     print(f"Unique functions of fpointer stores: (count={len(storeinst_locs)})")
     print(
-        f"Function pointer store instructions in funcions different than PCs: (count={len(store_inst_diff)}):",
+        f"Function pointer store instructions in functions different than PCs: (count={len(store_inst_diff)}):",
         f"\n{sorted(store_inst_diff)}",
     )
     print("------------------------------------------------")
