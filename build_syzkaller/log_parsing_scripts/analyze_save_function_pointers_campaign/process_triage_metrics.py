@@ -266,9 +266,9 @@ def check_minimization_stats(prog2log: dict[str, dict[str, Any]]) -> None:
 
 def check_pc_cover_vs_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
     check_PC_exec_funcStore_literal_diffs(prog2log)
-    
-    storeinst_addr2loc, fpointer_addr2loc, storeinst_locs, fpointer_locs = get_fPointeStore_dicts_and_locs(prog2log)
-    all_pc_locs = get_unique_covered_functions(prog2log)
+
+    storeinst_addr2loc, fpointer_addr2loc, storeinst_locs, fpointer_locs = get_fPointerStore_dicts_and_locs(prog2log)
+    all_pc_locs = get_unique_covered_locations(prog2log)
     store_inst_diff, _ = locInfo_fname_diff(storeinst_locs, all_pc_locs)
     uncovered_fpointer_locs, covered_fpointer_locs = locInfo_fname_diff(fpointer_locs, all_pc_locs)
 
@@ -279,8 +279,19 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
     check_saved_because_skip_signal_vs_fpointers(prog2log, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs, uncovered_fpointer_locs)
 
 def write_covered_vs_uncovered_fpointers(prog2log: dict[str, dict[str, Any]], storeinst_addr2loc, fpointer_addr2loc, uncovered_fpointer_locs, covered_fpointer_locs):
+    """
+    Generate and save python dictionaries mapping function pointers (uncovered and covered)
+    to the source code locations of the instructions that stored them.
+
+    Args:
+        prog2log: Dictionary with the standard format for triage entries of each prog|call pair.
+        storeinst_addr2loc: Dict mapping store instruction addresses to their source code locations.
+        fpointer_addr2loc: Dict mapping function pointer addresses to their source code locations.
+        uncovered_fpointer_locs: Set of source code locations for function pointers that were not covered.
+        covered_fpointer_locs: Set of source code locations for function pointers that were covered.
+    """
     fpointer2storeinst = get_fpointer2storeinst(prog2log)
-    uncovered_fpointers_out, skip_count = get_fpointer2storeinst_as_source_locations(
+    uncovered_fpointers_out, skip_count = filter_fpointer2storeinst_by_source_locations(
         fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs,
     )
     assert skip_count == 0
@@ -289,7 +300,7 @@ def write_covered_vs_uncovered_fpointers(prog2log: dict[str, dict[str, Any]], st
         print(uncovered_fpointers_out, file=f)
     print(f"Mapping of uncovered function pointer to instructions that store them saved to {uncovered_fpointers_file.name}")
 
-    covered_fpointers_out, skip_count = get_fpointer2storeinst_as_source_locations(
+    covered_fpointers_out, skip_count = filter_fpointer2storeinst_by_source_locations(
         fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs
     )
     assert skip_count == 0
@@ -305,12 +316,23 @@ def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict[str, A
                                                 covered_fpointer_locs:  set[locInfo],
                                                 uncovered_fpointer_locs:  set[locInfo],
                                                 ) -> None:
+    """
+    Analyze and output metrics for function pointers that were stored in tests specifically saved
+    because of the function pointers (that is, when the interesting signal was 0).
+
+    Args:
+        prog2log: Dictionary with the standard format for triage entries of each prog|call pair.
+        fpointer_addr2loc: Dict mapping function pointer addresses to their source code locations.
+        storeinst_addr2loc: Dict mapping store instruction addresses to their source code locations.
+        covered_fpointer_locs: Set of source code locations for function pointers that were covered.
+        uncovered_fpointer_locs: Set of source code locations for function pointers that were not covered.
+    """
     saved_because_skip_signal = get_saved_because_skip_signal(prog2log)
     skip_signal_fpointer2storeinst = get_fpointer2storeinst(saved_because_skip_signal, stable_only=True)
-    covered_fpointers_saved_because_skip_signal, missed_covered = get_fpointer2storeinst_as_source_locations(
+    covered_fpointers_saved_because_skip_signal, missed_covered = filter_fpointer2storeinst_by_source_locations(
         skip_signal_fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs
     )
-    uncovered_fpointers_saved_because_skip_signal, missed_uncovered = get_fpointer2storeinst_as_source_locations(
+    uncovered_fpointers_saved_because_skip_signal, missed_uncovered = filter_fpointer2storeinst_by_source_locations(
         skip_signal_fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs
     )
 
@@ -331,7 +353,7 @@ def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict[str, A
         f"(count={len(uncovered_fpointers_saved_because_skip_signal)}",
         f"(ignored due to filter={missed_uncovered}) saved to {uncovered_fpointers_because_skip_signal_file.name}"
         )
-    print("------------------------------------------------")    
+    print("------------------------------------------------")
     covered_fpointers_subdict = filter_many_cond(saved_because_skip_signal,
                                                  lambda e: any(
                                                      # Each entry in FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC a list of locations.
@@ -365,10 +387,10 @@ def get_fpointer2storeinst(prog2log: dict[str, dict[str, Any]], stable_only: boo
     """
     Args:
         prog2log: dictionary with the standard format for triage entries of each prog|call pair.
-        stable_only: if true, ignore function pointer stores registered in NEW_FPOINTERS_PAYLOAD.
+        stable_only: if true, only consider function pointer stores registered in NEW_STABLE_FPOINTERS_PAYLOAD.
 
     Returns:
-        fpointer2storeinst: dict function pointer values stored to instructions that store them (hexadecimal strings).
+        fpointer2storeinst: dict from function pointers (as addresses) to sets of store instructions (as addresses) that store them.
     """
     fpointer2storeinst: dict[str, set[str]] = {}
     for entries in prog2log.values():
@@ -436,7 +458,7 @@ def print_source_code_diffs(
     """
     Print differences between stored fpointer data and executed PCs using source code location data.
     """
-    print(f"Unique functions covered: (count={len(all_pc_locs)})")
+    print(f"Unique locations (file + line number) covered: (count={len(all_pc_locs)})")
     print("------------------------------------------------")
     # First question:
     # How many of the reported instructions that store a value
@@ -452,12 +474,23 @@ def print_source_code_diffs(
     print(f"Stored functions that were not executed: (count={len(stored_value_diff)}):")
     print(f"Stored functions that did get executed: (count={len(stored_value_intersection)}):")
 
-def get_fPointeStore_dicts_and_locs(prog2log: dict[str, dict[str, Any]]) -> tuple[
+def get_fPointerStore_dicts_and_locs(prog2log: dict[str, dict[str, Any]]) -> tuple[
     dict[str, list[locInfo]],
     dict[str, list[locInfo]],
     set[locInfo],
     set[locInfo]
 ]:
+    """
+    Args:
+        prog2log: Dictionary with the standard format for triage entries of each prog|call pair.
+
+    Returns:
+        tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo], set[locInfo]]: A tuple with four elements:
+            storeinst_addr2location: Dict from store instruction addresses to source code locations (including inline resolutions).
+            fpointer_addr2location: Dict from function pointer addresses to source code locations (including inline resolutions).
+            storeinst_locs: Set of all source code locations of store instructions.
+            fpointer_locs: Set of all source code locations of function pointers.
+    """
     storeinst_addr2location : dict[str, list[locInfo]] = dict()
     fpointer_addr2location : dict[str, list[locInfo]] = dict()
     storeinst_locs : set[locInfo] = set()
@@ -483,7 +516,14 @@ def get_fPointeStore_dicts_and_locs(prog2log: dict[str, dict[str, Any]]) -> tupl
                 _fill_collections(fp)
     return storeinst_addr2location,fpointer_addr2location,storeinst_locs,fpointer_locs
 
-def get_unique_covered_functions(prog2log: dict[str, dict[str, Any]]) -> set[locInfo]:
+def get_unique_covered_locations(prog2log: dict[str, dict[str, Any]]) -> set[locInfo]:
+    """
+    Args:
+        prog2log: Dictionary with the standard format for triage entries of each prog|call pair.
+
+    Returns:
+        set[locInfo]: Set of source code locations of the executed PCs.
+    """
     all_pc_locs: set[locInfo] = set()
     for e in prog2log.values():
         for pc_entry in e.get(RESULT_KEYS.PC_COVER, []):
@@ -513,27 +553,28 @@ def locInfo_fname_diff(
     return diff, intersection
 
 
-def get_fpointer2storeinst_as_source_locations(
+def filter_fpointer2storeinst_by_source_locations(
     fpointer2storeinst: dict[str, set[str]],
     fpointer_addr2loc: dict[str, list[locInfo]],
     storeinst_addr2loc: dict[str, list[locInfo]],
     interesting_fpointer_locs: set[locInfo],
 ) -> tuple[dict[locInfo, set[locInfo]], int]:
     """
-    Filters the `fpointer2storeinst` dictionary using `interesting_fpointer_locs`.
+    Translates the mapping fpointer2storeinst (function pointers -> store instructions) as hexadecimal addresses into
+    the same mapping of (function pointers -> store instructions) as source code locations.
+    Flters the function pointers included in the result to only use those in interesting_fpointer_locs.
 
     Args:
-        fpointer2storeinst: dict from function pointer (hexadecimal strings) to the set of instructions that store it (hexadecimal strings).
-        fpointer_addr2loc: dict from function pointer (hexadecimal strings) to source code locations.
-        storeinst_addr2loc: dict from store instruction (hexadecimal strings) to source code locations.
-        interesting_fpointer_locs: set of source code locations (of function pointers) that must be a key in the output.
+        fpointer2storeinst: dict from function pointer addresses (hexadecimal strings) to the set of store instructions (addresses) that store them.
+        fpointer_addr2loc: dict from function pointer addresses to source code locations.
+        storeinst_addr2loc: dict from store instruction addresses to source code locations.
+        interesting_fpointer_locs: set of source code locations (of function pointers) that must be included in the output.
 
     Returns:
-        tuple[dict[locInfo, set[locInfo]], set[str], int]: A tuple with two elements:
-            output_dir: A dict from source code locations to sets of source code locations.
-                        The key represents the source code locations of the interesting function pointers.
-                        The values represent the source code locations of the instructions that store them.
-            skip_count: The number of `interesting_fpointer_locs` that did not match any fpointer in `fpointer2storeinst`
+        tuple[dict[locInfo, set[locInfo]], int]: A tuple with two elements:
+            output_dict: A dict from source code locations of the interesting function pointers
+                         to sets of source code locations of the instructions that store them.
+            skip_count: The number of `interesting_fpointer_locs` that did not match any function pointer in `fpointer2storeinst`.
     """
     interesting_fpointer2loc = {
         fpointer: locs[0]
@@ -541,16 +582,16 @@ def get_fpointer2storeinst_as_source_locations(
         if locs[0] in interesting_fpointer_locs
     }
     skip_count = 0
-    output_dir: dict[locInfo, set[locInfo]] = {}
+    output_dict: dict[locInfo, set[locInfo]] = {}
     for fpointer_addr, fpointer_loc in interesting_fpointer2loc.items():
         if fpointer_addr not in fpointer2storeinst:
             skip_count += 1
             continue
-        if fpointer_loc not in output_dir:
-            output_dir[fpointer_loc] = set()
+        if fpointer_loc not in output_dict:
+            output_dict[fpointer_loc] = set()
         for storeinst_addr in fpointer2storeinst[fpointer_addr]:
-            output_dir[fpointer_loc].update(storeinst_addr2loc[storeinst_addr])
-    return output_dir, skip_count
+            output_dict[fpointer_loc].update(storeinst_addr2loc[storeinst_addr])
+    return output_dict, skip_count
 
 
 if __name__ == "__main__":
