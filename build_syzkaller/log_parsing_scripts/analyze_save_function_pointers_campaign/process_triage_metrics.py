@@ -423,9 +423,7 @@ def check_source_code_diffs(prog2log: dict[str, dict[str, Any]]) -> tuple[
     Print differences between stored fpointer data and executed PCs using source code location data.
 
     Args:
-        all_pcs: Set of covered instruction addresses (hexadecimal strings).
-        all_fpointers_stores: Set of instructions that store a function pointer (hexadecimal strings).
-        all_fpointers: Set of function pointer values stored (hexadecimal strings).
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
 
     Returns:
         tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo], set[locInfo]]: A tuple with four elements:

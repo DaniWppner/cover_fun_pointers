@@ -419,27 +419,24 @@ def get_PCs_to_locs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpoin
         all_fpointers: Set of function pointer values stored (hexadecimal strings).
 
     Returns:
-        tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo], set[locInfo]]: A tuple with four elements:
-            fpointer_addr2location: dict mapping function pointer addresses all its source code locations, including inline resolutions.
-            storeinst_addr2location: dict mapping store instruction addresses all its source code locations, including inline resolutions.
-            stored_value_diff: set of source code locations for function pointers that were not covered.
-            stored_value_intersection: set of source code locations for function pointers that were covered.
+        tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], dict[str, list[locInfo]]]: A tuple with three elements:
+            allpcs_addr2location: dict mapping PC addresses to their source code locations, including inline resolutions.
+            fpointer_addr2location: dict mapping function pointer addresses to their source code locations, including inline resolutions.
+            storeinst_addr2location: dict mapping store instruction addresses to their source code locations, including inline resolutions.
     """
-    allpcs_addr2location, _, _ = get_source_code_refs(all_pcs)
-    storeinst_addr2location, _, _ = get_source_code_refs(all_fpointers_stores)
-    fpointer_addr2location, _, _ = get_source_code_refs(all_fpointers)
+    allpcs_addr2location = get_source_code_refs(all_pcs)
+    storeinst_addr2location = get_source_code_refs(all_fpointers_stores)
+    fpointer_addr2location = get_source_code_refs(all_fpointers)
     return allpcs_addr2location, fpointer_addr2location, storeinst_addr2location
 
 
 
 def get_source_code_refs(
     all_pcs: Iterable[str],
-) -> tuple[dict[str, list[locInfo]], set[locInfo], set[locInfo]]:
+) -> dict[str, list[locInfo]]:
     """
     Receives an iterable of PCs (hexadecimal values)
-    Returns a dictionary and two sets.
-    The first set is the set of locations those PCs are part of, including inlines.
-    The second set is the set of locations those PCs are part of without considering inlines.
+    Returns a dictionary mapping from the input PCs to a list of source code locations, including inlines.
     That means for PC 0x00c1, the following function structure:
 
         // file a.c line 743
@@ -452,14 +449,10 @@ def get_source_code_refs(
         748:    0x00c2        z = z % 3;
                           (...)
                         }
-    Would return {('modulo_3', ??), ('complement_modulo_3', ??) , ('foo', a.c:747)} for 0x00c1 in the first set.
-    But it would return just {('foo', a.c:747)} for 0xc00c1 in the second set.
-    Finally, the returned dictionary is a mapping from the input PCs to this information for each PC.
+    Would return [('modulo_3', ??), ('complement_modulo_3', ??) , ('foo', a.c:747)] for 0x00c1.
     """
     addr2fun_names = _get_source_code_refs_impl(all_pcs)
-    pc_info = set(f for flist in addr2fun_names.values() for f in flist)
-    pc_info_no_inlines = set(flist[-1] for flist in addr2fun_names.values())
-    return addr2fun_names, pc_info, pc_info_no_inlines
+    return addr2fun_names
 
 
 def _get_source_code_refs_impl(offsets: Iterable[str]) -> dict[str, list[locInfo]]:
