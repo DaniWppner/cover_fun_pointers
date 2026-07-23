@@ -3,6 +3,7 @@ import argparse
 import json
 import sys
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -18,19 +19,24 @@ def convert_types_nicely(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict[
         neat: list[locInfo] = [(funct, line) for funct, line in dict_entry[key]]
         return neat
 
+    def parsed_timestamp(ts: str) -> datetime:
+        return datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+
     for prog_key, entries in prog2log.items():
-        key1 = FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC
-        key2 = FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC
+        entries[RESULT_KEYS.TIMESTAMP_END] = parsed_timestamp(entries[RESULT_KEYS.TIMESTAMP_END])
+        entries[RESULT_KEYS.TIMESTAMP_BEGIN] = parsed_timestamp(entries[RESULT_KEYS.TIMESTAMP_BEGIN])
+        fpointer_loc_key = FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC
+        storeinst_loc_key = FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC
         for fpointer_payload in entries.get(RESULT_KEYS.NEW_FPOINTERS_PAYLOAD, []):
-            neat1 = convert_locations_list(fpointer_payload, key1)
-            neat2 = convert_locations_list(fpointer_payload, key2)
-            fpointer_payload[key1] = neat1
-            fpointer_payload[key2] = neat2
+            neat1 = convert_locations_list(fpointer_payload, fpointer_loc_key)
+            neat2 = convert_locations_list(fpointer_payload, storeinst_loc_key)
+            fpointer_payload[fpointer_loc_key] = neat1
+            fpointer_payload[storeinst_loc_key] = neat2
         for fpointer_payload in entries.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD,[]):
-            neat1 = convert_locations_list(fpointer_payload, key1)
-            neat2 = convert_locations_list(fpointer_payload, key2)
-            fpointer_payload[key1] = neat1
-            fpointer_payload[key2] = neat2
+            neat1 = convert_locations_list(fpointer_payload, fpointer_loc_key)
+            neat2 = convert_locations_list(fpointer_payload, storeinst_loc_key)
+            fpointer_payload[fpointer_loc_key] = neat1
+            fpointer_payload[storeinst_loc_key] = neat2
         for pc_entry in entries.get(RESULT_KEYS.PC_COVER, []):
             neat = convert_locations_list(pc_entry, PC_VALUES.PC_LOCATION)
             pc_entry[PC_VALUES.PC_LOCATION] = neat
@@ -68,17 +74,17 @@ def check_easy_stats(prog2log: dict[str, dict[str, Any]]) -> None:
         f"Number of <prog,call> pairs with multiple saved progs (count={len(multiple_saved_progs)}) saved to {multiple_corpus_fout.name}"
     )
     with open(multiple_corpus_fout, "w") as f:
-        json.dump(multiple_saved_progs, f, indent=2)
+        json.dump(multiple_saved_progs, f, indent=2, default=str)
 
 
 def has_minimization_result(minimization_result_type: str) -> Callable[[dict[str, Any]], bool]:
-    '''
+    """
     Args:
         minimization_result_type: desired key in one of the minimization results in an entry
 
     Returns:
         function that returns True for entries that have the specified minimization result type
-    '''
+    """
     def checker(prog_entry: dict[str, Any]) -> bool:
         if RESULT_KEYS.MINIMIZATION_RESULT not in prog_entry:
             return False
@@ -154,7 +160,7 @@ def deduplicate_saved_progs(prog2log: dict[str, dict[str, Any]]) -> tuple[
             reverse=True,
         )
     )
-    sorted_by_duplicates = {}
+    sorted_by_duplicates = dict()
     for listofjobids in sorted_count.values():
         sub_dict = {jobid: prog2log[jobid] for jobid in listofjobids}
         diff_with_res = {
@@ -167,13 +173,13 @@ def deduplicate_saved_progs(prog2log: dict[str, dict[str, Any]]) -> tuple[
 
 
 def get_saved_because_skip_signal(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    '''
+    """
     Args:
         prog2log: dictionary with the standard format for triage entries of each prog|call pair.
 
     Returns:
         sub-dictionary of the input where only functionPointerCoverage was interesting
-    '''
+    """
     return filter_many_cond(
         prog2log,
         has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SIGNAL_SKIP),
@@ -203,7 +209,7 @@ def check_saved_because_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
         f"saved to {saved_because_fpointer_Wduplicate_fout.name}"
     )
     with open(saved_because_fpointer_Wduplicate_fout, "w") as f:
-        json.dump(saved_because_skip_signal, f, indent=2)
+        json.dump(saved_because_skip_signal, f, indent=2, default=str)
 
     saved_deduplicate_fout = Path.cwd() / "saved_because_fpointer.json"
     print(
@@ -211,7 +217,7 @@ def check_saved_because_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
         f"saved to {saved_deduplicate_fout.name}"
     )
     with open(saved_deduplicate_fout, "w") as f:
-        json.dump(deduplicate_interesting, f, indent=2)
+        json.dump(deduplicate_interesting, f, indent=2, default=str)
 
     print(f"Number of progs saved with fpointer and skip signal more than once: {count_duplicate_saved_interesting_progs}")
 
@@ -261,7 +267,7 @@ def check_minimization_stats(prog2log: dict[str, dict[str, Any]]) -> None:
         + f"saved to {both_unique_fout.name}"
     )
     with open(both_unique_fout, "w") as f:
-        json.dump(unique_signal_and_fpointer, f, indent=2)
+        json.dump(unique_signal_and_fpointer, f, indent=2, default=str)
 
 
 def check_pc_cover_vs_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
@@ -274,21 +280,26 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
 
     print(colored("################################################", "cyan"))
     print_source_code_diffs(all_pc_locs, storeinst_locs, store_inst_diff, fpointer_locs, uncovered_fpointer_locs, covered_fpointer_locs)
-    write_covered_vs_uncovered_fpointers(prog2log, storeinst_addr2loc, fpointer_addr2loc, uncovered_fpointer_locs, covered_fpointer_locs)
+    write_covered_vs_uncovered_fpointers(prog2log, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs, uncovered_fpointer_locs)
     print(colored("################################################", "cyan"))
     check_saved_because_skip_signal_vs_fpointers(prog2log, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs, uncovered_fpointer_locs)
 
-def write_covered_vs_uncovered_fpointers(prog2log: dict[str, dict[str, Any]], storeinst_addr2loc, fpointer_addr2loc, uncovered_fpointer_locs, covered_fpointer_locs):
+def write_covered_vs_uncovered_fpointers(prog2log: dict[str, dict[str, Any]],
+                                        fpointer_addr2loc: dict[str, list[locInfo]],
+                                        storeinst_addr2loc:  dict[str, list[locInfo]],
+                                        covered_fpointer_locs:  set[locInfo],
+                                        uncovered_fpointer_locs:  set[locInfo],
+                                        ) -> None:
     """
     Generate and save python dictionaries mapping function pointers (uncovered and covered)
     to the source code locations of the instructions that stored them.
 
     Args:
         prog2log: Dictionary with the standard format for triage entries of each prog|call pair.
-        storeinst_addr2loc: Dict mapping store instruction addresses to their source code locations.
         fpointer_addr2loc: Dict mapping function pointer addresses to their source code locations.
-        uncovered_fpointer_locs: Set of source code locations for function pointers that were not covered.
+        storeinst_addr2loc: Dict mapping store instruction addresses to their source code locations.
         covered_fpointer_locs: Set of source code locations for function pointers that were covered.
+        uncovered_fpointer_locs: Set of source code locations for function pointers that were not covered.
     """
     fpointer2storeinst = get_fpointer2storeinst(prog2log)
     uncovered_fpointers_out, skip_count = filter_fpointer2storeinst_by_source_locations(
@@ -371,14 +382,14 @@ def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict[str, A
                                                  ))
     covered_fpointers_subdict_fout = Path.cwd() / "registered_covered_fpointers_saved_because_fpointer.json"
     with open(covered_fpointers_subdict_fout, "w") as f:
-        json.dump(covered_fpointers_subdict, f, indent=2)
+        json.dump(covered_fpointers_subdict, f, indent=2, default=str)
     print("Progs saved with fpointer and skip signal that registered a covered function pointer",
          f"(count={len(covered_fpointers_subdict)}) saved to {covered_fpointers_subdict_fout.name}"
     )
 
     uncovered_fpointers_subdict_fout = Path.cwd() / "registered_uncovered_fpointers_saved_because_fpointer.json"
     with open(uncovered_fpointers_subdict_fout, "w") as f:
-        json.dump(uncovered_fpointers_subdict, f, indent=2)
+        json.dump(uncovered_fpointers_subdict, f, indent=2, default=str)
     print("Progs saved with fpointer and skip signal that registered an uncovered function pointer",
          f"(count={len(uncovered_fpointers_subdict)}) saved to {uncovered_fpointers_subdict_fout.name}"
     )
@@ -392,7 +403,7 @@ def get_fpointer2storeinst(prog2log: dict[str, dict[str, Any]], stable_only: boo
     Returns:
         fpointer2storeinst: dict from function pointers (as addresses) to sets of store instructions (as addresses) that store them.
     """
-    fpointer2storeinst: dict[str, set[str]] = {}
+    fpointer2storeinst: dict[str, set[str]] = dict()
     for entries in prog2log.values():
         if not stable_only and RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in entries:
             for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
@@ -531,6 +542,93 @@ def get_unique_covered_locations(prog2log: dict[str, dict[str, Any]]) -> set[loc
     return all_pc_locs
 
 
+def get_function_pointer_coverage_timeline(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict[locInfo, tuple[datetime, datetime, int]]]:
+    """
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
+
+    Returns:
+        dict[str, dict[locInfo, tuple[datetime, datetime, int]]]: A dictionary from top-level function names
+            to dictionaries of locInfos executed within that function.
+            Each value in the nested dictionaries is a tuple with three elements:
+                min_timestamp_begin: the earliest start timestamp among triage jobs that covered this locInfo
+                min_timestamp_end: the earliest end timestamp among triage jobs that covered this locInfo
+                count: the total number of triage jobs that covered this locInfo
+    """
+    function_cover_map: dict[str, dict[locInfo, tuple[datetime, datetime, int]]] = dict()
+    for entry in prog2log.values():
+        if RESULT_KEYS.PC_COVER not in entry:
+            continue
+        t_start = entry[RESULT_KEYS.TIMESTAMP_BEGIN]
+        t_end = entry[RESULT_KEYS.TIMESTAMP_END]
+        for pc_entry in entry[RESULT_KEYS.PC_COVER]:
+            locs = pc_entry[PC_VALUES.PC_LOCATION]
+            # locs is a list of locInfo representing the inline stack.
+            # locs[0] corresponds to the current, non-inlined executing function.
+            top_level_loc = locs[0]
+            func_name = top_level_loc[1]
+
+            if func_name not in function_cover_map:
+                function_cover_map[func_name] = dict()
+            loc_dict = function_cover_map[func_name]
+
+            if top_level_loc not in loc_dict:
+                # will get +1 in just a second
+                loc_dict[top_level_loc] = (t_start, t_end, 0)
+            else:
+                # will be t_start, t_end if this was the first entry.
+                old_start, old_end, current_count = loc_dict[top_level_loc]
+                new_start = min(old_start, t_start)
+                new_end = min(old_end, t_end)
+                loc_dict[top_level_loc] = (new_start, new_end, current_count + 1)
+    return function_cover_map
+
+
+def get_fPointers_covered_accross_timeline(
+    prog2log: dict[str, dict[str, Any]],
+    fPointer_coverage_timeline: dict[str, dict[locInfo, tuple[datetime, datetime, int]]]
+) -> tuple[set[locInfo], set[locInfo], set[locInfo]]:
+    """
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
+        fPointer_coverage_timeline: The output of get_function_pointer_coverage_timeline.
+
+    Returns:
+        tuple[set[locInfo], set[locInfo], set[locInfo]]: A tuple with three elements:
+            not_covered_in_this_triage: Function pointers that were not executed during the triage that stored them.
+            not_covered_yet: Function pointers that had never been executed up to the point where they were stored.
+            covered_strictly_after: Function pointers that were executed only after the point where they were stored.
+    """
+    not_covered_in_this_triage: set[locInfo] = set()
+    not_covered_yet: set[locInfo] = set()
+    covered_strictly_after: set[locInfo] = set()
+
+    for entries in prog2log.values():
+        job_end = entries[RESULT_KEYS.TIMESTAMP_END]
+        job_covered_funcs: set[str] = set()
+        if RESULT_KEYS.PC_COVER in entries:
+            for pc_entry in entries[RESULT_KEYS.PC_COVER]:
+                job_covered_funcs.add(pc_entry[PC_VALUES.PC_LOCATION][0][1])
+
+        for fPointer_entry in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD]:
+            fp_loc = fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC][0]
+            func_name = fp_loc[1]
+
+            if func_name not in job_covered_funcs:
+                not_covered_in_this_triage.add(fp_loc)
+
+            if func_name not in fPointer_coverage_timeline:
+                not_covered_yet.add(fp_loc)
+            else:
+                min_start = min(start for start, end, count in fPointer_coverage_timeline[func_name].values())
+                if min_start > job_end:
+                    # hacky hack: not covered yet is the set of never covered + the set of covered striclty after.
+                    not_covered_yet.add(fp_loc)
+                    covered_strictly_after.add(fp_loc)
+
+    return not_covered_in_this_triage, not_covered_yet, covered_strictly_after
+
+
 def locInfo_fname_diff(
     this: Iterable[locInfo], other: Iterable[locInfo]
 ) -> tuple[set[locInfo], set[locInfo]]:
@@ -582,7 +680,7 @@ def filter_fpointer2storeinst_by_source_locations(
         if locs[0] in interesting_fpointer_locs
     }
     skip_count = 0
-    output_dict: dict[locInfo, set[locInfo]] = {}
+    output_dict: dict[locInfo, set[locInfo]] = dict()
     for fpointer_addr, fpointer_loc in interesting_fpointer2loc.items():
         if fpointer_addr not in fpointer2storeinst:
             skip_count += 1
@@ -592,6 +690,34 @@ def filter_fpointer2storeinst_by_source_locations(
         for storeinst_addr in fpointer2storeinst[fpointer_addr]:
             output_dict[fpointer_loc].update(storeinst_addr2loc[storeinst_addr])
     return output_dict, skip_count
+
+
+def check_fPointers_covered_after_save(prog2log: dict[str, dict[str, Any]]) -> None:
+    fPointer_coverage_timeline = get_function_pointer_coverage_timeline(prog2log)
+    saved_because_skip_signal = get_saved_because_skip_signal(prog2log)
+
+    not_covered_in_skip_signal, not_covered_before_skip_signal, covered_strictly_after_skip_signal = get_fPointers_covered_accross_timeline(
+        saved_because_skip_signal, fPointer_coverage_timeline
+    )
+    print("------------Tests that were saved only due to function pointers------------")
+    print("Function pointers not covered in tests for that function pointer (with no other interesting signal):"+
+          f"(count={len(not_covered_in_skip_signal)})")
+    print(f"Function pointers not covered before the test for that function pointer (with no other interesting signal):"+
+          f"(count={len(not_covered_before_skip_signal)})")
+    print(f"Function pointers covered after the test for that function pointer (with no other interesting signal):"+
+          f"(count={len(covered_strictly_after_skip_signal)})")
+
+    saves_fPointer = filter_many_cond(prog2log, has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER))
+    not_covered_in_saves_fpointer, not_covered_before_saves_fPointer, covered_strictly_after_saves_fpointer = get_fPointers_covered_accross_timeline(
+        saves_fPointer, fPointer_coverage_timeline
+    )
+    print("------------Tests that saved function pointers and had new signal------------")
+    print("Function pointers not covered in the test that saved them:"+
+          f"(count={len(not_covered_in_saves_fpointer)})")
+    print(f"Function pointers not covered before the test in the test that saved them:"+
+          f"(count={len(not_covered_before_saves_fPointer)})")
+    print(f"Function pointers covered after the test in the test that saved them:"+
+          f"(count={len(covered_strictly_after_saves_fpointer)})")
 
 
 if __name__ == "__main__":
@@ -627,6 +753,8 @@ if __name__ == "__main__":
 
     print(colored("################################################", "cyan"))
     check_pc_cover_vs_fpointer(triage_json)
+    print(colored("################################################", "cyan"))
+    check_fPointers_covered_after_save(triage_json)
     print(colored("################################################", "cyan"))
     check_easy_stats(triage_json)
     print(colored("################################################", "cyan"))
