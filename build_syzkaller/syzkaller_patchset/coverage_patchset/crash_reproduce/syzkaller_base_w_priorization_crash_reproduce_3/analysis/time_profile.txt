@@ -1,0 +1,24 @@
+Saved plot to job_duration_series_sorted_by_finish_time.png
+Saved plot to prog_exec_duration_seriessorted_by_finish_time.png
+Saved plot to all_execs_series.png
+Saved plot to all_execs_histogram.png
+-------------------------------------
+Total campaign duration (seconds): 1 day, 17:23:32
+-------------------------------------
+Total triages during campaign: 1859
+-------------------------------------
+Triages / hour during campaign: 44.912
+-------------------------------------
+Total job execution time: 1507 days, 13:10:25.733238
+-------------------------------------
+Total prog execution time during jobs: 1507 days, 13:10:20.331874
+-------------------------------------
+Average prog execution time during jobs: 19:35:16.997479
+-------------------------------------
+Total prog executions during jobs: 37483
+-------------------------------------
+Average prog executions during jobs: 20.163
+##############################
+Cleaned up json lines outputted to triage_lines.jsonl
+##############################
+Time profile data outputted to time_profile_data.json

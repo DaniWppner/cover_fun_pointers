@@ -357,24 +357,26 @@ def process_time_profile_lines(lines: list[dict], out_dir: Path):
     entry_timestamps = [entry[RESULT_KEYS.TIMESTAMP] for entry in unified_dict.values()]
     start_time = min(entry_timestamps)
     entry_hours = [(timestamp - start_time).total_seconds() / 3600 for timestamp in entry_timestamps]
+
     initialize_convertion_functions(list(range(len(entry_hours))), entry_hours)
-    all_individual_durations = [entry[RESULT_KEYS.PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS] for entry in unified_dict.values()]
-    fpointer_individual_durations = [entry[RESULT_KEYS.PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS] for entry in unified_dict.values()]
+    all_individual_durations = [entry.get(RESULT_KEYS.PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS, []) for entry in unified_dict.values()]
+    fpointer_individual_durations = [entry.get(RESULT_KEYS.PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS, []) for entry in unified_dict.values()]
+    unified_individual_durations = sum(all_individual_durations, start=[])
+    unified_fpointer_individual_durations = sum(fpointer_individual_durations, start=[])
+    if unified_individual_durations or unified_fpointer_individual_durations:
+        in_flight_generic_progs_at, start_time, end_time = calculate_in_flight_progs(unified_individual_durations)
+        in_flight_fpointer_progs_at, _, _ = calculate_in_flight_progs(unified_fpointer_individual_durations)
 
-    in_flight_generic_progs_at, start_time, end_time = calculate_in_flight_progs(sum(all_individual_durations, start=[]))
-    in_flight_fpointer_progs_at, _, _ = calculate_in_flight_progs(sum(fpointer_individual_durations, start=[]))
+        per_job_all_durations = collapse_job_durations(all_individual_durations)
+        per_job_fpointer_durations = collapse_job_durations(fpointer_individual_durations)
 
-    per_job_all_durations = collapse_job_durations(all_individual_durations)
-    per_job_fpointer_durations = collapse_job_durations(fpointer_individual_durations)
-
-    timestart_sorted_dur = [e["DurationSeconds"] for e in sorted(per_job_all_durations, key=lambda e:e["TimeStart"])]
-    timestart_sorted_fpointer_dur = [e["DurationSeconds"] for e in sorted(per_job_fpointer_durations, key=lambda e:e["TimeStart"])]
+        timestart_sorted_dur = [e["DurationSeconds"] for e in sorted(per_job_all_durations, key=lambda e:e["TimeStart"])]
+        timestart_sorted_fpointer_dur = [e["DurationSeconds"] for e in sorted(per_job_fpointer_durations, key=lambda e:e["TimeStart"])]
+        show_job_over_time_plots(timestart_sorted_dur, None, entry_hours, 'sorted by begin time', out_dir)
+        show_progs_in_flight_plots(in_flight_generic_progs_at, in_flight_fpointer_progs_at, start_time, end_time, out_dir)
 
     show_job_over_time_plots(prog_exec_times, job_times, entry_hours, 'sorted by finish time', out_dir)
-    show_job_over_time_plots(timestart_sorted_dur, None, entry_hours, 'sorted by begin time', out_dir)
 
-
-    show_progs_in_flight_plots(in_flight_generic_progs_at, in_flight_fpointer_progs_at, start_time, end_time, out_dir)
     show_prog_exec_frecuency_plots(all_execs, function_pointer_execs, out_dir)
     show_info(all_execs,
               function_pointer_execs,
