@@ -1,0 +1,1335 @@
+diff --git a/executor/executor.cc b/executor/executor.cc
+index 3ba21e846..225e3aae3 100644
+--- a/executor/executor.cc
++++ b/executor/executor.cc
+@@ -4,6 +4,7 @@
+ // +build
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <errno.h>
+ #include <limits.h>
+ #include <signal.h>
+@@ -102,7 +103,7 @@ static NORETURN void doexit_thread(int status);
+ static PRINTF(1, 2) void debug(const char* msg, ...);
+ void debug_dump_data(const char* data, int length);
+ 
+-#if 0
++#if 1
+ #define debug_verbose(...) debug(__VA_ARGS__)
+ #else
+ #define debug_verbose(...) (void)0
+@@ -339,6 +340,11 @@ static const uint64 arg_csum_chunk_const = 1;
+ 
+ typedef intptr_t(SYSCALLAPI* syscall_t)(intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t, intptr_t);
+ 
++#define KCOV_ENTRY_TYPE_HEADER_PC 0xdeadbeeffffffffeULL
++#define KCOV_ENTRY_TYPE_HEADER_FUN_POINTER 0xdeadbeefffffffffULL
++#define KCOV_ENTRY_WORD_SIZE_PC 1
++#define KCOV_ENTRY_WORD_SIZE_FUN_POINTER 3
++
+ struct call_t {
+ 	const char* name;
+ 	int sys_nr;
+@@ -379,6 +385,16 @@ struct cover_t {
+ 	bool overflow;
+ 	// True if cover_enable() was called for this object.
+ 	bool enabled;
++
++	// Arrays used to store KCOV data after parsing.
++	// Uninitialized after collection at first.
++	// Array for standard PC coverage
++	char* pc_data;
++	uint32 pc_size;
++
++	// Array for function pointer stores
++	char* store_func_data;
++	uint32 store_func_size;
+ };
+ 
+ struct thread_t {
+@@ -1228,13 +1244,12 @@ uint32 write_signal(flatbuffers::FlatBufferBuilder& fbb, int index, cover_t* cov
+ 	// Write out feedback signals.
+ 	// Currently it is code edges computed as xor of two subsequent basic block PCs.
+ 	fbb.StartVector<uint64_t>(0);
+-	cover_data_t* cover_data = (cover_data_t*)(cov->data + cov->data_offset);
+-	if ((char*)(cover_data + cov->size) > cov->data_end)
+-		failmsg("too much cover", "cov=%u", cov->size);
++	cover_data_t* cover_data = (cover_data_t*)(cov->pc_data);
++	// Checking of data overflow is now done on parse_kcov_buffer
+ 	uint32 nsig = 0;
+ 	cover_data_t prev_pc = 0;
+ 	bool prev_filter = true;
+-	for (uint32 i = 0; i < cov->size; i++) {
++	for (uint32 i = 0; i < cov->pc_size; i++) {
+ 		cover_data_t pc = cover_data[i] + cov->pc_offset;
+ 		uint64 sig = pc;
+ 		if (use_cover_edges) {
+@@ -1258,11 +1273,34 @@ uint32 write_signal(flatbuffers::FlatBufferBuilder& fbb, int index, cover_t* cov
+ 	return fbb.EndVector(nsig);
+ }
+ 
++template <typename cover_data_t>
++uint32 write_function_pointer_stores(flatbuffers::FlatBufferBuilder& fbb, cover_t* cov)
++{
++	rpc::StoreFunPointerRaw* out_vector;
++	uint32 store_count = cov->store_func_size;
++	cover_data_t* store_data = (cover_data_t*)(cov->store_func_data);
++	// out_vector will get allocated to a buffer we can write to
++	auto ret_vector = fbb.CreateUninitializedVectorOfStructs<rpc::StoreFunPointerRaw>(
++	    store_count, &out_vector);
++	for (uint32 i = 0; i < store_count; i++) {
++		// This implementation creates a rpc::StoreFunPointerRaw for each entry
++		// without assuming the size of each word will necessatily be uint64
++		uint32 entry_start_index = i * KCOV_ENTRY_WORD_SIZE_FUN_POINTER;
++		out_vector[i] = rpc::StoreFunPointerRaw(
++		    store_data[entry_start_index + cov->pc_offset], // pc
++		    store_data[entry_start_index + 1], // store addr
++		    store_data[entry_start_index + 2] // stored value
++		);
++	}
++	// TO DO: Why is this what we want to return?
++	return ret_vector.o;
++}
++
+ template <typename cover_data_t>
+ uint32 write_cover(flatbuffers::FlatBufferBuilder& fbb, cover_t* cov)
+ {
+-	uint32 cover_size = cov->size;
+-	cover_data_t* cover_data = (cover_data_t*)(cov->data + cov->data_offset);
++	uint32 cover_size = cov->pc_size;
++	cover_data_t* cover_data = (cover_data_t*)(cov->pc_data);
+ 	if (flag_dedup_cover) {
+ 		cover_data_t* end = cover_data + cover_size;
+ 		std::sort(cover_data, end);
+@@ -1374,6 +1412,91 @@ void copyout_call_results(thread_t* th)
+ 	}
+ }
+ 
++template <typename cover_data_t>
++void parse_kcov_buffer(cover_t* cov)
++{
++	uint32 pc_count = 0;
++	uint32 store_func_count = 0;
++	// cov->data is of type char*. Casting it to cover_data_t*
++	// will allow for well-aligned element iteration.
++	cover_data_t* cover_data = (cover_data_t*)(cov->data + cov->data_offset);
++	// Doing black pointer size arithmetic to figure out
++	// what is actually the last valid index in cover_data will pay out.
++	// This is because cov->data_size is the amount of readable bytes.
++	uint32 data_size_words = (cov->data_size) / sizeof(cover_data_t);
++
++	// We're going to fill tmp_data with pc entries front-to-back,
++	// and back-to-front with store_func_pointer entries.
++	cover_data_t* tmp_data = (cover_data_t*)malloc(cov->data_size);
++	uint32 tmp_data_end_index = data_size_words - 1;
++
++	// Since we're starting from cov->data + cov->data_offset,
++	// position 0 is already the first kcov entry.
++	uint64 i = 0;
++	while (i < cov->size) {
++		cover_data_t entry_type = cover_data[i];
++
++		if (entry_type == KCOV_ENTRY_TYPE_HEADER_PC) {
++			if (i + KCOV_ENTRY_WORD_SIZE_PC > data_size_words) {
++				failmsg("too much cover", "cov=%u", cov->size);
++			}
++			tmp_data[pc_count] = cover_data[i + 1];
++			pc_count++;
++
++			i += KCOV_ENTRY_WORD_SIZE_PC + 1;
++
++		} else if (entry_type == KCOV_ENTRY_TYPE_HEADER_FUN_POINTER) {
++			if (i + KCOV_ENTRY_WORD_SIZE_FUN_POINTER > data_size_words) {
++				failmsg("too much cover", "cov=%u", cov->size);
++			}
++
++			uint32 curr_idx = tmp_data_end_index - (store_func_count * KCOV_ENTRY_WORD_SIZE_FUN_POINTER);
++
++			tmp_data[curr_idx] = cover_data[i + 1]; // pc
++			tmp_data[curr_idx - 1] = cover_data[i + 2]; // store_addr
++			tmp_data[curr_idx - 2] = cover_data[i + 3]; // stored_value
++			store_func_count++;
++
++			i += KCOV_ENTRY_WORD_SIZE_FUN_POINTER + 1;
++
++		} else {
++			// FIXME: if cover_data_t is uint32, this will probably be the default case,
++			// as the kcov type headers assume 64 bit constants.
++
++			// Upcast to uint64 for printf compatibility
++			failmsg("unknown kcov entry type", "type=%llu", (uint64)entry_type);
++		}
++	}
++	uint32 data_idx = 0;
++	uint32 store_func_start;
++
++	// copy all pc entries to the beginning of cover_data
++	for (uint32 i = 0; i < pc_count; i++) {
++		cover_data[data_idx] = tmp_data[i];
++		data_idx++;
++	}
++
++	// copy all store_func_pointer entries just after cover_data
++	store_func_start = data_idx;
++	for (uint32 i = 0; i < store_func_count; i++) {
++		uint32 curr_idx = tmp_data_end_index - (i * KCOV_ENTRY_WORD_SIZE_FUN_POINTER);
++		cover_data[data_idx] = tmp_data[curr_idx]; // pc
++		cover_data[data_idx + 1] = tmp_data[curr_idx - 1]; // store_addr
++		cover_data[data_idx + 2] = tmp_data[curr_idx - 2]; // stored_value
++		data_idx += KCOV_ENTRY_WORD_SIZE_FUN_POINTER;
++	}
++
++	// We need to cast back to char* in order to be able to store in cov->data.
++	// Fear not as write_signal, etc. will know what format to expect in the byte array.
++	cov->pc_size = pc_count;
++	cov->pc_data = (char*)cover_data;
++
++	cov->store_func_size = store_func_count;
++	cov->store_func_data = (char*)(cover_data + store_func_start);
++
++	free(tmp_data);
++}
++
+ void write_output(int index, cover_t* cov, rpc::CallFlag flags, uint32 error, bool all_signal)
+ {
+ 	CoverAccessScope scope(cov);
+@@ -1383,14 +1506,28 @@ void write_output(int index, cover_t* cov, rpc::CallFlag flags, uint32 error, bo
+ 	uint32 signal_off = 0;
+ 	uint32 cover_off = 0;
+ 	uint32 comps_off = 0;
++	uint32 stores_off = 0;
+ 	if (flag_comparisons) {
+ 		comps_off = write_comparisons(fbb, cov);
+ 	} else {
++		// write_comparisons still assumes the original kcov formatting,
++		// which is luckily maintained by the patch when kcov_mode = comparisons.
++		// It should be OK to attempt to parse cov->data only when in kcov_mode=pc.
++		debug("parse_kcov_buffer on call %d start", index);
++		if (is_kernel_64_bit)
++			parse_kcov_buffer<uint64>(cov);
++		else
++			parse_kcov_buffer<uint32>(cov);
++		debug("parse_kcov_buffer on call %d ended", index);
++
+ 		if (flag_collect_signal) {
+-			if (is_kernel_64_bit)
++			if (is_kernel_64_bit) {
+ 				signal_off = write_signal<uint64>(fbb, index, cov, all_signal);
+-			else
++				stores_off = write_function_pointer_stores<uint64>(fbb, cov);
++			} else {
+ 				signal_off = write_signal<uint32>(fbb, index, cov, all_signal);
++				stores_off = write_function_pointer_stores<uint32>(fbb, cov);
++			}
+ 		}
+ 		if (flag_collect_cover) {
+ 			if (is_kernel_64_bit)
+@@ -1405,8 +1542,10 @@ void write_output(int index, cover_t* cov, rpc::CallFlag flags, uint32 error, bo
+ 		flags |= rpc::CallFlag::CoverageOverflow;
+ 	builder.add_flags(flags);
+ 	builder.add_error(error);
+-	if (signal_off)
++	if (signal_off) {
+ 		builder.add_signal(signal_off);
++		builder.add_func_stores(stores_off);
++	}
+ 	if (cover_off)
+ 		builder.add_cover(cover_off);
+ 	if (comps_off)
+@@ -1420,8 +1559,8 @@ void write_output(int index, cover_t* cov, rpc::CallFlag flags, uint32 error, bo
+ 	call.offset = off;
+ 	output_data->consumed.store(output_builder->GetSize(), std::memory_order_release);
+ 	output_data->completed.store(slot + 1, std::memory_order_release);
+-	debug_verbose("out #%u: index=%u errno=%d flags=0x%x total_size=%u\n",
+-		      slot + 1, index, error, static_cast<unsigned>(flags), call.data_size - start_size);
++	debug_verbose("out #%u: index=%u errno=%d flags=0x%x total_size=?\n",
++		      slot + 1, index, error, static_cast<unsigned>(flags));
+ }
+ 
+ void write_call_output(thread_t* th, bool finished)
+diff --git a/pkg/corpus/corpus.go b/pkg/corpus/corpus.go
+index 1b00e1b59..10e4d9958 100644
+--- a/pkg/corpus/corpus.go
++++ b/pkg/corpus/corpus.go
+@@ -10,6 +10,7 @@ import (
+ 	"maps"
+ 	"slices"
+ 	"sync"
++	"time"
+ 
+ 	"github.com/google/syzkaller/pkg/cover"
+ 	"github.com/google/syzkaller/pkg/hash"
+@@ -97,13 +98,14 @@ type ItemUpdate struct {
+ // too hard to synchonize accesses to them across the whole project.
+ // When Corpus updates one of its items, it saves a copy of it.
+ type Item struct {
+-	Sig     string
+-	Call    int
+-	Prog    *prog.Prog
+-	HasAny  bool // whether the prog contains squashed arguments
+-	Signal  signal.Signal
+-	Cover   []uint64
+-	Updates []ItemUpdate
++	Sig       string
++	Call      int
++	Prog      *prog.Prog
++	HasAny    bool // whether the prog contains squashed arguments
++	Signal    signal.Signal
++	Timestamp time.Time
++	Cover     []uint64
++	Updates   []ItemUpdate
+ 
+ 	areas map[*focusAreaState]struct{}
+ }
+@@ -147,14 +149,15 @@ func (corpus *Corpus) Save(inp NewInput) {
+ 		newCover.Merge(old.Cover)
+ 		newCover.Merge(inp.Cover)
+ 		newItem := &Item{
+-			Sig:     sig,
+-			Prog:    old.Prog,
+-			Call:    old.Call,
+-			HasAny:  old.HasAny,
+-			Signal:  newSignal,
+-			Cover:   newCover.Serialize(),
+-			Updates: slices.Clone(old.Updates),
+-			areas:   maps.Clone(old.areas),
++			Sig:       sig,
++			Prog:      old.Prog,
++			Call:      old.Call,
++			HasAny:    old.HasAny,
++			Timestamp: old.Timestamp,
++			Signal:    newSignal,
++			Cover:     newCover.Serialize(),
++			Updates:   slices.Clone(old.Updates),
++			areas:     maps.Clone(old.areas),
+ 		}
+ 		const maxUpdates = 32
+ 		if len(newItem.Updates) < maxUpdates {
+@@ -164,13 +167,14 @@ func (corpus *Corpus) Save(inp NewInput) {
+ 		corpus.applyFocusAreas(newItem, inp.Cover)
+ 	} else {
+ 		item := &Item{
+-			Sig:     sig,
+-			Call:    inp.Call,
+-			Prog:    inp.Prog,
+-			HasAny:  inp.Prog.ContainsAny(),
+-			Signal:  inp.Signal,
+-			Cover:   inp.Cover,
+-			Updates: []ItemUpdate{update},
++			Sig:       sig,
++			Call:      inp.Call,
++			Prog:      inp.Prog,
++			HasAny:    inp.Prog.ContainsAny(),
++			Signal:    inp.Signal,
++			Timestamp: time.Now(),
++			Cover:     inp.Cover,
++			Updates:   []ItemUpdate{update},
+ 		}
+ 		corpus.progsMap[sig] = item
+ 		corpus.applyFocusAreas(item, inp.Cover)
+diff --git a/pkg/execbackend/local.go b/pkg/execbackend/local.go
+index 7709c0578..2e9da3aa6 100644
+--- a/pkg/execbackend/local.go
++++ b/pkg/execbackend/local.go
+@@ -46,6 +46,10 @@ func (m *localManager) CoverageFilter([]*vminfo.KernelModule) ([]uint64, error)
+ 	return nil, nil
+ }
+ 
++func (m *localManager) DebugFilter(modules []*vminfo.KernelModule) ([]uint64, error) {
++	return []uint64{}, nil
++}
++
+ func (m *localManager) MachineChecked(features flatrpc.Feature, syscalls map[*prog.Syscall]bool) error {
+ 	if m.source != nil {
+ 		m.backend.SetSource(m.source)
+diff --git a/pkg/flatrpc/flatrpc.fbs b/pkg/flatrpc/flatrpc.fbs
+index b8542bf9e..ff3406963 100644
+--- a/pkg/flatrpc/flatrpc.fbs
++++ b/pkg/flatrpc/flatrpc.fbs
+@@ -229,6 +229,14 @@ table CallInfoRaw {
+ 	cover			:[uint64];
+ 	// Comparison operands.
+ 	comps			:[ComparisonRaw];
++	// Store Instructions where the stored value is a function pointer.
++	func_stores		:[StoreFunPointerRaw];
++}
++
++struct StoreFunPointerRaw {
++	pc			:uint64;
++	store_addr	:uint64;
++	store_value  :uint64;
+ }
+ 
+ struct ComparisonRaw {
+diff --git a/pkg/flatrpc/flatrpc.go b/pkg/flatrpc/flatrpc.go
+index 9f86b077a..d925d89ef 100644
+--- a/pkg/flatrpc/flatrpc.go
++++ b/pkg/flatrpc/flatrpc.go
+@@ -2705,11 +2705,12 @@ func ExecutingMessageRawEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+ }
+ 
+ type CallInfoRawT struct {
+-	Flags  CallFlag          `json:"flags"`
+-	Error  int32             `json:"error"`
+-	Signal []uint64          `json:"signal"`
+-	Cover  []uint64          `json:"cover"`
+-	Comps  []*ComparisonRawT `json:"comps"`
++	Flags      CallFlag               `json:"flags"`
++	Error      int32                  `json:"error"`
++	Signal     []uint64               `json:"signal"`
++	Cover      []uint64               `json:"cover"`
++	Comps      []*ComparisonRawT      `json:"comps"`
++	FuncStores []*StoreFunPointerRawT `json:"func_stores"`
+ }
+ 
+ func (t *CallInfoRawT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+@@ -2743,12 +2744,22 @@ func (t *CallInfoRawT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+ 		}
+ 		compsOffset = builder.EndVector(compsLength)
+ 	}
++	funcStoresOffset := flatbuffers.UOffsetT(0)
++	if t.FuncStores != nil {
++		funcStoresLength := len(t.FuncStores)
++		CallInfoRawStartFuncStoresVector(builder, funcStoresLength)
++		for j := funcStoresLength - 1; j >= 0; j-- {
++			t.FuncStores[j].Pack(builder)
++		}
++		funcStoresOffset = builder.EndVector(funcStoresLength)
++	}
+ 	CallInfoRawStart(builder)
+ 	CallInfoRawAddFlags(builder, t.Flags)
+ 	CallInfoRawAddError(builder, t.Error)
+ 	CallInfoRawAddSignal(builder, signalOffset)
+ 	CallInfoRawAddCover(builder, coverOffset)
+ 	CallInfoRawAddComps(builder, compsOffset)
++	CallInfoRawAddFuncStores(builder, funcStoresOffset)
+ 	return CallInfoRawEnd(builder)
+ }
+ 
+@@ -2772,6 +2783,13 @@ func (rcv *CallInfoRaw) UnPackTo(t *CallInfoRawT) {
+ 		rcv.Comps(&x, j)
+ 		t.Comps[j] = x.UnPack()
+ 	}
++	funcStoresLength := rcv.FuncStoresLength()
++	t.FuncStores = make([]*StoreFunPointerRawT, funcStoresLength)
++	for j := 0; j < funcStoresLength; j++ {
++		x := StoreFunPointerRaw{}
++		rcv.FuncStores(&x, j)
++		t.FuncStores[j] = x.UnPack()
++	}
+ }
+ 
+ func (rcv *CallInfoRaw) UnPack() *CallInfoRawT {
+@@ -2913,8 +2931,27 @@ func (rcv *CallInfoRaw) CompsLength() int {
+ 	return 0
+ }
+ 
++func (rcv *CallInfoRaw) FuncStores(obj *StoreFunPointerRaw, j int) bool {
++	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
++	if o != 0 {
++		x := rcv._tab.Vector(o)
++		x += flatbuffers.UOffsetT(j) * 24
++		obj.Init(rcv._tab.Bytes, x)
++		return true
++	}
++	return false
++}
++
++func (rcv *CallInfoRaw) FuncStoresLength() int {
++	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
++	if o != 0 {
++		return rcv._tab.VectorLen(o)
++	}
++	return 0
++}
++
+ func CallInfoRawStart(builder *flatbuffers.Builder) {
+-	builder.StartObject(5)
++	builder.StartObject(6)
+ }
+ func CallInfoRawAddFlags(builder *flatbuffers.Builder, flags CallFlag) {
+ 	builder.PrependByteSlot(0, byte(flags), 0)
+@@ -2940,10 +2977,85 @@ func CallInfoRawAddComps(builder *flatbuffers.Builder, comps flatbuffers.UOffset
+ func CallInfoRawStartCompsVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+ 	return builder.StartVector(32, numElems, 8)
+ }
++func CallInfoRawAddFuncStores(builder *flatbuffers.Builder, funcStores flatbuffers.UOffsetT) {
++	builder.PrependUOffsetTSlot(5, flatbuffers.UOffsetT(funcStores), 0)
++}
++func CallInfoRawStartFuncStoresVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
++	return builder.StartVector(24, numElems, 8)
++}
+ func CallInfoRawEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
+ 	return builder.EndObject()
+ }
+ 
++type StoreFunPointerRawT struct {
++	Pc         uint64 `json:"pc"`
++	StoreAddr  uint64 `json:"store_addr"`
++	StoreValue uint64 `json:"store_value"`
++}
++
++func (t *StoreFunPointerRawT) Pack(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
++	if t == nil {
++		return 0
++	}
++	return CreateStoreFunPointerRaw(builder, t.Pc, t.StoreAddr, t.StoreValue)
++}
++func (rcv *StoreFunPointerRaw) UnPackTo(t *StoreFunPointerRawT) {
++	t.Pc = rcv.Pc()
++	t.StoreAddr = rcv.StoreAddr()
++	t.StoreValue = rcv.StoreValue()
++}
++
++func (rcv *StoreFunPointerRaw) UnPack() *StoreFunPointerRawT {
++	if rcv == nil {
++		return nil
++	}
++	t := &StoreFunPointerRawT{}
++	rcv.UnPackTo(t)
++	return t
++}
++
++type StoreFunPointerRaw struct {
++	_tab flatbuffers.Struct
++}
++
++func (rcv *StoreFunPointerRaw) Init(buf []byte, i flatbuffers.UOffsetT) {
++	rcv._tab.Bytes = buf
++	rcv._tab.Pos = i
++}
++
++func (rcv *StoreFunPointerRaw) Table() flatbuffers.Table {
++	return rcv._tab.Table
++}
++
++func (rcv *StoreFunPointerRaw) Pc() uint64 {
++	return rcv._tab.GetUint64(rcv._tab.Pos + flatbuffers.UOffsetT(0))
++}
++func (rcv *StoreFunPointerRaw) MutatePc(n uint64) bool {
++	return rcv._tab.MutateUint64(rcv._tab.Pos+flatbuffers.UOffsetT(0), n)
++}
++
++func (rcv *StoreFunPointerRaw) StoreAddr() uint64 {
++	return rcv._tab.GetUint64(rcv._tab.Pos + flatbuffers.UOffsetT(8))
++}
++func (rcv *StoreFunPointerRaw) MutateStoreAddr(n uint64) bool {
++	return rcv._tab.MutateUint64(rcv._tab.Pos+flatbuffers.UOffsetT(8), n)
++}
++
++func (rcv *StoreFunPointerRaw) StoreValue() uint64 {
++	return rcv._tab.GetUint64(rcv._tab.Pos + flatbuffers.UOffsetT(16))
++}
++func (rcv *StoreFunPointerRaw) MutateStoreValue(n uint64) bool {
++	return rcv._tab.MutateUint64(rcv._tab.Pos+flatbuffers.UOffsetT(16), n)
++}
++
++func CreateStoreFunPointerRaw(builder *flatbuffers.Builder, pc uint64, storeAddr uint64, storeValue uint64) flatbuffers.UOffsetT {
++	builder.Prep(8, 24)
++	builder.PrependUint64(storeValue)
++	builder.PrependUint64(storeAddr)
++	builder.PrependUint64(pc)
++	return builder.Offset()
++}
++
+ type ComparisonRawT struct {
+ 	Pc      uint64 `json:"pc"`
+ 	Op1     uint64 `json:"op1"`
+diff --git a/pkg/flatrpc/flatrpc.h b/pkg/flatrpc/flatrpc.h
+index 6807434e6..1eaf537b3 100644
+--- a/pkg/flatrpc/flatrpc.h
++++ b/pkg/flatrpc/flatrpc.h
+@@ -81,6 +81,8 @@ struct CallInfoRaw;
+ struct CallInfoRawBuilder;
+ struct CallInfoRawT;
+ 
++struct StoreFunPointerRaw;
++
+ struct ComparisonRaw;
+ 
+ struct ProgInfoRaw;
+@@ -811,6 +813,35 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(8) ExecOptsRaw FLATBUFFERS_FINAL_CLASS {
+ };
+ FLATBUFFERS_STRUCT_END(ExecOptsRaw, 24);
+ 
++FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(8) StoreFunPointerRaw FLATBUFFERS_FINAL_CLASS {
++ private:
++  uint64_t pc_;
++  uint64_t store_addr_;
++  uint64_t store_value_;
++
++ public:
++  StoreFunPointerRaw()
++      : pc_(0),
++        store_addr_(0),
++        store_value_(0) {
++  }
++  StoreFunPointerRaw(uint64_t _pc, uint64_t _store_addr, uint64_t _store_value)
++      : pc_(::flatbuffers::EndianScalar(_pc)),
++        store_addr_(::flatbuffers::EndianScalar(_store_addr)),
++        store_value_(::flatbuffers::EndianScalar(_store_value)) {
++  }
++  uint64_t pc() const {
++    return ::flatbuffers::EndianScalar(pc_);
++  }
++  uint64_t store_addr() const {
++    return ::flatbuffers::EndianScalar(store_addr_);
++  }
++  uint64_t store_value() const {
++    return ::flatbuffers::EndianScalar(store_value_);
++  }
++};
++FLATBUFFERS_STRUCT_END(StoreFunPointerRaw, 24);
++
+ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(8) ComparisonRaw FLATBUFFERS_FINAL_CLASS {
+  private:
+   uint64_t pc_;
+@@ -2227,6 +2258,7 @@ struct CallInfoRawT : public ::flatbuffers::NativeTable {
+   std::vector<uint64_t> signal{};
+   std::vector<uint64_t> cover{};
+   std::vector<rpc::ComparisonRaw> comps{};
++  std::vector<rpc::StoreFunPointerRaw> func_stores{};
+ };
+ 
+ struct CallInfoRaw FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+@@ -2237,7 +2269,8 @@ struct CallInfoRaw FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+     VT_ERROR = 6,
+     VT_SIGNAL = 8,
+     VT_COVER = 10,
+-    VT_COMPS = 12
++    VT_COMPS = 12,
++    VT_FUNC_STORES = 14
+   };
+   rpc::CallFlag flags() const {
+     return static_cast<rpc::CallFlag>(GetField<uint8_t>(VT_FLAGS, 0));
+@@ -2254,6 +2287,9 @@ struct CallInfoRaw FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+   const ::flatbuffers::Vector<const rpc::ComparisonRaw *> *comps() const {
+     return GetPointer<const ::flatbuffers::Vector<const rpc::ComparisonRaw *> *>(VT_COMPS);
+   }
++  const ::flatbuffers::Vector<const rpc::StoreFunPointerRaw *> *func_stores() const {
++    return GetPointer<const ::flatbuffers::Vector<const rpc::StoreFunPointerRaw *> *>(VT_FUNC_STORES);
++  }
+   bool Verify(::flatbuffers::Verifier &verifier) const {
+     return VerifyTableStart(verifier) &&
+            VerifyField<uint8_t>(verifier, VT_FLAGS, 1) &&
+@@ -2264,6 +2300,8 @@ struct CallInfoRaw FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+            verifier.VerifyVector(cover()) &&
+            VerifyOffset(verifier, VT_COMPS) &&
+            verifier.VerifyVector(comps()) &&
++           VerifyOffset(verifier, VT_FUNC_STORES) &&
++           verifier.VerifyVector(func_stores()) &&
+            verifier.EndTable();
+   }
+   CallInfoRawT *UnPack(const ::flatbuffers::resolver_function_t *_resolver = nullptr) const;
+@@ -2290,6 +2328,9 @@ struct CallInfoRawBuilder {
+   void add_comps(::flatbuffers::Offset<::flatbuffers::Vector<const rpc::ComparisonRaw *>> comps) {
+     fbb_.AddOffset(CallInfoRaw::VT_COMPS, comps);
+   }
++  void add_func_stores(::flatbuffers::Offset<::flatbuffers::Vector<const rpc::StoreFunPointerRaw *>> func_stores) {
++    fbb_.AddOffset(CallInfoRaw::VT_FUNC_STORES, func_stores);
++  }
+   explicit CallInfoRawBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+         : fbb_(_fbb) {
+     start_ = fbb_.StartTable();
+@@ -2307,8 +2348,10 @@ inline ::flatbuffers::Offset<CallInfoRaw> CreateCallInfoRaw(
+     int32_t error = 0,
+     ::flatbuffers::Offset<::flatbuffers::Vector<uint64_t>> signal = 0,
+     ::flatbuffers::Offset<::flatbuffers::Vector<uint64_t>> cover = 0,
+-    ::flatbuffers::Offset<::flatbuffers::Vector<const rpc::ComparisonRaw *>> comps = 0) {
++    ::flatbuffers::Offset<::flatbuffers::Vector<const rpc::ComparisonRaw *>> comps = 0,
++    ::flatbuffers::Offset<::flatbuffers::Vector<const rpc::StoreFunPointerRaw *>> func_stores = 0) {
+   CallInfoRawBuilder builder_(_fbb);
++  builder_.add_func_stores(func_stores);
+   builder_.add_comps(comps);
+   builder_.add_cover(cover);
+   builder_.add_signal(signal);
+@@ -2323,17 +2366,20 @@ inline ::flatbuffers::Offset<CallInfoRaw> CreateCallInfoRawDirect(
+     int32_t error = 0,
+     const std::vector<uint64_t> *signal = nullptr,
+     const std::vector<uint64_t> *cover = nullptr,
+-    const std::vector<rpc::ComparisonRaw> *comps = nullptr) {
++    const std::vector<rpc::ComparisonRaw> *comps = nullptr,
++    const std::vector<rpc::StoreFunPointerRaw> *func_stores = nullptr) {
+   auto signal__ = signal ? _fbb.CreateVector<uint64_t>(*signal) : 0;
+   auto cover__ = cover ? _fbb.CreateVector<uint64_t>(*cover) : 0;
+   auto comps__ = comps ? _fbb.CreateVectorOfStructs<rpc::ComparisonRaw>(*comps) : 0;
++  auto func_stores__ = func_stores ? _fbb.CreateVectorOfStructs<rpc::StoreFunPointerRaw>(*func_stores) : 0;
+   return rpc::CreateCallInfoRaw(
+       _fbb,
+       flags,
+       error,
+       signal__,
+       cover__,
+-      comps__);
++      comps__,
++      func_stores__);
+ }
+ 
+ ::flatbuffers::Offset<CallInfoRaw> CreateCallInfoRaw(::flatbuffers::FlatBufferBuilder &_fbb, const CallInfoRawT *_o, const ::flatbuffers::rehasher_function_t *_rehasher = nullptr);
+@@ -3510,6 +3556,7 @@ inline void CallInfoRaw::UnPackTo(CallInfoRawT *_o, const ::flatbuffers::resolve
+   { auto _e = signal(); if (_e) { _o->signal.resize(_e->size()); for (::flatbuffers::uoffset_t _i = 0; _i < _e->size(); _i++) { _o->signal[_i] = _e->Get(_i); } } else { _o->signal.resize(0); } }
+   { auto _e = cover(); if (_e) { _o->cover.resize(_e->size()); for (::flatbuffers::uoffset_t _i = 0; _i < _e->size(); _i++) { _o->cover[_i] = _e->Get(_i); } } else { _o->cover.resize(0); } }
+   { auto _e = comps(); if (_e) { _o->comps.resize(_e->size()); for (::flatbuffers::uoffset_t _i = 0; _i < _e->size(); _i++) { _o->comps[_i] = *_e->Get(_i); } } else { _o->comps.resize(0); } }
++  { auto _e = func_stores(); if (_e) { _o->func_stores.resize(_e->size()); for (::flatbuffers::uoffset_t _i = 0; _i < _e->size(); _i++) { _o->func_stores[_i] = *_e->Get(_i); } } else { _o->func_stores.resize(0); } }
+ }
+ 
+ inline ::flatbuffers::Offset<CallInfoRaw> CallInfoRaw::Pack(::flatbuffers::FlatBufferBuilder &_fbb, const CallInfoRawT* _o, const ::flatbuffers::rehasher_function_t *_rehasher) {
+@@ -3525,13 +3572,15 @@ inline ::flatbuffers::Offset<CallInfoRaw> CreateCallInfoRaw(::flatbuffers::FlatB
+   auto _signal = _o->signal.size() ? _fbb.CreateVector(_o->signal) : 0;
+   auto _cover = _o->cover.size() ? _fbb.CreateVector(_o->cover) : 0;
+   auto _comps = _o->comps.size() ? _fbb.CreateVectorOfStructs(_o->comps) : 0;
++  auto _func_stores = _o->func_stores.size() ? _fbb.CreateVectorOfStructs(_o->func_stores) : 0;
+   return rpc::CreateCallInfoRaw(
+       _fbb,
+       _flags,
+       _error,
+       _signal,
+       _cover,
+-      _comps);
++      _comps,
++      _func_stores);
+ }
+ 
+ inline ProgInfoRawT::ProgInfoRawT(const ProgInfoRawT &o)
+diff --git a/pkg/flatrpc/helpers.go b/pkg/flatrpc/helpers.go
+index c1bf00219..2a4ce255c 100644
+--- a/pkg/flatrpc/helpers.go
++++ b/pkg/flatrpc/helpers.go
+@@ -38,6 +38,7 @@ type CorpusTriaged = CorpusTriagedRawT
+ type ExecutingMessage = ExecutingMessageRawT
+ type CallInfo = CallInfoRawT
+ type Comparison = ComparisonRawT
++type FuncPointerStore = StoreFunPointerRawT
+ type ExecOpts = ExecOptsRawT
+ type ProgInfo = ProgInfoRawT
+ type ExecResult = ExecResultRawT
+diff --git a/pkg/fuzzer/fuzzer.go b/pkg/fuzzer/fuzzer.go
+index efd66fdad..0619f4610 100644
+--- a/pkg/fuzzer/fuzzer.go
++++ b/pkg/fuzzer/fuzzer.go
+@@ -171,8 +171,9 @@ func (fuzzer *Fuzzer) processResult(req *queue.Request, res *queue.Result, flags
+ 				queue:    queue.Append(),
+ 				calls:    triage,
+ 				info: &JobInfo{
+-					Name: req.Prog.String(),
+-					Type: jobType,
++					Name:   req.Prog.String(),
++					Type:   jobType,
++					ProgId: fmt.Sprintf("%p", req.Prog),
+ 				},
+ 			}
+ 			for id := range triage {
+@@ -226,6 +227,7 @@ type Config struct {
+ 	NewInputFilter func(call string) bool
+ 	PatchTest      bool
+ 	ModeKFuzzTest  bool
++	DebugFilters   map[uint64]struct{}
+ }
+ 
+ func (fuzzer *Fuzzer) triageProgCall(p *prog.Prog, info *flatrpc.CallInfo, call int, triage *map[int]*triageCall) {
+@@ -234,13 +236,16 @@ func (fuzzer *Fuzzer) triageProgCall(p *prog.Prog, info *flatrpc.CallInfo, call
+ 	}
+ 	prio := signalPrio(p, info, call)
+ 	newMaxSignal := fuzzer.Cover.addRawMaxSignal(info.Signal, prio)
++	fuzzer.Logf(3, "[prog-%p] stored function pointers in call #%d [%s]: %s",
++		p, call, p.CallName(call), signal.StorePreview(info.FuncStores))
++
+ 	if newMaxSignal.Empty() {
+ 		return
+ 	}
+ 	if !fuzzer.Config.NewInputFilter(p.CallName(call)) {
+ 		return
+ 	}
+-	fuzzer.Logf(2, "found new signal in call %d in %s", call, p)
++	fuzzer.Logf(3, "found new signal in call #%d [%s] in %s", call, p.CallName(call), p)
+ 	if *triage == nil {
+ 		*triage = make(map[int]*triageCall)
+ 	}
+@@ -329,10 +334,35 @@ func (fuzzer *Fuzzer) startJob(stat *stat.Val, newJob job) {
+ 			}()
+ 		}
+ 
++		jobStart := time.Now()
+ 		newJob.run(fuzzer)
++		jobDuration := time.Since(jobStart)
++		if jobObj, ok := newJob.(jobIntrospector); ok {
++			fuzzer.logJobResults(jobObj.getInfo(), jobDuration)
++		}
+ 	}()
+ }
+ 
++func (fuzzer *Fuzzer) logJobResults(jobInfo *JobInfo, jobDuration time.Duration) {
++	jobInfo.Logf("total job duration: %f seconds", jobDuration.Seconds())
++	jobInfo.Logf("%d total test case executions", jobInfo.Execs.Load())
++
++	if jobInfo.ExecTimeTotal.Load() > 0 {
++		_execTime := time.Duration(jobInfo.ExecTimeTotal.Load())
++		jobInfo.Logf("test executions (total) job duration: %f seconds", _execTime.Seconds())
++	}
++	if len(jobInfo.ExecsTimeLapses.arr) > 0 {
++		jsonData, err := jobInfo.ExecsTimeLapses.AsJson()
++		if err != nil {
++			panic(fmt.Sprintf("failed to format time lapses as json %v", jobInfo.ExecsTimeLapses.arr))
++		}
++		jobInfo.Logf("test executions (total) individual durations: %s", jsonData)
++	}
++
++	fuzzer.Logf(5, "%s", jobInfo.Bytes())
++
++}
++
+ func (fuzzer *Fuzzer) Next() *queue.Request {
+ 	req := fuzzer.source.Next()
+ 	if req == nil {
+diff --git a/pkg/fuzzer/job.go b/pkg/fuzzer/job.go
+index e8aec3239..d84a81f68 100644
+--- a/pkg/fuzzer/job.go
++++ b/pkg/fuzzer/job.go
+@@ -5,6 +5,7 @@ package fuzzer
+ 
+ import (
+ 	"bytes"
++	"encoding/json"
+ 	"fmt"
+ 	"math/rand"
+ 	"strings"
+@@ -38,10 +39,14 @@ type jobIntrospector interface {
+ }
+ 
+ type JobInfo struct {
+-	Name  string
+-	Calls []string
+-	Type  JobType
+-	Execs atomic.Int32
++	Name   string
++	Calls  []string
++	Type   JobType
++	Execs  atomic.Int32
++	ProgId string
++
++	ExecTimeTotal          atomic.Int64
++	ExecsTimeLapses        syncTimePairArray
+ 
+ 	syncBuffer
+ }
+@@ -80,6 +85,19 @@ func mutateProgRequest(fuzzer *Fuzzer, rnd *rand.Rand) *queue.Request {
+ 	}
+ }
+ 
++func filteredCoverage(slice []uint64, set map[uint64]struct{}) []uint64 {
++	res := make([]uint64, 0, len(slice))
++	if len(slice) == 0 || len(set) == 0 {
++		return res
++	}
++	for _, v := range slice {
++		if _, ok := set[v]; ok {
++			res = append(res, v)
++		}
++	}
++	return res
++}
++
+ // triageJob are programs for which we noticed potential new coverage during
+ // first execution. But we are not sure yet if the coverage is real or not.
+ // During triage we understand if these programs in fact give new coverage,
+@@ -142,7 +160,15 @@ const (
+ func (job *triageJob) execute(req *queue.Request, flags ProgFlags) *queue.Result {
+ 	defer job.info.Execs.Add(1)
+ 	req.Important = true // All triage executions are important.
+-	return job.fuzzer.executeWithFlags(job.queue, req, flags)
++	execStart := time.Now()
++	execResult := job.fuzzer.executeWithFlags(job.queue, req, flags)
++	execEnd := time.Now()
++	execTime := execEnd.Sub(execStart)
++
++	job.info.ExecTimeTotal.Add(int64(execTime))
++	job.info.ExecsTimeLapses.AppendAtomic(execStart, execEnd)
++
++	return execResult
+ }
+ 
+ func (job *triageJob) run(fuzzer *Fuzzer) {
+@@ -152,6 +178,12 @@ func (job *triageJob) run(fuzzer *Fuzzer) {
+ 	for call, info := range job.calls {
+ 		job.info.Logf("call #%d [%s]: |new signal|=%d%s",
+ 			call, job.p.CallName(call), info.newSignal.Len(), signalPreview(info.newSignal))
++
++		filteredRawSignal := filteredCoverage(info.newSignal.ToRaw(), job.fuzzer.Config.DebugFilters)
++		if len(filteredRawSignal) > 0 {
++			job.info.Logf("call #%d [%s]: |new filtered signal|=%d%s",
++				call, job.p.CallName(call), len(filteredRawSignal), signal.RawPreview(filteredRawSignal))
++		}
+ 	}
+ 
+ 	// Compute input coverage and non-flaky signal for minimization.
+@@ -172,7 +204,7 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
+ 	if info.newStableSignal.Empty() {
+ 		return
+ 	}
+-
++	log_og_call := call
+ 	p := job.p
+ 	if job.flags&ProgMinimized == 0 {
+ 		p, call = job.minimize(call, info)
+@@ -181,6 +213,12 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
+ 		}
+ 	}
+ 	callName := p.CallName(call)
++
++	filteredRaw := filteredCoverage(info.cover.Serialize(), job.fuzzer.Config.DebugFilters)
++	if len(filteredRaw) > 0 {
++		job.info.Logf("handle call #%d [%s] with flagged coverage: %s", call, callName, signal.RawPreview(filteredRaw))
++	}
++
+ 	if !job.fuzzer.Config.NewInputFilter(callName) {
+ 		return
+ 	}
+@@ -189,9 +227,10 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
+ 			exec: job.fuzzer.smashQueue,
+ 			p:    p.Clone(),
+ 			info: &JobInfo{
+-				Name:  p.String(),
+-				Type:  JobSmash,
+-				Calls: []string{p.CallName(call)},
++				Name:   p.String(),
++				Type:   JobSmash,
++				Calls:  []string{p.CallName(call)},
++				ProgId: job.info.ProgId,
+ 			},
+ 		})
+ 		if job.fuzzer.Config.Comparisons && call >= 0 {
+@@ -200,9 +239,10 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
+ 				p:    p.Clone(),
+ 				call: call,
+ 				info: &JobInfo{
+-					Name:  p.String(),
+-					Type:  JobHints,
+-					Calls: []string{p.CallName(call)},
++					Name:   p.String(),
++					Type:   JobHints,
++					Calls:  []string{p.CallName(call)},
++					ProgId: job.info.ProgId,
+ 				},
+ 			})
+ 		}
+@@ -211,10 +251,17 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
+ 				exec: job.fuzzer.smashQueue,
+ 				p:    p.Clone(),
+ 				call: call,
++				info: &JobInfo{
++					Name:   p.String(),
++					Type:   "fault-injection",
++					Calls:  []string{p.CallName(call)},
++					ProgId: job.info.ProgId,
++				},
+ 			})
+ 		}
+ 	}
+-	job.fuzzer.Logf(2, "added new input for %v to the corpus: %s", callName, p)
++	job.info.Logf("added new input for #%d [%s] to the corpus with program:\n%s", log_og_call, callName, p.Serialize())
++	job.info.Logf("total cover for call #%d [%s]:\n%s", log_og_call, callName, signal.RawPreview(info.cover.Serialize()))
+ 	input := corpus.NewInput{
+ 		Prog:     p,
+ 		Call:     call,
+@@ -273,6 +320,9 @@ func (job *triageJob) deflake(exec func(*queue.Request, ProgFlags) *queue.Result
+ 			if len(info.rawCover) == 0 && job.fuzzer.Config.FetchRawCover {
+ 				info.rawCover = res.Cover
+ 			}
++			if len(filteredCoverage(res.Cover, job.fuzzer.Config.DebugFilters)) > 0 {
++				job.info.Logf("call #%d [%s] triggered flagged coverage during deflake", call, job.p.CallName(call))
++			}
+ 			// Since the signal is frequently flaky, we may get some new new max signal.
+ 			// Merge it into the new signal we are chasing.
+ 			// Most likely we won't conclude it's stable signal b/c we already have at least one
+@@ -303,6 +353,14 @@ func (job *triageJob) deflake(exec func(*queue.Request, ProgFlags) *queue.Result
+ 		job.info.Logf("call #%d [%s]: |stable signal|=%d, |new stable signal|=%d%s",
+ 			call, job.p.CallName(call), info.stableSignal.Len(), info.newStableSignal.Len(),
+ 			signalPreview(info.newStableSignal))
++
++		newStableFilteredSignal := filteredCoverage(info.newStableSignal.ToRaw(), job.fuzzer.Config.DebugFilters)
++		stableFilteredSignal := filteredCoverage(info.stableSignal.ToRaw(), job.fuzzer.Config.DebugFilters)
++
++		if len(stableFilteredSignal) > 0 {
++			job.info.Logf("call #%d [%s]: |stable filtered signal|=%d, |new stable filtered signal|=%d%s",
++				call, job.p.CallName(call), len(stableFilteredSignal), len(newStableFilteredSignal), signal.RawPreview(newStableFilteredSignal))
++		}
+ 	}
+ 	return false
+ }
+@@ -348,7 +406,7 @@ func (job *triageJob) stopDeflake(run, needRuns int, noNewSignal bool) bool {
+ }
+ 
+ func (job *triageJob) minimize(call int, info *triageCall) (*prog.Prog, int) {
+-	job.info.Logf("[call #%d] minimize started", call)
++	job.info.Logf("call #%d [%s]: minimize started", call, job.p.CallName(call))
+ 	minimizeAttempts := 3
+ 	if job.fuzzer.Config.Snapshot {
+ 		minimizeAttempts = 2
+@@ -385,12 +443,12 @@ func (job *triageJob) minimize(call int, info *triageCall) (*prog.Prog, int) {
+ 				mergedSignal.Merge(thisSignal)
+ 			}
+ 			if info.newStableSignal.Intersection(mergedSignal).Len() == info.newStableSignal.Len() {
+-				job.info.Logf("[call #%d] minimization step success (|calls| = %d)",
+-					call, len(p1.Calls))
++				job.info.Logf("call #%d [%s] minimization step success (|calls| = %d)",
++					call, job.p.CallName(call), len(p1.Calls))
+ 				return true
+ 			}
+ 		}
+-		job.info.Logf("[call #%d] minimization step failure", call)
++		job.info.Logf("call #%d [%s] minimization step failure", call, job.p.CallName(call))
+ 		return false
+ 	})
+ 	if stop {
+@@ -452,7 +510,7 @@ type smashJob struct {
+ }
+ 
+ func (job *smashJob) run(fuzzer *Fuzzer) {
+-	fuzzer.Logf(2, "smashing the program %s:", job.p)
++	job.info.Logf("smashing the program %s:", job.p)
+ 	job.info.Logf("\n%s", job.p.Serialize())
+ 
+ 	const iters = 25
+@@ -505,12 +563,13 @@ type faultInjectionJob struct {
+ 	exec queue.Executor
+ 	p    *prog.Prog
+ 	call int
++	info *JobInfo
+ }
+ 
+ func (job *faultInjectionJob) run(fuzzer *Fuzzer) {
+ 	for nth := 1; nth <= 100; nth++ {
+-		fuzzer.Logf(2, "injecting fault into call %v, step %v",
+-			job.call, nth)
++		job.info.Logf("injecting fault into call #%d [%s], step %v",
++			job.call, job.p.CallName(job.call), nth)
+ 		newProg := job.p.Clone()
+ 		newProg.Calls[job.call].Props.FailNth = nth
+ 		result := fuzzer.execute(job.exec, &queue.Request{
+@@ -528,6 +587,10 @@ func (job *faultInjectionJob) run(fuzzer *Fuzzer) {
+ 	}
+ }
+ 
++func (job *faultInjectionJob) getInfo() *JobInfo {
++	return job.info
++}
++
+ type hintsJob struct {
+ 	exec queue.Executor
+ 	p    *prog.Prog
+@@ -589,18 +652,44 @@ func (job *hintsJob) getInfo() *JobInfo {
+ 	return job.info
+ }
+ 
++type syncTimePairArray struct {
++	mu  sync.RWMutex
++	arr [][2]time.Time
++}
++
++func (stpa *syncTimePairArray) AppendAtomic(start time.Time, end time.Time) {
++	stpa.mu.Lock()
++	defer stpa.mu.Unlock()
++	stpa.arr = append(stpa.arr, [2]time.Time{start, end})
++}
++
++func (stpa *syncTimePairArray) AsJson() ([]byte, error) {
++	stpa.mu.RLock()
++	defer stpa.mu.RUnlock()
++	// array where each position has 2 maps from string to string
++	mapFormatted := []map[string]string{}
++	for _, startEnd := range stpa.arr {
++		entry := map[string]string{}
++		entry["TimeStart"] = startEnd[0].Format(time.DateTime)
++		entry["TimeEnd"] = startEnd[1].Format(time.DateTime)
++		entry["DurationSeconds"] = fmt.Sprintf("%f", startEnd[1].Sub(startEnd[0]).Seconds())
++		mapFormatted = append(mapFormatted, entry)
++	}
++	return json.Marshal(mapFormatted)
++}
++
+ type syncBuffer struct {
+ 	mu  sync.Mutex
+ 	buf bytes.Buffer
+ }
+ 
+-func (sb *syncBuffer) Logf(logFmt string, args ...any) {
+-	sb.mu.Lock()
+-	defer sb.mu.Unlock()
++func (ji *JobInfo) Logf(logFmt string, args ...any) {
++	ji.mu.Lock()
++	defer ji.mu.Unlock()
+ 
+-	fmt.Fprintf(&sb.buf, "%s: ", time.Now().Format(time.DateTime))
+-	fmt.Fprintf(&sb.buf, logFmt, args...)
+-	sb.buf.WriteByte('\n')
++	fmt.Fprintf(&ji.buf, "%s [%s-%s] [prog-%s]: ", time.Now().Format(time.DateTime), ji.Type, ji.ID(), ji.ProgId)
++	fmt.Fprintf(&ji.buf, logFmt, args...)
++	ji.buf.WriteByte('\n')
+ }
+ 
+ func (sb *syncBuffer) Bytes() []byte {
+diff --git a/pkg/manager/covfilter.go b/pkg/manager/covfilter.go
+index c879c34e9..992ffd382 100644
+--- a/pkg/manager/covfilter.go
++++ b/pkg/manager/covfilter.go
+@@ -137,6 +137,29 @@ type CoverageFilters struct {
+ 	ExecutorFilter map[uint64]struct{}
+ }
+ 
++func PrepareDebugFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Config, strict bool) (map[uint64]struct{}, error) {
++	ret := make(map[uint64]struct{})
++	for _, cfgFilter := range cfg.Experimental.DebugFilters {
++		pcs, err := CoverageFilter(source, cfgFilter, strict)
++		if err != nil {
++			return ret, err
++		}
++		// This is copy-pasted from PrepareCoverageFilters
++		// KCOV will point to the next instruction, so we need to adjust the map.
++		for pc := range pcs {
++			next := backend.NextInstructionPC(cfg.SysTarget, cfg.Type, pc)
++			ret[next] = struct{}{}
++		}
++	}
++	keys := make([]uint64, 0, len(ret))
++	for k := range ret {
++		keys = append(keys, k)
++	}
++	log.Logf(3, "debug coverage filter PCs: %#x", keys)
++
++	return ret, nil
++}
++
+ func PrepareCoverageFilters(source *ReportGeneratorWrapper, cfg *mgrconfig.Config,
+ 	strict bool) (CoverageFilters, error) {
+ 	var ret CoverageFilters
+diff --git a/pkg/manager/diff/kernel.go b/pkg/manager/diff/kernel.go
+index ce01a22c6..afda30c18 100644
+--- a/pkg/manager/diff/kernel.go
++++ b/pkg/manager/diff/kernel.go
+@@ -247,6 +247,10 @@ func (kc *kernelContext) CoverageFilter(modules []*vminfo.KernelModule) ([]uint6
+ 	return pcs, nil
+ }
+ 
++func (kc *kernelContext) DebugFilter(modules []*vminfo.KernelModule) ([]uint64, error) {
++	return []uint64{}, nil
++}
++
+ func (kc *kernelContext) fuzzerInstance(ctx context.Context, inst *vm.Instance, updInfo dispatcher.UpdateInfo) {
+ 	reps, err := kc.serv.RunRequests(ctx, inst, kc.reporter, updInfo)
+ 	if len(reps) > 0 {
+diff --git a/pkg/manager/http.go b/pkg/manager/http.go
+index 3430849e0..29dbd0c7a 100644
+--- a/pkg/manager/http.go
++++ b/pkg/manager/http.go
+@@ -490,9 +490,10 @@ func (serv *HTTPServer) httpCorpus(w http.ResponseWriter, r *http.Request) {
+ 			continue
+ 		}
+ 		data.Inputs = append(data.Inputs, UIInput{
+-			Sig:   inp.Sig,
+-			Short: inp.Prog.String(),
+-			Cover: len(inp.Cover),
++			Sig:       inp.Sig,
++			Short:     inp.Prog.String(),
++			Cover:     len(inp.Cover),
++			Timestamp: inp.Timestamp.Format("2006/01/02 15:04:05 "),
+ 		})
+ 	}
+ 	sort.Slice(data.Inputs, func(i, j int) bool {
+@@ -845,6 +846,9 @@ func (serv *HTTPServer) httpInput(w http.ResponseWriter, r *http.Request) {
+ 		return
+ 	}
+ 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
++	w.Write([]byte("Timestamp: "))
++	w.Write([]byte(inp.Timestamp.Format("2006/01/02 15:04:05 ")))
++	w.Write([]byte("------------------------"))
+ 	w.Write(inp.Prog.Serialize())
+ }
+ 
+@@ -1217,9 +1221,10 @@ type UICorpusPage struct {
+ }
+ 
+ type UIInput struct {
+-	Sig   string
+-	Short string
+-	Cover int
++	Sig       string
++	Short     string
++	Cover     int
++	Timestamp string
+ }
+ 
+ type UIPageHeader struct {
+diff --git a/pkg/mgrconfig/config.go b/pkg/mgrconfig/config.go
+index 2bc36f517..dd2745099 100644
+--- a/pkg/mgrconfig/config.go
++++ b/pkg/mgrconfig/config.go
+@@ -260,6 +260,11 @@ type Experimental struct {
+ 	// E.g. "focus_areas": [ {"filter": {"files": ["^net"]}, "weight": 10.0}, {"weight": 1.0} ].
+ 	FocusAreas []FocusArea `json:"focus_areas,omitempty"`
+ 
++	// DebugFilters is like FocusAreas:
++	// It configures for what areas of the kernel syzkaller should provide additional debug information.
++	// For example, whenever a TriageJob handles coverage that covers an area matching the filter, output additional information regarding that triage.
++	DebugFilters []CovFilterCfg `json:"debug_filters,omitempty"`
++
+ 	// Enable dynamic discovery and fuzzing of KFuzzTest targets.
+ 	EnableKFuzzTest bool `json:"enable_kfuzztest"`
+ }
+diff --git a/pkg/rpcserver/local.go b/pkg/rpcserver/local.go
+index cd72901c0..033da2639 100644
+--- a/pkg/rpcserver/local.go
++++ b/pkg/rpcserver/local.go
+@@ -133,6 +133,10 @@ func (l *local) CoverageFilter(modules []*vminfo.KernelModule) ([]uint64, error)
+ 	return l.cfg.CoverFilter, nil
+ }
+ 
++func (l *local) DebugFilter(modules []*vminfo.KernelModule) ([]uint64, error) {
++	return []uint64{}, nil
++}
++
+ func (l *local) Serve(ctx context.Context) error {
+ 	return l.serv.Serve(ctx)
+ }
+diff --git a/pkg/rpcserver/rpcserver.go b/pkg/rpcserver/rpcserver.go
+index d0f3bf2a0..72fe064a2 100644
+--- a/pkg/rpcserver/rpcserver.go
++++ b/pkg/rpcserver/rpcserver.go
+@@ -93,6 +93,7 @@ type Manager interface {
+ 	BugFrames() (leaks []string, races []string)
+ 	MachineChecked(features flatrpc.Feature, syscalls map[*prog.Syscall]bool) error
+ 	CoverageFilter(modules []*vminfo.KernelModule) ([]uint64, error)
++	DebugFilter(modules []*vminfo.KernelModule) ([]uint64, error)
+ }
+ 
+ type server struct {
+@@ -113,6 +114,7 @@ type server struct {
+ 	setupFeatures    flatrpc.Feature
+ 	canonicalModules *cover.Canonicalizer
+ 	coverFilter      []uint64
++	debugFilter      []uint64
+ 
+ 	mu            sync.Mutex
+ 	runners       map[int]*Runner
+@@ -415,6 +417,11 @@ func (serv *server) handleMachineInfo(infoReq *flatrpc.InfoRequestRawT) (handsha
+ 			retErr = fmt.Errorf("%w: %w", errFatal, err)
+ 			return
+ 		}
++		serv.debugFilter, err = serv.mgr.DebugFilter(modules)
++		if err != nil {
++			retErr = fmt.Errorf("%w: %w", errFatal, err)
++			return
++		}
+ 	})
+ 	if retErr != nil {
+ 		return handshakeResult{}, retErr
+diff --git a/pkg/signal/signal.go b/pkg/signal/signal.go
+index df0244d79..3ccbbbbf0 100644
+--- a/pkg/signal/signal.go
++++ b/pkg/signal/signal.go
+@@ -4,7 +4,13 @@
+ // Package signal provides types for working with feedback signal.
+ package signal
+ 
+-import "maps"
++import (
++	"fmt"
++	"maps"
++	"strings"
++
++	"github.com/google/syzkaller/pkg/flatrpc"
++)
+ 
+ type (
+ 	elemType uint64
+@@ -28,6 +34,39 @@ func (s Signal) Copy() Signal {
+ 	return c
+ }
+ 
++func StorePreview(raw []*flatrpc.FuncPointerStore) string {
++	if len(raw) > 0 {
++		var sb strings.Builder
++		sb.WriteByte('[')
++		for i, entry := range raw {
++			if i > 0 {
++				sb.WriteString(", ")
++			}
++			fmt.Fprintf(&sb, "{\"PC\": \"0x%x\", \"StoreAddr\": \"0x%x\", \"StoredValue\": \"0x%x\"}",
++				entry.Pc, entry.StoreAddr, entry.StoreValue)
++		}
++		sb.WriteByte(']')
++		return sb.String()
++	}
++	return ""
++}
++
++func RawPreview(raw []uint64) string {
++	if len(raw) > 0 {
++		var sb strings.Builder
++		sb.WriteString(" (")
++		for i, x := range raw {
++			if i > 0 {
++				sb.WriteString(", ")
++			}
++			fmt.Fprintf(&sb, "0x%x", x)
++		}
++		sb.WriteByte(')')
++		return sb.String()
++	}
++	return ""
++}
++
+ func FromRaw(raw []uint64, prio uint8) Signal {
+ 	if len(raw) == 0 {
+ 		return nil
+diff --git a/syz-manager/manager.go b/syz-manager/manager.go
+index 8e3629335..d15295eaa 100644
+--- a/syz-manager/manager.go
++++ b/syz-manager/manager.go
+@@ -86,6 +86,7 @@ type Manager struct {
+ 	reportGenerator *manager.ReportGeneratorWrapper
+ 	fresh           bool
+ 	coverFilters    manager.CoverageFilters
++	debugFilters    map[uint64]struct{}
+ 
+ 	dash *dashapi.Dashboard
+ 	// This is specifically separated from dash, so that we can keep dash = nil when
+@@ -1186,9 +1187,6 @@ func (mgr *Manager) MachineChecked(features flatrpc.Feature,
+ 			NoMutateCalls:  mgr.cfg.NoMutateCalls,
+ 			FetchRawCover:  mgr.cfg.RawCover,
+ 			Logf: func(level int, msg string, args ...any) {
+-				if level != 0 {
+-					return
+-				}
+ 				log.Logf(level, msg, args...)
+ 			},
+ 			NewInputFilter: func(call string) bool {
+@@ -1197,6 +1195,7 @@ func (mgr *Manager) MachineChecked(features flatrpc.Feature,
+ 				return !mgr.saturatedCalls[call]
+ 			},
+ 			ModeKFuzzTest: mgr.cfg.Experimental.EnableKFuzzTest,
++			DebugFilters:  mgr.debugFilters,
+ 		}, rnd, mgr.target)
+ 		fuzzerObj.AddCandidates(candidates)
+ 		mgr.fuzzer.Store(fuzzerObj)
+@@ -1484,6 +1483,20 @@ func (mgr *Manager) dashboardReproTasks() {
+ 	}
+ }
+ 
++func (mgr *Manager) DebugFilter(modules []*vminfo.KernelModule) ([]uint64, error) {
++	filters, err := manager.PrepareDebugFilters(mgr.reportGenerator, mgr.cfg, true)
++	if err != nil {
++		return nil, fmt.Errorf("failed to init debug filter: %w", err)
++	}
++	mgr.debugFilters = filters
++	// No store in mgr.http.Cover?
++	var pcs []uint64
++	for pc := range filters {
++		pcs = append(pcs, pc)
++	}
++	return pcs, nil
++}
++
+ func (mgr *Manager) CoverageFilter(modules []*vminfo.KernelModule) ([]uint64, error) {
+ 	mgr.reportGenerator.Init(modules)
+ 	filters, err := manager.PrepareCoverageFilters(mgr.reportGenerator, mgr.cfg, true)

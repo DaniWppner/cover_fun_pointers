@@ -1,0 +1,27 @@
+Saved plot to prog_exec_duration_seriessorted_by_begin_time.png
+[INFO] filtered 2105 empty intervals out of 204819 total intervals
+Saved plot to all_progs_flight_timelapse.png
+Saved plot to job_duration_series_sorted_by_finish_time.png
+Saved plot to prog_exec_duration_seriessorted_by_finish_time.png
+Saved plot to all_execs_series.png
+Saved plot to all_execs_histogram.png
+-------------------------------------
+Total campaign duration (seconds): 3 days, 19:19:52
+-------------------------------------
+Total triages during campaign: 10929
+-------------------------------------
+Triages / hour during campaign: 119.663
+-------------------------------------
+Total job execution time: 68 days, 22:47:45.700757
+-------------------------------------
+Total prog execution time during jobs: 68 days, 22:46:56.931476
+-------------------------------------
+Average prog execution time during jobs: 0:09:49.574207
+-------------------------------------
+Total prog executions during jobs: 204819
+-------------------------------------
+Average prog executions during jobs: 18.741
+##############################
+Cleaned up json lines outputted to triage_lines.jsonl
+##############################
+Time profile data outputted to time_profile_data.json

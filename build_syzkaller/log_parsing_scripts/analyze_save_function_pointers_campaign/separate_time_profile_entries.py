@@ -231,7 +231,9 @@ def show_job_over_time_plots(prog_exec_times: Iterable[float] | None, job_times:
 
 
 def show_progs_in_flight_plots(
-    in_flight_generic_progs_at, in_flight_fpointer_progs_at, start_time, end_time, out_dir: Path
+    in_flight_generic_progs_at: Callable[[datetime], list[dict[str, str]]],
+    in_flight_fpointer_progs_at: Callable[[datetime], list[dict[str, str]]] | None,
+    start_time: datetime, end_time: datetime, out_dir: Path
 ):
     show_in_flight_timelapse(
         in_flight_generic_progs_at,
@@ -241,14 +243,15 @@ def show_progs_in_flight_plots(
         title="In-flight prog executions over time",
         ylabel="In-flight prog executions",
     )
-    show_in_flight_timelapse(
-        in_flight_fpointer_progs_at,
-        start_time,
-        end_time,
-        output_path= out_dir / "fpointer_progs_in_flight_timelapse.png",
-        title="In-flight function-pointer prog executions over time",
-        ylabel="In-flight prog executions",
-    )
+    if in_flight_fpointer_progs_at is not None:
+        show_in_flight_timelapse(
+            in_flight_fpointer_progs_at,
+            start_time,
+            end_time,
+            output_path= out_dir / "fpointer_progs_in_flight_timelapse.png",
+            title="In-flight function-pointer prog executions over time",
+            ylabel="In-flight prog executions",
+        )
 
 
 def show_info(all_execs: list | None,
@@ -363,16 +366,19 @@ def process_time_profile_lines(lines: list[dict], out_dir: Path):
     fpointer_individual_durations = [entry.get(RESULT_KEYS.PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS, []) for entry in unified_dict.values()]
     unified_individual_durations = sum(all_individual_durations, start=[])
     unified_fpointer_individual_durations = sum(fpointer_individual_durations, start=[])
-    if unified_individual_durations or unified_fpointer_individual_durations:
-        in_flight_generic_progs_at, start_time, end_time = calculate_in_flight_progs(unified_individual_durations)
-        in_flight_fpointer_progs_at, _, _ = calculate_in_flight_progs(unified_fpointer_individual_durations)
 
+    if unified_individual_durations or unified_fpointer_individual_durations:
         per_job_all_durations = collapse_job_durations(all_individual_durations)
         per_job_fpointer_durations = collapse_job_durations(fpointer_individual_durations)
-
         timestart_sorted_dur = [e["DurationSeconds"] for e in sorted(per_job_all_durations, key=lambda e:e["TimeStart"])]
         timestart_sorted_fpointer_dur = [e["DurationSeconds"] for e in sorted(per_job_fpointer_durations, key=lambda e:e["TimeStart"])]
         show_job_over_time_plots(timestart_sorted_dur, None, entry_hours, 'sorted by begin time', out_dir)
+
+        in_flight_generic_progs_at, start_time, end_time = calculate_in_flight_progs(unified_individual_durations)
+        if unified_fpointer_individual_durations:
+            in_flight_fpointer_progs_at, _, _ = calculate_in_flight_progs(unified_fpointer_individual_durations)
+        else:
+            in_flight_fpointer_progs_at = None
         show_progs_in_flight_plots(in_flight_generic_progs_at, in_flight_fpointer_progs_at, start_time, end_time, out_dir)
 
     show_job_over_time_plots(prog_exec_times, job_times, entry_hours, 'sorted by finish time', out_dir)
@@ -401,7 +407,7 @@ def collapse_job_durations(per_job_individual_durations: Iterable[list[dict[str,
 def calculate_in_flight_progs(
     unified: Iterable[dict[str, str]],
 ) -> tuple[
-    Callable[[datetime], list[dict[str, str]]], datetime | None, datetime | None
+    Callable[[datetime], list[dict[str, str]]], datetime, datetime
 ]:
     """
 
