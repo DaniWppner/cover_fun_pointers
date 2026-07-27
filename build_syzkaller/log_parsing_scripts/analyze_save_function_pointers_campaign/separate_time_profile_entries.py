@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+"""
+This script parses a syzkaller json lines log file to extract and separate
+time profiling data from regular triage metrics.
+
+It outputs a clean json lines file containing only the regular triage metrics
+for further downstream analysis.
+Futhermore, it uses the time profiling entries for plot analysis.
+"""
 import argparse
 import json
 import sys
@@ -27,11 +35,14 @@ N_INTERESTING_KEYS = len(INTERESTING_KEYS)
 
 def filter_time_profile_lines(json_lines_path: Path) -> tuple[list[dict], list[dict]]:
     """
-    Returns two lists
-        The first one is the the list of json lines that are time profiling information
-        The second one is the list of json lines that are not time profiling information
-    """
+    Args:
+        json_lines_path: Path to the raw jsonlines triage log.
 
+    Returns:
+        tuple[list[dict], list[dict]]:
+            - List of triage entries containing time profiling information.
+            - List of triage entries containing regular information.
+    """
     with open(json_lines_path, "r") as f:
         lines = f.readlines()
     interesting_lines, not_interesting_lines = [], []
@@ -488,6 +499,12 @@ def unify_per_job(lines):
             timestamp_entry,
             "%Y-%m-%d %H:%M:%S",
         )
+        if unified_key in unified_dict:
+            # since we are only using time profile triage entries, we expect to get 1 of
+            # each type of entry for each triage_id|prog_id pair. If we ever got a duplicate
+            # entry for some reason (e.g, data being reported by triage_id|prog_id + call_id pairs)
+            # something would break.
+            raise ValueError("Would overwrite entry in unified triage job dict.")
         unified_dict[unified_key] = unified_entry
     return unified_dict
 
