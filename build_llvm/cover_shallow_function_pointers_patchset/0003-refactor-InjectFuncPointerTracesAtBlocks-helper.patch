@@ -1,0 +1,89 @@
+From cac6560cf1bf6ad7d6a24c3882cb0293407e78eb Mon Sep 17 00:00:00 2001
+From: daniel wappner <dwappner@dc.uba.ar>
+Date: Mon, 27 Jul 2026 19:02:06 -0300
+Subject: [PATCH 03/12] refactor InjectFuncPointerTracesAtBlocks helper
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 52 +++++++++++++------
+ 1 file changed, 35 insertions(+), 17 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 628214949..97f934b0c 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -253,6 +253,11 @@ private:
+   void InjectTraceForShallowFunctionPointerStores(
+       Function &F, ArrayRef<StoreInst *> InterestingStores);
+   void InjectFuncPointerTraceAtBlock(BasicBlock *BB, StoreInst *SI);
++  void InjectFuncPointerTracesAtBlocks(ArrayRef<std::pair<BasicBlock *, StoreInst *>> BlocksToInstrument,
++                                       json::Object &DebugDump,
++                                       json::Array &StoreInstInfoArray,
++                                       unsigned InstrumentedCount,
++                                       ArrayRef<Type *> FuncPointerArgTypes);
+   void InjectTraceForSwitch(Function &F,
+                             ArrayRef<Instruction *> SwitchTraceTargets);
+   bool InjectCoverage(Function &F, ArrayRef<BasicBlock *> AllBlocks,
+@@ -1049,6 +1054,24 @@ void ModuleSanitizerCoverage::InjectFuncPointerTraceAtBlock(BasicBlock *BB,
+                      IRB.CreatePointerCast(SI->getValueOperand(), IntptrTy),
+                  });
+ }
++void ModuleSanitizerCoverage::InjectFuncPointerTracesAtBlocks(ArrayRef<std::pair<BasicBlock *, StoreInst *>> BlocksToInstrument,
++  json::Object &DebugDump,
++  json::Array &StoreInstInfoArray,
++  unsigned InstrumentedCount,
++  ArrayRef<Type *> FuncPointerArgTypes
++){
++  for (const std::pair<BasicBlock *, StoreInst *> &Item : BlocksToInstrument) {
++    InjectFuncPointerTraceAtBlock(Item.first, Item.second);
++  }
++
++  DebugDump["InstrumentedStores"] = std::move(StoreInstInfoArray);
++  if (InstrumentedCount || FuncPointerArgTypes.size()) {
++    json::Value FinalJson = std::move(DebugDump);
++    std::error_code EC;
++    raw_fd_ostream JSONOut("/tmp/naked_pointers.json", EC, sys::fs::OF_Append);
++    JSONOut << llvm::formatv("{0:2}", FinalJson) << ",\n";
++  }
++}
+ 
+ // On every store to a function pointer variable call we call a run-time
+ // function __sanitizer_cov_store_fun_pointer* with two parameters:
+@@ -1143,23 +1166,18 @@ void ModuleSanitizerCoverage::InjectTraceForShallowFunctionPointerStores(
+                std::pair<BasicBlock *, StoreInst *> T2) {
+               return T1.first < T2.first;
+             });
+-  std::unique(BlocksToInstrument.begin(), BlocksToInstrument.end(),
+-            [](std::pair<BasicBlock *, StoreInst *> T1,
+-               std::pair<BasicBlock *, StoreInst *> T2) {
+-              return T1.first == T2.first;
+-            });
+-
+-  for (std::pair<BasicBlock *, StoreInst *> Item : BlocksToInstrument) {
+-    InjectFuncPointerTraceAtBlock(Item.first, Item.second);
+-  }
+-
+-  DebugDump["InstrumentedStores"] = std::move(StoreInstInfoArray);
+-  if (InstrumentedCount || FuncPointerArgTypes.size()) {
+-    json::Value FinalJson = std::move(DebugDump);
+-    std::error_code EC;
+-    raw_fd_ostream JSONOut("/tmp/naked_pointers.json", EC, sys::fs::OF_Append);
+-    JSONOut << llvm::formatv("{0:2}", FinalJson) << ",\n";
+-  }
++  BlocksToInstrument.erase(
++      std::unique(BlocksToInstrument.begin(), BlocksToInstrument.end(),
++                  [](std::pair<BasicBlock *, StoreInst *> T1,
++                     std::pair<BasicBlock *, StoreInst *> T2) {
++                    return T1.first == T2.first;
++                  }),
++      BlocksToInstrument.end());
++  InjectFuncPointerTracesAtBlocks(BlocksToInstrument,
++    DebugDump,
++    StoreInstInfoArray,
++    InstrumentedCount,
++    FuncPointerArgTypes);
+ }
+ 
+ void ModuleSanitizerCoverage::InjectTraceForCmp(
+-- 
+2.43.0
+

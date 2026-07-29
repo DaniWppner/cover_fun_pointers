@@ -1,0 +1,246 @@
+From c2b413c02645a40395af89d65020ff0e6e838303 Mon Sep 17 00:00:00 2001
+From: daniel wappner <dwappner@dc.uba.ar>
+Date: Wed, 29 Jul 2026 16:57:02 -0300
+Subject: [PATCH 06/12] [WIP] TraceShallowFunctionPointerStores implementation
+ DELETEME
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 132 ++++++++++++------
+ 1 file changed, 86 insertions(+), 46 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 83ef1b210..ba4fc9bbf 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -33,6 +33,7 @@
+ #include "llvm/IR/Mangler.h"
+ #include "llvm/IR/Module.h"
+ #include "llvm/IR/Type.h"
++#include "llvm/IR/Value.h"
+ #include "llvm/InitializePasses.h"
+ #include "llvm/Support/Casting.h"
+ #include "llvm/Support/CommandLine.h"
+@@ -44,6 +45,7 @@
+ #include "llvm/Transforms/Instrumentation.h"
+ #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+ #include "llvm/Transforms/Utils/ModuleUtils.h"
++#include <utility>
+ 
+ using namespace llvm;
+ 
+@@ -1013,9 +1015,20 @@ static void ShowElementVector(std::vector<T> genericVector) {
+ 
+ 
+ typedef std::vector<Type *> Types;
+-typedef std::vector<int> Offsets;
+-typedef std::vector<std::pair<Types, Offsets>> vectorTypesOffsets;
+-typedef std::pair<bool, vectorTypesOffsets> retType;
++typedef std::vector<unsigned> Offsets;
++// TypesXOffsets represents the flattened path from Type `a` to a Type  `b`
++//  that can be reached through the nested Type structure `a`.
++//  (Type `a` is the last element in the Types array. Type `b` is the first.)
++//  For a given n: int, The last n elements in the Offsets array from back
++//  to front are the indexes used to traverse the nested Type structure `a`
++//  and reach the nth reachable Type in the Type array.
++typedef std::pair<Types, Offsets> TypesXOffsets;
++// vectorTypesXOffsets represents a vector of all the reachable interesting types,
++//  where each reachable interesting type has its corresponding TypesXOffsets entry
++typedef std::vector<TypesXOffsets> vectorTypesXOffsets;
++// retType represents whether a function pointer is reachable from a father type,
++// and the vectorTypesXOffsets to all reachable function pointers.
++typedef std::pair<bool, vectorTypesXOffsets> retType;
+ 
+ // Unused, for debugging purposes
+ static void showTypeAndOffsetChain(Types typeChain, Offsets offsetChain) {
+@@ -1028,10 +1041,10 @@ static void showTypeAndOffsetChain(Types typeChain, Offsets offsetChain) {
+ }
+ 
+ // Unused, for debugging purposes
+-static void ShowTypesOffsets(vectorTypesOffsets typesOffsets) {
+-  errs() << "(size " << typesOffsets.size() << ") \n{\n";
+-  for (unsigned i = 0; i < typesOffsets.size(); i++) {
+-    showTypeAndOffsetChain(typesOffsets[i].first, typesOffsets[i].second);
++static void ShowTypesXOffsets(vectorTypesXOffsets TypesXOffsetsArr) {
++  errs() << "(size " << TypesXOffsetsArr.size() << ") \n{\n";
++  for (unsigned i = 0; i < TypesXOffsetsArr.size(); i++) {
++    showTypeAndOffsetChain(TypesXOffsetsArr[i].first, TypesXOffsetsArr[i].second);
+   }
+   errs() << "}\n";
+ }
+@@ -1041,13 +1054,13 @@ static void ShowTypesOffsets(vectorTypesOffsets typesOffsets) {
+ /*
+ Returns all intermediate values that appear while stripping pointer casts.
+ */
+-static std::vector<Value *> GetAllValuesThatWouldBeStripped(Value *V) {
++static SmallVector<Value *, 8> GetAllValuesThatWouldBeStripped(Value *V) {
+   SmallPtrSet<const Value *, 8> Visited;
+-  std::vector<Value *> res;
+-  bool ciclicalTypeDetected = false;
++  SmallVector<Value *, 8> Res;
++  bool CiclicalTypeDetected = false;
+   Visited.insert(V);
+-  res.push_back(V);
+-  while (!ciclicalTypeDetected) {
++  Res.push_back(V);
++  while (!CiclicalTypeDetected) {
+ 
+     /*
+     There are four cases we are interested in
+@@ -1064,15 +1077,15 @@ static std::vector<Value *> GetAllValuesThatWouldBeStripped(Value *V) {
+       if (!GEP->hasAllZeroIndices())
+         // In this case a different memory address is accessed
+         // so we cannot handle it as just a type cast
+-        return res;
++        return Res;
+       // retrieve the "base" pointer
+       V = GEP->getPointerOperand();
+     } else if (Operator::getOpcode(V) == Instruction::BitCast) {
+       // first operand is the original type
+       Value *NewV = cast<Operator>(V)->getOperand(0);
+       if (!NewV->getType()->isPointerTy()) {
+-        res.push_back(NewV);
+-        return res;
++        Res.push_back(NewV);
++        return Res;
+       }
+       V = NewV;
+     } else if (Operator::getOpcode(V) == Instruction::AddrSpaceCast) {
+@@ -1082,18 +1095,46 @@ static std::vector<Value *> GetAllValuesThatWouldBeStripped(Value *V) {
+       if (Value *RV = Call->getReturnedArgOperand()) {
+         V = RV;
+       } else {
+-        return res;
++        return Res;
+       }
+     } else {
+       // There are no other types we want to handle, this is the end.
+-      return res;
++      return Res;
+     }
+ 
+     assert(V->getType()->isPointerTy() && "Unexpected operand type!");
+-    res.push_back(V);
+-    ciclicalTypeDetected = !(Visited.insert(V).second);
++    Res.push_back(V);
++    CiclicalTypeDetected = !(Visited.insert(V).second);
+   }
+-  return res;
++  return Res;
++}
++
++
++static retType GetOffsetsFromShallowStructType(StructType *STy){
++  vectorTypesXOffsets Res;
++  for (unsigned j = 0; j < STy->getNumElements(); j++) {
++    Type *ElemType = STy->getElementType(j);
++    if (ElemType->isPointerTy() && ElemType->getPointerElementType()->isFunctionTy()) {
++      Res.push_back(std::make_pair(
++        Types{ElemType, STy},
++        Offsets{j, 0}
++      ));
++    }
++  }
++  if (!Res.empty()) {
++    return std::make_pair(true, Res);
++  }
++  return std::make_pair(false, Res);
++}
++
++static retType GetOffsetsFromFunctionType(Type* FunctionType){
++  vectorTypesXOffsets Res = {
++    std::make_pair(
++      Types{FunctionType},
++      Offsets{0}
++    )
++  };
++  return std::make_pair(true, Res);
+ }
+ 
+ /*
+@@ -1101,34 +1142,29 @@ Returns:
+   - bool: whether the type can be stripped to a function pointer with some offsets
+   - vector: pairs of struct types and offset chains used to access each function pointer.
+ */
+-static retType
+-getOneLevelOffsetsFromAllValues(std::vector<Value *> possibleStoredValues) {
+-  for (unsigned i = 0; i < possibleStoredValues.size(); i++) {
+-    Type *StoredType = possibleStoredValues[i]->getType();
++static retType GetOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
++  for (unsigned i = 0; i < PossibleStoredValues.size(); i++) {
++    Type *StoredType = PossibleStoredValues[i]->getType();
+     if (!StoredType->isPointerTy())
+-      continue;
+-
++      assert(false && "We only expect function pointer types here.\n");
+     Type *PointeeType = StoredType->getPointerElementType();
+     if (PointeeType->isFunctionTy()) {
+       // Depth 0: naked function pointer
+-      return std::make_pair(true, vectorTypesOffsets{std::make_pair(Types{PointeeType}, Offsets{0})});
+-    } else if (StructType *STy = dyn_cast<StructType>(PointeeType)) {
++      return GetOffsetsFromFunctionType(PointeeType);
++    } // else: must be struct
++    if (StructType *STy = dyn_cast<StructType>(PointeeType)) {
+       // Depth 1: struct containing function pointers
+-      vectorTypesOffsets offsets;
+-      for (unsigned j = 0; j < STy->getNumElements(); j++) {
+-        Type *ElemType = STy->getElementType(j);
+-        if (ElemType->isPointerTy() && ElemType->getPointerElementType()->isFunctionTy()) {
+-          offsets.push_back(std::make_pair(Types{STy, ElemType->getPointerElementType()}, Offsets{(int)j, 0}));
+-        }
+-      }
+-      if (!offsets.empty()) {
+-        return std::make_pair(true, offsets);
+-      }
++      return GetOffsetsFromShallowStructType(STy);
+     }
++    // TODO: handle more types
++    assert(false && "Unexpected type during function pointer analysis.\n");
++    // unreachable, but makes the compiler complain less
++    return std::make_pair(false, vectorTypesXOffsets{});
+   }
+-  return std::make_pair(false, vectorTypesOffsets{});
++  return std::make_pair(false, vectorTypesXOffsets{});
+ }
+ 
++
+ static std::pair<Value *, Value *> getFunctionPointerAndAddressUsingOffsetChain(
+     Value *StorePtr, Value *StoredValue, Offsets offsetChain, Types typeChain,
+     IRBuilder<> &Builder) {
+@@ -1250,7 +1286,7 @@ void ModuleSanitizerCoverage::InjectFuncPointerTracesAtBlocks(ArrayRef<std::pair
+   json::Object &DebugDump,
+   json::Array &StoreInstInfoArray,
+   unsigned InstrumentedCount,
+-  bool HaveFuncPointerArgTypes,
++  bool HaveFuncPointerArgTypes
+ ){
+   for (const std::pair<BasicBlock *, StoreInst *> &Item : BlocksToInstrument) {
+     InjectFuncPointerTraceAtBlock(Item.first, Item.second);
+@@ -1313,15 +1349,19 @@ void ModuleSanitizerCoverage::InjectTraceForShallowFunctionPointerStores(
+   SmallVector<std::pair<BasicBlock *, StoreInst *>, 8> BlocksToInstrument{};
+   for (StoreInst *SI : Stores) {
+     Value *StoredValue = SI->getValueOperand();
+-    if (StoredValue->getType()->isPointerTy())
+-      if (StoredValue->getType()->getPointerElementType()->isFunctionTy()) {
+-        InstrumentedCount++;
+-        BasicBlock *BlockOfSI = SI->getParent();
+-        BlocksToInstrument.push_back(std::make_pair(BlockOfSI, SI));
++    Value *StoreTarget = SI->getPointerOperand();
++    if (StoredValue->getType()->isPointerTy()){
++      SmallVector<Value *, 8> AllIntermediateValues = GetAllValuesThatWouldBeStripped(StoredValue);
++      retType ShallowOffsets = GetOneLevelOffsetsFromAllValues(AllIntermediateValues);
++      if (ShallowOffsets.first){
++        for (auto Item : ShallowOffsets.second){
++          auto B = getFunctionPointerAndAddressUsingOffsetChain(StoreTarget,StoredValue,Item.second,Item.first);
++        }
++      }
++    }
+         // Only warn about stores that don't map to source code.
+         if (SI->getDebugLoc())
+           putStoreInstIntoJson(SI, StoreInstInfoArray);
+-      }
+   }
+   // Turn the array into a set of blocks via sort;unique;
+   std::sort(BlocksToInstrument.begin(), BlocksToInstrument.end(),
+-- 
+2.43.0
+

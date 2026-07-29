@@ -1,0 +1,211 @@
+From 6c583941dbbc7be34dae02a14071087f89628011 Mon Sep 17 00:00:00 2001
+From: daniel wappner <dwappner@dc.uba.ar>
+Date: Mon, 27 Jul 2026 18:05:53 -0300
+Subject: [PATCH 01/12] add scaffolding of TraceShallowFunctionPointerStores,
+ pass that instruments function pointer stores of depth smaller than 1
+
+---
+ clang/include/clang/Basic/CodeGenOptions.def  |  3 ++-
+ clang/include/clang/Basic/CodeGenOptions.h    |  3 ++-
+ clang/include/clang/Driver/Options.td         |  4 ++++
+ clang/lib/CodeGen/BackendUtil.cpp             |  1 +
+ clang/lib/Driver/SanitizerArgs.cpp            | 11 +++++++---
+ .../include/llvm/Transforms/Instrumentation.h |  1 +
+ .../Instrumentation/SanitizerCoverage.cpp     | 22 +++++++++++++++++++
+ 7 files changed, 40 insertions(+), 5 deletions(-)
+
+diff --git a/clang/include/clang/Basic/CodeGenOptions.def b/clang/include/clang/Basic/CodeGenOptions.def
+index 5183e8f2b..ae4415465 100644
+--- a/clang/include/clang/Basic/CodeGenOptions.def
++++ b/clang/include/clang/Basic/CodeGenOptions.def
+@@ -273,7 +273,8 @@ CODEGENOPT(SanitizeCoverageNoPrune, 1, 0) ///< Disable coverage pruning.
+ CODEGENOPT(SanitizeCoverageStackDepth, 1, 0) ///< Enable max stack depth tracing
+ CODEGENOPT(SanitizeCoverageTraceLoads, 1, 0) ///< Enable tracing of loads.
+ CODEGENOPT(SanitizeCoverageTraceStores, 1, 0) ///< Enable tracing of stores.
+-CODEGENOPT(SanitizeCoverageTraceNakedFunctionPointerStores, 1, 0) ///< Enable tracing of function pointer stores.
++CODEGENOPT(SanitizeCoverageTraceNakedFunctionPointerStores, 1, 0) ///< Enable tracing of "raw" function pointer stores.
++CODEGENOPT(SanitizeCoverageTraceShallowFunctionPointerStores, 1, 0) ///< Enable tracing of "shallow" (in structs of depth 1) function pointer stores.
+ CODEGENOPT(SanitizeStats     , 1, 0) ///< Collect statistics for sanitizers.
+ CODEGENOPT(SimplifyLibCalls  , 1, 1) ///< Set when -fbuiltin is enabled.
+ CODEGENOPT(SoftFloat         , 1, 0) ///< -soft-float.
+diff --git a/clang/include/clang/Basic/CodeGenOptions.h b/clang/include/clang/Basic/CodeGenOptions.h
+index 454596f77..d294cadb4 100644
+--- a/clang/include/clang/Basic/CodeGenOptions.h
++++ b/clang/include/clang/Basic/CodeGenOptions.h
+@@ -478,7 +478,8 @@ public:
+     return SanitizeCoverageType || SanitizeCoverageIndirectCalls ||
+            SanitizeCoverageTraceCmp || SanitizeCoverageTraceLoads ||
+            SanitizeCoverageTraceStores ||
+-           SanitizeCoverageTraceNakedFunctionPointerStores;
++           SanitizeCoverageTraceNakedFunctionPointerStores ||
++           SanitizeCoverageTraceShallowFunctionPointerStores;
+   }
+ };
+ 
+diff --git a/clang/include/clang/Driver/Options.td b/clang/include/clang/Driver/Options.td
+index bd6fc178c..75f014efa 100644
+--- a/clang/include/clang/Driver/Options.td
++++ b/clang/include/clang/Driver/Options.td
+@@ -5221,6 +5221,10 @@ def fsanitize_coverage_trace_naked_function_pointer_stores
+     : Flag<["-"], "fsanitize-coverage-trace-naked-function-pointer-stores">,
+       HelpText<"Enable tracing of naked function pointer stores">,
+       MarshallingInfoFlag<CodeGenOpts<"SanitizeCoverageTraceNakedFunctionPointerStores">>;
++def fsanitize_coverage_trace_shallow_function_pointer_stores
++    : Flag<["-"], "fsanitize-coverage-trace-shallow-function-pointer-stores">,
++      HelpText<"Enable tracing of shallow function pointer stores">,
++      MarshallingInfoFlag<CodeGenOpts<"SanitizeCoverageTraceShallowFunctionPointerStores">>;      
+ def fpatchable_function_entry_offset_EQ
+     : Joined<["-"], "fpatchable-function-entry-offset=">, MetaVarName<"<M>">,
+       HelpText<"Generate M NOPs before function entry">,
+diff --git a/clang/lib/CodeGen/BackendUtil.cpp b/clang/lib/CodeGen/BackendUtil.cpp
+index e9dd7c718..fdb2580bf 100644
+--- a/clang/lib/CodeGen/BackendUtil.cpp
++++ b/clang/lib/CodeGen/BackendUtil.cpp
+@@ -256,6 +256,7 @@ getSancovOptsFromCGOpts(const CodeGenOptions &CGOpts) {
+   Opts.TraceLoads = CGOpts.SanitizeCoverageTraceLoads;
+   Opts.TraceStores = CGOpts.SanitizeCoverageTraceStores;
+   Opts.TraceNakedFunctionPointerStores = CGOpts.SanitizeCoverageTraceNakedFunctionPointerStores;
++  Opts.TraceShallowFunctionPointerStores = CGOpts.SanitizeCoverageTraceShallowFunctionPointerStores;  
+   return Opts;
+ }
+ 
+diff --git a/clang/lib/Driver/SanitizerArgs.cpp b/clang/lib/Driver/SanitizerArgs.cpp
+index 29333f358..e831beb76 100644
+--- a/clang/lib/Driver/SanitizerArgs.cpp
++++ b/clang/lib/Driver/SanitizerArgs.cpp
+@@ -95,6 +95,7 @@ enum CoverageFeature {
+   CoverageTraceLoads = 1 << 16,
+   CoverageTraceStores = 1 << 17,
+   CoverageTraceNakedFunctionPointerStores = 1 << 18,
++  CoverageTraceShallowFunctionPointerStores = 1 << 19,  
+ };
+ 
+ /// Parse a -fsanitize= or -fno-sanitize= argument's values, diagnosing any
+@@ -759,7 +760,8 @@ SanitizerArgs::SanitizerArgs(const ToolChain &TC,
+   int InsertionPointTypes = CoverageFunc | CoverageBB | CoverageEdge;
+   int InstrumentationTypes = CoverageTracePC | CoverageTracePCGuard |
+                              CoverageInline8bitCounters | CoverageTraceLoads |
+-                             CoverageTraceStores | CoverageTraceNakedFunctionPointerStores| 
++                             CoverageTraceStores | CoverageTraceNakedFunctionPointerStores |
++                             CoverageTraceShallowFunctionPointerStores |
+                              CoverageInlineBoolFlag;
+   if ((CoverageFeatures & InsertionPointTypes) &&
+       !(CoverageFeatures & InstrumentationTypes) && DiagnoseErrors) {
+@@ -772,7 +774,8 @@ SanitizerArgs::SanitizerArgs(const ToolChain &TC,
+   if (!(CoverageFeatures & InsertionPointTypes)) {
+     if (CoverageFeatures &
+         (CoverageTracePC | CoverageTracePCGuard | CoverageInline8bitCounters |
+-         CoverageInlineBoolFlag | CoverageTraceNakedFunctionPointerStores))
++         CoverageInlineBoolFlag | CoverageTraceNakedFunctionPointerStores | 
++         CoverageTraceShallowFunctionPointerStores))
+       CoverageFeatures |= CoverageEdge;
+ 
+     if (CoverageFeatures & CoverageStackDepth)
+@@ -1046,7 +1049,8 @@ void SanitizerArgs::addArgs(const ToolChain &TC, const llvm::opt::ArgList &Args,
+       std::make_pair(CoverageStackDepth, "-fsanitize-coverage-stack-depth"),
+       std::make_pair(CoverageTraceLoads, "-fsanitize-coverage-trace-loads"),
+       std::make_pair(CoverageTraceStores, "-fsanitize-coverage-trace-stores"),
+-      std::make_pair(CoverageTraceNakedFunctionPointerStores, "-fsanitize-coverage-trace-naked-function-pointer-stores")};
++      std::make_pair(CoverageTraceNakedFunctionPointerStores, "-fsanitize-coverage-trace-naked-function-pointer-stores"),
++      std::make_pair(CoverageTraceShallowFunctionPointerStores, "-fsanitize-coverage-trace-shallow-function-pointer-stores")};
+   for (auto F : CoverageFlags) {
+     if (CoverageFeatures & F.first)
+       CmdArgs.push_back(F.second);
+@@ -1293,6 +1297,7 @@ int parseCoverageFeatures(const Driver &D, const llvm::opt::Arg *A,
+                 .Case("trace-loads", CoverageTraceLoads)
+                 .Case("trace-stores", CoverageTraceStores)
+                 .Case("trace-naked-function-pointer-stores", CoverageTraceNakedFunctionPointerStores)
++                .Case("trace-shallow-function-pointer-stores", CoverageTraceShallowFunctionPointerStores)
+                 .Default(0);
+     if (F == 0 && DiagnoseErrors)
+       D.Diag(clang::diag::err_drv_unsupported_option_argument)
+diff --git a/llvm/include/llvm/Transforms/Instrumentation.h b/llvm/include/llvm/Transforms/Instrumentation.h
+index 50a4d3912..54d9f7e36 100644
+--- a/llvm/include/llvm/Transforms/Instrumentation.h
++++ b/llvm/include/llvm/Transforms/Instrumentation.h
+@@ -172,6 +172,7 @@ struct SanitizerCoverageOptions {
+   bool TraceLoads = false;
+   bool TraceStores = false;
+   bool TraceNakedFunctionPointerStores = false;
++  bool TraceShallowFunctionPointerStores = false;
+ 
+   SanitizerCoverageOptions() = default;
+ };
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index d1c7fe74a..b532362db 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -150,6 +150,12 @@ static cl::opt<bool> ClNakedFunPointerStoreTracing(
+              "contained in a struct"),
+     cl::Hidden);
+ 
++static cl::opt<bool> ClShallowFunPointerStoreTracing(
++    "sanitizer-coverage-trace-shallow-function-pointer-stores",
++    cl::desc("Tracing of store instructions of function pointers that are "
++             "contained in nested structure of structs of depth up to 1."),
++    cl::Hidden);
++
+ static cl::opt<bool> ClGEPTracing("sanitizer-coverage-trace-geps",
+                                   cl::desc("Tracing of GEP instructions"),
+                                   cl::Hidden, cl::init(false));
+@@ -206,6 +212,7 @@ SanitizerCoverageOptions OverrideFromCL(SanitizerCoverageOptions Options) {
+   Options.TraceLoads |= ClLoadTracing;
+   Options.TraceStores |= ClStoreTracing;
+   Options.TraceNakedFunctionPointerStores |= ClNakedFunPointerStoreTracing;
++  Options.TraceShallowFunctionPointerStores |= ClShallowFunPointerStoreTracing;
+   if (!Options.TracePCGuard && !Options.TracePC &&
+       !Options.Inline8bitCounters && !Options.StackDepth &&
+       !Options.InlineBoolFlag && !Options.TraceLoads && !Options.TraceStores)
+@@ -242,6 +249,8 @@ private:
+                                     ArrayRef<StoreInst *> Stores);
+   void InjectTraceForNakedFunctionPointerStores(
+       Function &F, ArrayRef<StoreInst *> InterestingStores);
++  void InjectTraceForShallowFunctionPointerStores(
++      Function &F, ArrayRef<StoreInst *> InterestingStores);
+   void InjectTraceForSwitch(Function &F,
+                             ArrayRef<Instruction *> SwitchTraceTargets);
+   bool InjectCoverage(Function &F, ArrayRef<BasicBlock *> AllBlocks,
+@@ -699,6 +708,7 @@ void ModuleSanitizerCoverage::instrumentFunction(
+   SmallVector<LoadInst *, 8> Loads;
+   SmallVector<StoreInst *, 8> Stores;
+   SmallVector<StoreInst *, 8> NakedFunctionPointerStores;
++  SmallVector<StoreInst *, 8> ShallowFunctionPointerStores;
+ 
+   const DominatorTree *DT = DTCallback(F);
+   const PostDominatorTree *PDT = PDTCallback(F);
+@@ -737,6 +747,9 @@ void ModuleSanitizerCoverage::instrumentFunction(
+       if (Options.TraceNakedFunctionPointerStores)
+         if (StoreInst *SI = dyn_cast<StoreInst>(&Inst))
+           NakedFunctionPointerStores.push_back(SI);
++      if (Options.TraceShallowFunctionPointerStores)
++        if (StoreInst *SI = dyn_cast<StoreInst>(&Inst))
++          ShallowFunctionPointerStores.push_back(SI);
+       if (Options.StackDepth)
+         if (isa<InvokeInst>(Inst) ||
+             (isa<CallInst>(Inst) && !isa<IntrinsicInst>(Inst)))
+@@ -752,6 +765,7 @@ void ModuleSanitizerCoverage::instrumentFunction(
+   InjectTraceForGep(F, GepTraceTargets);
+   InjectTraceForLoadsAndStores(F, Loads, Stores);
+   InjectTraceForNakedFunctionPointerStores(F, NakedFunctionPointerStores);
++  InjectTraceForShallowFunctionPointerStores(F, ShallowFunctionPointerStores);
+ }
+ 
+ GlobalVariable *ModuleSanitizerCoverage::CreateFunctionLocalArrayInSection(
+@@ -1071,6 +1085,14 @@ void ModuleSanitizerCoverage::InjectTraceForNakedFunctionPointerStores(
+   }
+ }
+ 
++// On every store to a function pointer variable call we call a run-time
++// function __sanitizer_cov_store_fun_pointer* with two parameters:
++//   - address of the variable,
++//   - stored function pointer
++void ModuleSanitizerCoverage::InjectTraceForShallowFunctionPointerStores(
++    Function &F, ArrayRef<StoreInst *> Stores) {
++}
++
+ void ModuleSanitizerCoverage::InjectTraceForCmp(
+     Function &, ArrayRef<Instruction *> CmpTraceTargets) {
+   for (auto I : CmpTraceTargets) {
+-- 
+2.43.0
+
