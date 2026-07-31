@@ -13,4 +13,4 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # This folder needs to be mounted in the docker-compose
-ENV PATH="/home/custom_llvm/build/bin:${PATH}"
+ENV PATH="/home/src/llvm-project/build/bin:${PATH}"
