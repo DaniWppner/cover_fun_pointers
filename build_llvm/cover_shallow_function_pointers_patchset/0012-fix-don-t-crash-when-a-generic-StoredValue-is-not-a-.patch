@@ -1,7 +1,7 @@
 From f1ee68fa230ab2ffc306b482d1eb43eba5b45588 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Wed, 29 Jul 2026 19:09:55 -0300
-Subject: [PATCH 11/12] fix: don't crash when a generic StoredValue is not a
+Subject: [PATCH 12/15] fix: don't crash when a generic StoredValue is not a
  pointer. Handle both assigning of a Literal struct and a struct pointer
 
 ---

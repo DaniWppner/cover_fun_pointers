@@ -1,7 +1,7 @@
 From f820617d19478795bac735bbeed5dff5cc5ded20 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Wed, 29 Jul 2026 17:56:26 -0300
-Subject: [PATCH 08/12] setup InjectFuncPointerTraceAtBlock to depend on
+Subject: [PATCH 09/15] setup InjectFuncPointerTraceAtBlock to depend on
  injectFuncPointerCallbackUsingOffsetChain regardless of trace mode
 
 ---

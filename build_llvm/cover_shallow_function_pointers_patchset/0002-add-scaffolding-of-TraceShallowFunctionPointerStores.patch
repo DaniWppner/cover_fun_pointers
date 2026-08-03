@@ -1,7 +1,7 @@
 From 6c583941dbbc7be34dae02a14071087f89628011 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Mon, 27 Jul 2026 18:05:53 -0300
-Subject: [PATCH 01/12] add scaffolding of TraceShallowFunctionPointerStores,
+Subject: [PATCH 02/15] add scaffolding of TraceShallowFunctionPointerStores,
  pass that instruments function pointer stores of depth smaller than 1
 
 ---
