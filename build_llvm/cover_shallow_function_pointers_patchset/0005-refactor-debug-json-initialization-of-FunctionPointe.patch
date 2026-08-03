@@ -1,7 +1,7 @@
 From f46d0831ddab906bd2fb1548b42e411a27b7faed Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Mon, 27 Jul 2026 19:25:30 -0300
-Subject: [PATCH 04/12] refactor debug json initialization of
+Subject: [PATCH 05/15] refactor debug json initialization of
  FunctionPointerStores InjectTrace functions
 
 ---

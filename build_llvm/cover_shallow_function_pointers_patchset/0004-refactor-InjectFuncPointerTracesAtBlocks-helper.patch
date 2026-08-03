@@ -1,7 +1,7 @@
 From cac6560cf1bf6ad7d6a24c3882cb0293407e78eb Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Mon, 27 Jul 2026 19:02:06 -0300
-Subject: [PATCH 03/12] refactor InjectFuncPointerTracesAtBlocks helper
+Subject: [PATCH 04/15] refactor InjectFuncPointerTracesAtBlocks helper
 
 ---
  .../Instrumentation/SanitizerCoverage.cpp     | 52 +++++++++++++------
