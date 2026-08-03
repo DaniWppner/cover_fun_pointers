@@ -1,0 +1,45 @@
+From 0b4cf0ad7b7e614366a3b7e652e91d015ebb258a Mon Sep 17 00:00:00 2001
+From: daniel wappner <dwappner@dc.uba.ar>
+Date: Mon, 3 Aug 2026 16:01:58 -0300
+Subject: [PATCH] ignore more non shallow pointer types in
+ getOneLevelOffsetsFromAllValues
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp           | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 08ef4e9d2..efad69b43 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1185,17 +1185,24 @@ getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+       continue;
+     // else: assume Pointer
+     Type *PointeeType = StoredType->getPointerElementType();
++    if (PointeeType->isIntegerTy())
++      //pointer to int is usually not a type signature we can get function pointers from
++      continue;
+     if (PointeeType->isFunctionTy()) {
+       // Depth 0: naked function pointer
+       return getOffsetsFromFunctionType(PointeeType);
+     } // else: must be struct
+     if (StructType *STy = dyn_cast<StructType>(PointeeType)) {
+-      // Depth 1 again: pointer to struct possibly containing function
+-      // pointers
++      // Depth 1+: pointer to struct possibly containing function pointers
+       return getOffsetsFromPointerToShallowStructType(STy);
+     }
+     if (PointeeType->isPointerTy())
+-      //we cannot handle double/triple/nested pointer types in this implementation
++      // we cannot handle double/triple/nested pointer types in this implementation
++      // TODO: handle this in nested version
++      continue;
++    if (PointeeType->isArrayTy())
++      // we cannot handle array types types in this implementation
++      // TODO: handle this in nested version
+       continue;
+ 
+     // TODO: handle more types
+-- 
+2.43.0
+
