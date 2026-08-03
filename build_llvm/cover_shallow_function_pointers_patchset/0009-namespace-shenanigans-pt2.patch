@@ -1,0 +1,638 @@
+From b7b3969d587a3dbf9e2de1daa7db24fe1e763fe9 Mon Sep 17 00:00:00 2001
+From: daniel wappner <dwappner@dc.uba.ar>
+Date: Wed, 29 Jul 2026 17:58:09 -0300
+Subject: [PATCH 09/12] namespace shenanigans pt2
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 514 +++++++++---------
+ 1 file changed, 249 insertions(+), 265 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 3a843dba9..28ce17206 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -177,18 +177,20 @@ namespace {
+ 
+ typedef std::vector<Type *> Types;
+ typedef std::vector<unsigned> Offsets;
+-// TypesXOffsets represents the flattened path from Type `a` to a Type `b` 
++// TypesXOffsets represents the flattened path from Type `a` to a Type `b`
+ //  that can be reached through the nested Type structure `a`.
+ //  (Type `a` is the last element in the Types array. Type `b` is the first.)
+ //  For a given n: int, The last n elements in the Offsets array from back
+ //  to front are the indexes used to traverse the nested Type structure `a`
+ //  and reach the nth reachable Type in the Type array.
+ typedef std::pair<Types, Offsets> TypesXOffsets;
+-// vectorTypesXOffsets represents a vector of all the reachable interesting types,
+-//  where each reachable interesting type has its corresponding TypesXOffsets entry
++// vectorTypesXOffsets represents a vector of all the reachable interesting
++// types,
++//  where each reachable interesting type has its corresponding TypesXOffsets
++//  entry
+ typedef std::vector<TypesXOffsets> vectorTypesXOffsets;
+-// retType represents whether a function pointer is reachable from a father type,
+-// and the vectorTypesXOffsets to all reachable function pointers.
++// retType represents whether a function pointer is reachable from a father
++// type, and the vectorTypesXOffsets to all reachable function pointers.
+ typedef std::pair<bool, vectorTypesXOffsets> retType;
+ 
+ struct TraceInstrumentTarget {
+@@ -279,11 +281,10 @@ private:
+   void InjectTraceForShallowFunctionPointerStores(
+       Function &F, ArrayRef<StoreInst *> InterestingStores);
+   void InjectFuncPointerTraceAtBlock(TraceInstrumentTarget Target);
+-  void InjectFuncPointerTracesAtBlocks(ArrayRef<TraceInstrumentTarget> BlocksToInstrument,
+-                                       json::Object &DebugDump,
+-                                       json::Array &StoreInstInfoArray,
+-                                       unsigned InstrumentedCount,
+-                                       bool HaveFuncPointerArgTypes);
++  void InjectFuncPointerTracesAtBlocks(
++      ArrayRef<TraceInstrumentTarget> BlocksToInstrument,
++      json::Object &DebugDump, json::Array &StoreInstInfoArray,
++      unsigned InstrumentedCount, bool HaveFuncPointerArgTypes);
+   void InjectTraceForSwitch(Function &F,
+                             ArrayRef<Instruction *> SwitchTraceTargets);
+   bool InjectCoverage(Function &F, ArrayRef<BasicBlock *> AllBlocks,
+@@ -1017,6 +1018,7 @@ void ModuleSanitizerCoverage::InjectTraceForLoadsAndStores(
+   }
+ }
+ 
++namespace {
+ // Unused, for debugging purposes
+ template <typename T>
+ static void ShowPointerVector(std::vector<T *> genericVector) {
+@@ -1028,8 +1030,7 @@ static void ShowPointerVector(std::vector<T *> genericVector) {
+ }
+ 
+ // Unused, for debugging purposes
+-template <typename T>
+-  void ShowElementVector(std::vector<T> genericVector) {
++template <typename T> void ShowElementVector(std::vector<T> genericVector) {
+   errs() << "(size " << genericVector.size() << ") \n{\n";
+   for (unsigned i = 0; i < genericVector.size(); i++) {
+     errs() << genericVector[i] << "\n";
+@@ -1037,264 +1038,257 @@ template <typename T>
+   errs() << "}\n";
+ }
+ 
+-namespace {
+-  // Unused, for debugging purposes
+-  void showTypeAndOffsetChain(Types TypeChain, Offsets OffsetChain) {
+-    errs() << "{\n";
+-    for (unsigned j = 0; j < TypeChain.size(); j++) {
+-      errs() << std::string('\t', j) << "Type: " << *TypeChain[j]
+-            << " Offset: " << OffsetChain[j] << "\n";
+-    }
+-    errs() << "}\n";
++// Unused, for debugging purposes
++void showTypeAndOffsetChain(Types TypeChain, Offsets OffsetChain) {
++  errs() << "{\n";
++  for (unsigned j = 0; j < TypeChain.size(); j++) {
++    errs() << std::string('\t', j) << "Type: " << *TypeChain[j]
++           << " Offset: " << OffsetChain[j] << "\n";
+   }
++  errs() << "}\n";
++}
+ 
+-  // Unused, for debugging purposes
+-  void showTypesXOffsets(vectorTypesXOffsets TypesXOffsetsArr) {
+-    errs() << "(size " << TypesXOffsetsArr.size() << ") \n{\n";
+-    for (unsigned i = 0; i < TypesXOffsetsArr.size(); i++) {
+-      showTypeAndOffsetChain(TypesXOffsetsArr[i].first, TypesXOffsetsArr[i].second);
+-    }
+-    errs() << "}\n";
++// Unused, for debugging purposes
++void showTypesXOffsets(vectorTypesXOffsets TypesXOffsetsArr) {
++  errs() << "(size " << TypesXOffsetsArr.size() << ") \n{\n";
++  for (unsigned i = 0; i < TypesXOffsetsArr.size(); i++) {
++    showTypeAndOffsetChain(TypesXOffsetsArr[i].first,
++                           TypesXOffsetsArr[i].second);
+   }
++  errs() << "}\n";
++}
+ 
+-  /*
+-  Returns all intermediate values that appear while stripping pointer casts.
+-  */
+-  SmallVector<Value *, 8> getAllValuesThatWouldBeStripped(Value *V) {
+-    SmallPtrSet<const Value *, 8> Visited;
+-    SmallVector<Value *, 8> Res;
+-    bool CiclicalTypeDetected = false;
+-    Visited.insert(V);
+-    Res.push_back(V);
+-    while (!CiclicalTypeDetected) {
+-
+-      /*
+-      There are four cases we are interested in
+-        1. GEPOperator means the pointer can be used to access the same address as
+-      a different type
+-        2. BitCast Instruction is by definition a type change without modifying
+-      the data
+-        3. AddressSpaceCast Instruction moves the pointer to a different address
+-      space, and can redefine the pointer type
+-        4. CallBase Instruction can be interpreted as the Value being of the
+-      function return type
+-      */
+-      if (GEPOperator *GEP = dyn_cast<GEPOperator>(V)) {
+-        if (!GEP->hasAllZeroIndices())
+-          // In this case a different memory address is accessed
+-          // so we cannot handle it as just a type cast
+-          return Res;
+-        // retrieve the "base" pointer
+-        V = GEP->getPointerOperand();
+-      } else if (Operator::getOpcode(V) == Instruction::BitCast) {
+-        // first operand is the original type
+-        Value *NewV = cast<Operator>(V)->getOperand(0);
+-        if (!NewV->getType()->isPointerTy()) {
+-          Res.push_back(NewV);
+-          return Res;
+-        }
+-        V = NewV;
+-      } else if (Operator::getOpcode(V) == Instruction::AddrSpaceCast) {
+-        // first operand is the original pointer type
+-        V = cast<Operator>(V)->getOperand(0);
+-      } else if (CallBase *Call = dyn_cast<CallBase>(V)) {
+-        if (Value *RV = Call->getReturnedArgOperand()) {
+-          V = RV;
+-        } else {
+-          return Res;
+-        }
++/*
++Returns all intermediate values that appear while stripping pointer casts.
++*/
++SmallVector<Value *, 8> getAllValuesThatWouldBeStripped(Value *V) {
++  SmallPtrSet<const Value *, 8> Visited;
++  SmallVector<Value *, 8> Res;
++  bool CiclicalTypeDetected = false;
++  Visited.insert(V);
++  Res.push_back(V);
++  while (!CiclicalTypeDetected) {
++
++    /*
++    There are four cases we are interested in
++      1. GEPOperator means the pointer can be used to access the same address as
++    a different type
++      2. BitCast Instruction is by definition a type change without modifying
++    the data
++      3. AddressSpaceCast Instruction moves the pointer to a different address
++    space, and can redefine the pointer type
++      4. CallBase Instruction can be interpreted as the Value being of the
++    function return type
++    */
++    if (GEPOperator *GEP = dyn_cast<GEPOperator>(V)) {
++      if (!GEP->hasAllZeroIndices())
++        // In this case a different memory address is accessed
++        // so we cannot handle it as just a type cast
++        return Res;
++      // retrieve the "base" pointer
++      V = GEP->getPointerOperand();
++    } else if (Operator::getOpcode(V) == Instruction::BitCast) {
++      // first operand is the original type
++      Value *NewV = cast<Operator>(V)->getOperand(0);
++      if (!NewV->getType()->isPointerTy()) {
++        Res.push_back(NewV);
++        return Res;
++      }
++      V = NewV;
++    } else if (Operator::getOpcode(V) == Instruction::AddrSpaceCast) {
++      // first operand is the original pointer type
++      V = cast<Operator>(V)->getOperand(0);
++    } else if (CallBase *Call = dyn_cast<CallBase>(V)) {
++      if (Value *RV = Call->getReturnedArgOperand()) {
++        V = RV;
+       } else {
+-        // There are no other types we want to handle, this is the end.
+         return Res;
+       }
+-
+-      assert(V->getType()->isPointerTy() && "Unexpected operand type!");
+-      Res.push_back(V);
+-      CiclicalTypeDetected = !(Visited.insert(V).second);
++    } else {
++      // There are no other types we want to handle, this is the end.
++      return Res;
+     }
+-    return Res;
++
++    assert(V->getType()->isPointerTy() && "Unexpected operand type!");
++    Res.push_back(V);
++    CiclicalTypeDetected = !(Visited.insert(V).second);
+   }
++  return Res;
++}
+ 
+-  retType getOffsetsFromShallowStructType(StructType *STy){
+-    vectorTypesXOffsets Res;
+-    for (unsigned j = 0; j < STy->getNumElements(); j++) {
+-      Type *ElemType = STy->getElementType(j);
+-      if (ElemType->isPointerTy() && ElemType->getPointerElementType()->isFunctionTy()) {
+-        Res.push_back(std::make_pair(
+-          Types{ElemType, STy},
+-          Offsets{j, 0}
+-        ));
+-      }
+-    }
+-    if (!Res.empty()) {
+-      return std::make_pair(true, Res);
++retType getOffsetsFromShallowStructType(StructType *STy) {
++  vectorTypesXOffsets Res;
++  for (unsigned j = 0; j < STy->getNumElements(); j++) {
++    Type *ElemType = STy->getElementType(j);
++    if (ElemType->isPointerTy() &&
++        ElemType->getPointerElementType()->isFunctionTy()) {
++      Res.push_back(std::make_pair(Types{ElemType, STy}, Offsets{j, 0}));
+     }
+-    return std::make_pair(false, Res);
+   }
+-
+-  retType getOffsetsFromFunctionType(Type* FunctionType){
+-    vectorTypesXOffsets Res = {
+-      std::make_pair(
+-        Types{FunctionType},
+-        Offsets{0}
+-      )
+-    };
++  if (!Res.empty()) {
+     return std::make_pair(true, Res);
+   }
++  return std::make_pair(false, Res);
++}
+ 
+-  /*
+-  Returns:
+-    - bool: whether the type can be stripped to a function pointer with some offsets
+-    - vector: pairs of struct types and offset chains used to access each function pointer.
+-  */
+-  retType getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+-    for (unsigned i = 0; i < PossibleStoredValues.size(); i++) {
+-      Type *StoredType = PossibleStoredValues[i]->getType();
+-      if (!StoredType->isPointerTy())
+-        assert(false && "We only expect function pointer types here.\n");
+-      Type *PointeeType = StoredType->getPointerElementType();
+-      if (PointeeType->isFunctionTy()) {
+-        // Depth 0: naked function pointer
+-        return getOffsetsFromFunctionType(PointeeType);
+-      } // else: must be struct
+-      if (StructType *STy = dyn_cast<StructType>(PointeeType)) {
+-        // Depth 1: struct containing function pointers
+-        return getOffsetsFromShallowStructType(STy);
+-      }
+-      // TODO: handle more types
+-      assert(false && "Unexpected type during function pointer analysis.\n");
+-      // unreachable, but makes the compiler complain less
+-      return std::make_pair(false, vectorTypesXOffsets{});
++retType getOffsetsFromFunctionType(Type *FunctionType) {
++  vectorTypesXOffsets Res = {std::make_pair(Types{FunctionType}, Offsets{0})};
++  return std::make_pair(true, Res);
++}
++
++/*
++Returns:
++  - bool: whether the type can be stripped to a function pointer with some
++offsets
++  - vector: pairs of struct types and offset chains used to access each function
++pointer.
++*/
++retType
++getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
++  for (unsigned i = 0; i < PossibleStoredValues.size(); i++) {
++    Type *StoredType = PossibleStoredValues[i]->getType();
++    if (!StoredType->isPointerTy())
++      assert(false && "We only expect function pointer types here.\n");
++    Type *PointeeType = StoredType->getPointerElementType();
++    if (PointeeType->isFunctionTy()) {
++      // Depth 0: naked function pointer
++      return getOffsetsFromFunctionType(PointeeType);
++    } // else: must be struct
++    if (StructType *STy = dyn_cast<StructType>(PointeeType)) {
++      // Depth 1: struct containing function pointers
++      return getOffsetsFromShallowStructType(STy);
+     }
++    // TODO: handle more types
++    assert(false && "Unexpected type during function pointer analysis.\n");
++    // unreachable, but makes the compiler complain less
+     return std::make_pair(false, vectorTypesXOffsets{});
+   }
++  return std::make_pair(false, vectorTypesXOffsets{});
++}
+ 
+-  std::pair<Value *, Value *> injectFuncPointerCallbackUsingOffsetChain(
+-      Value *StorePtr, Value *StoredValue, Offsets offsetChain, Types typeChain,
+-      IRBuilder<> &Builder) {
+-
+-    if (offsetChain.size() == 1) {
+-      /*
+-      * Depth 0: Naked function pointer.
+-      * We return the original StorePtr as the address and the function pointer as the value.
+-      */
+-      assert(StoredValue->getType()->isPointerTy());
+-      Type *DesiredFType = typeChain[0];
+-      Type *MiscPointeeType = StoredValue->getType()->getPointerElementType();
+-
+-      Value *FunctionPtr = nullptr;
+-      if (MiscPointeeType->isFunctionTy()) {
+-        // We are already at the function pointer which we were looking for.
+-        assert(MiscPointeeType == DesiredFType);
+-        FunctionPtr = StoredValue;
+-      } else {
+-        // We have a pointer to a pointer to function.
+-        // To retrieve the function pointer we just need to load once.
+-        assert(MiscPointeeType->isPointerTy() &&
+-              MiscPointeeType->getPointerElementType()->isFunctionTy() &&
+-              MiscPointeeType->getPointerElementType() == DesiredFType);
+-
+-        // Address space hardcoded to 0 here because that's where function
+-        // pointers usually live.
+-        Type *FPointerType = PointerType::get(DesiredFType, 0);
+-        FunctionPtr = Builder.CreateLoad(FPointerType, StoredValue);
+-      }
+-      return std::make_pair(StorePtr, FunctionPtr);
+-
++std::pair<Value *, Value *>
++injectFuncPointerCallbackUsingOffsetChain(Value *StorePtr, Value *StoredValue,
++                                          Offsets OffsetChain, Types TypeChain,
++                                          IRBuilder<> &Builder) {
++
++  if (OffsetChain.size() == 1) {
++    /*
++     * Depth 0: Naked function pointer.
++     * We return the original StorePtr as the address and the function pointer
++     * as the value.
++     */
++    assert(StoredValue->getType()->isPointerTy());
++    Type *DesiredFType = TypeChain[0];
++    Type *MiscPointeeType = StoredValue->getType()->getPointerElementType();
++
++    Value *FunctionPtr = nullptr;
++    if (MiscPointeeType->isFunctionTy()) {
++      // We are already at the function pointer which we were looking for.
++      assert(MiscPointeeType == DesiredFType);
++      FunctionPtr = StoredValue;
+     } else {
+-      /*
+-      * Depth 1: Struct containing function pointers.
+-      * We evaluate the GEP to get the address of the function pointer inside the struct,
+-      * and load it to get the actual function pointer.
+-      */
+-      assert(offsetChain.size() == 2 && "Offset chain size must be 2 for depth 1 structs");
+-      StoredValue = StoredValue->stripPointerCastsAndAliases();
+-      int Offset = offsetChain[0];
+-      Type *StructType = typeChain[0];
+-      Type *ContainedType = typeChain[1];
+-
+-      unsigned AddrSpace = StoredValue->getType()->getPointerAddressSpace();
+-      PointerType *StructPtrTy = PointerType::get(StructType, AddrSpace);
+-
+-      // We would prefer crashing if while traversing the struct chain we
+-      // get a pointer to an unexpected type instead of casting it.
+-      Value *Cast = Builder.CreatePointerCast(StoredValue, StructPtrTy);
+-
+-      Value *Address = Builder.CreateInBoundsGEP(
+-          StructType, Cast,
+-          {ConstantInt::get(Type::getInt32Ty(StoredValue->getContext()), 0),
+-          ConstantInt::get(Type::getInt32Ty(StoredValue->getContext()), Offset)});
+-
+-      // The contained type in memory is a pointer to the function.
+-      Type *ContainedPtrType = PointerType::get(ContainedType, 0);
+-      Value *FunctionPtr = Builder.CreateLoad(ContainedPtrType, Address);
+-
+-      return std::make_pair(Address, FunctionPtr);
++      // We have a pointer to a pointer to function.
++      // To retrieve the function pointer we just need to load once.
++      assert(MiscPointeeType->isPointerTy() &&
++             MiscPointeeType->getPointerElementType()->isFunctionTy() &&
++             MiscPointeeType->getPointerElementType() == DesiredFType);
++
++      // Address space hardcoded to 0 here because that's where function
++      // pointers usually live.
++      Type *FPointerType = PointerType::get(DesiredFType, 0);
++      FunctionPtr = Builder.CreateLoad(FPointerType, StoredValue);
+     }
++    return std::make_pair(StorePtr, FunctionPtr);
++
++  } else {
++    /*
++     * Depth 1: Struct containing function pointers.
++     * We evaluate the GEP to get the address of the function pointer inside the
++     * struct, and load it to get the actual function pointer.
++     */
++    assert(OffsetChain.size() == 2 &&
++           "Offset chain size must be 2 for depth 1 structs");
++    StoredValue = StoredValue->stripPointerCastsAndAliases();
++    int Offset = OffsetChain[0];
++    Type *StructType = TypeChain[0];
++    Type *ContainedType = TypeChain[1];
++
++    unsigned AddrSpace = StoredValue->getType()->getPointerAddressSpace();
++    PointerType *StructPtrTy = PointerType::get(StructType, AddrSpace);
++
++    // We would prefer crashing if while traversing the struct chain we
++    // get a pointer to an unexpected type instead of casting it.
++    Value *Cast = Builder.CreatePointerCast(StoredValue, StructPtrTy);
++
++    Value *Address = Builder.CreateInBoundsGEP(
++        StructType, Cast,
++        {ConstantInt::get(Type::getInt32Ty(StoredValue->getContext()), 0),
++         ConstantInt::get(Type::getInt32Ty(StoredValue->getContext()),
++                          Offset)});
++
++    // The contained type in memory is a pointer to the function.
++    Type *ContainedPtrType = PointerType::get(ContainedType, 0);
++    Value *FunctionPtr = Builder.CreateLoad(ContainedPtrType, Address);
++
++    return std::make_pair(Address, FunctionPtr);
+   }
++}
+ 
+-  bool putFunctionArgFuncTypesIntoJson(Function &F,
+-                                              json::Object &RootJson) {
+-    SmallVector<Type *> FuncPointerArgTypes = {};
+-    FunctionType *FType = F.getFunctionType();
+-    for (Type *ParamType : FType->params()) {
+-      if (ParamType->isPointerTy() &&
+-          ParamType->getPointerElementType()->isFunctionTy()) {
+-        FuncPointerArgTypes.push_back(ParamType);
+-      }
+-    }
+-    json::Array FunctionPointerParameters;
+-    for (Type *T : FuncPointerArgTypes) {
+-      std::string TypeStr;
+-      raw_string_ostream RSO(TypeStr);
+-      T->print(RSO);
+-      FunctionPointerParameters.push_back(RSO.str());
++bool putFunctionArgFuncTypesIntoJson(Function &F, json::Object &RootJson) {
++  SmallVector<Type *> FuncPointerArgTypes = {};
++  FunctionType *FType = F.getFunctionType();
++  for (Type *ParamType : FType->params()) {
++    if (ParamType->isPointerTy() &&
++        ParamType->getPointerElementType()->isFunctionTy()) {
++      FuncPointerArgTypes.push_back(ParamType);
+     }
+-    RootJson["functionPointerParameters"] = std::move(FunctionPointerParameters);
+-    return !FuncPointerArgTypes.empty();
+   }
+-
+-  void putStoreInstIntoJson(StoreInst *SI,
+-                                  json::Array &storeInstInfoArray) {
+-    json::Object StoreJson;
+-    std::string StoreInstStr;
+-    raw_string_ostream RSOInst(StoreInstStr);
+-    SI->print(RSOInst);
+-    StoreJson["storeInst"] = RSOInst.str();
+-    StoreJson["lineNumber"] = SI->getDebugLoc().getLine();
+-    storeInstInfoArray.push_back(std::move(StoreJson));
++  json::Array FunctionPointerParameters;
++  for (Type *T : FuncPointerArgTypes) {
++    std::string TypeStr;
++    raw_string_ostream RSO(TypeStr);
++    T->print(RSO);
++    FunctionPointerParameters.push_back(RSO.str());
+   }
++  RootJson["functionPointerParameters"] = std::move(FunctionPointerParameters);
++  return !FuncPointerArgTypes.empty();
++}
+ 
+-  void fillJsonWithFunctionInfo(Function &F, json::Object &DebugDump) {
+-    DebugDump["Function"] = F.getName().str();
+-    json::Object SourceLocation;
+-    SourceLocation["fileName"] = F.getSubprogram()->getFilename();
+-    SourceLocation["lineNumber"] = F.getSubprogram()->getScopeLine();
+-    DebugDump["sourceLocation"] = std::move(SourceLocation);
+-  }
++void putStoreInstIntoJson(StoreInst *SI, json::Array &storeInstInfoArray) {
++  json::Object StoreJson;
++  std::string StoreInstStr;
++  raw_string_ostream RSOInst(StoreInstStr);
++  SI->print(RSOInst);
++  StoreJson["storeInst"] = RSOInst.str();
++  StoreJson["lineNumber"] = SI->getDebugLoc().getLine();
++  storeInstInfoArray.push_back(std::move(StoreJson));
++}
+ 
+-} //namespace
++void fillJsonWithFunctionInfo(Function &F, json::Object &DebugDump) {
++  DebugDump["Function"] = F.getName().str();
++  json::Object SourceLocation;
++  SourceLocation["fileName"] = F.getSubprogram()->getFilename();
++  SourceLocation["lineNumber"] = F.getSubprogram()->getScopeLine();
++  DebugDump["sourceLocation"] = std::move(SourceLocation);
++}
++
++} // namespace
+ 
+-void ModuleSanitizerCoverage::InjectFuncPointerTraceAtBlock(TraceInstrumentTarget Target) {
+-  Instruction* Terminator = Target.BB->getTerminator();
++void ModuleSanitizerCoverage::InjectFuncPointerTraceAtBlock(
++    TraceInstrumentTarget Target) {
++  Instruction *Terminator = Target.BB->getTerminator();
+   DebugLoc EntryLoc = Terminator->getDebugLoc();
+   IRBuilder<> IRB(Terminator);
+   IRB.SetCurrentDebugLocation(EntryLoc);
+   injectFuncPointerCallbackUsingOffsetChain(
+-    Target.SI->getPointerOperand(),
+-    Target.SI->getValueOperand(),
+-    Target.OffsetChain,
+-    Target.TypeChain,
+-    IRB
+-  );
++      Target.SI->getPointerOperand(), Target.SI->getValueOperand(),
++      Target.OffsetChain, Target.TypeChain, IRB);
+ }
+ 
+-void ModuleSanitizerCoverage::InjectFuncPointerTracesAtBlocks(ArrayRef<TraceInstrumentTarget> TargetsToInstrument,
+-  json::Object &DebugDump,
+-  json::Array &StoreInstInfoArray,
+-  unsigned InstrumentedCount,
+-  bool HaveFuncPointerArgTypes
+-){
++void ModuleSanitizerCoverage::InjectFuncPointerTracesAtBlocks(
++    ArrayRef<TraceInstrumentTarget> TargetsToInstrument,
++    json::Object &DebugDump, json::Array &StoreInstInfoArray,
++    unsigned InstrumentedCount, bool HaveFuncPointerArgTypes) {
+   for (TraceInstrumentTarget Item : TargetsToInstrument) {
+     InjectFuncPointerTraceAtBlock(Item);
+   }
+@@ -1323,28 +1317,22 @@ void ModuleSanitizerCoverage::InjectTraceForNakedFunctionPointerStores(
+   SmallVector<TraceInstrumentTarget, 8> TargetsToInstrument{};
+   for (StoreInst *SI : Stores) {
+     Value *StoredValue = SI->getValueOperand();
+-    if (StoredValue->getType()->isPointerTy()){
+-      Type* PointeeType = StoredValue->getType()->getPointerElementType();
++    if (StoredValue->getType()->isPointerTy()) {
++      Type *PointeeType = StoredValue->getType()->getPointerElementType();
+       if (PointeeType->isFunctionTy()) {
+         InstrumentedCount++;
+         BasicBlock *BlockOfSI = SI->getParent();
+-        TargetsToInstrument.push_back({
+-            BlockOfSI,
+-            SI,
+-            Types{PointeeType},
+-            Offsets{0}
+-          });
++        TargetsToInstrument.push_back(
++            {BlockOfSI, SI, Types{PointeeType}, Offsets{0}});
+         // Only warn about stores that don't map to source code.
+         if (SI->getDebugLoc())
+           putStoreInstIntoJson(SI, StoreInstInfoArray);
+       }
+     }
+   }
+-  InjectFuncPointerTracesAtBlocks(TargetsToInstrument,
+-    DebugDump,
+-    StoreInstInfoArray,
+-    InstrumentedCount,
+-    HaveFuncPointerTypeArgs);
++  InjectFuncPointerTracesAtBlocks(TargetsToInstrument, DebugDump,
++                                  StoreInstInfoArray, InstrumentedCount,
++                                  HaveFuncPointerTypeArgs);
+ }
+ 
+ // On every store to a function pointer variable call we call a run-time
+@@ -1362,19 +1350,17 @@ void ModuleSanitizerCoverage::InjectTraceForShallowFunctionPointerStores(
+   SmallVector<TraceInstrumentTarget, 8> TargetsToInstrument{};
+   for (StoreInst *SI : Stores) {
+     Value *StoredValue = SI->getValueOperand();
+-    if (StoredValue->getType()->isPointerTy()){
+-      SmallVector<Value *, 8> AllIntermediateValues = getAllValuesThatWouldBeStripped(StoredValue);
+-      retType ShallowOffsets = getOneLevelOffsetsFromAllValues(AllIntermediateValues);
+-      if (ShallowOffsets.first){
++    if (StoredValue->getType()->isPointerTy()) {
++      SmallVector<Value *, 8> AllIntermediateValues =
++          getAllValuesThatWouldBeStripped(StoredValue);
++      retType ShallowOffsets =
++          getOneLevelOffsetsFromAllValues(AllIntermediateValues);
++      if (ShallowOffsets.first) {
+         BasicBlock *BlockOfSI = SI->getParent();
+-        for (TypesXOffsets Item : ShallowOffsets.second){
+-          TargetsToInstrument.push_back({
+-            BlockOfSI,
+-            SI,
+-            Item.first,
+-            Item.second
+-          });
+-          InstrumentedCount ++;
++        for (TypesXOffsets Item : ShallowOffsets.second) {
++          TargetsToInstrument.push_back(
++              {BlockOfSI, SI, Item.first, Item.second});
++          InstrumentedCount++;
+         }
+         // Only warn about stores that don't map to source code.
+         if (SI->getDebugLoc())
+@@ -1383,11 +1369,9 @@ void ModuleSanitizerCoverage::InjectTraceForShallowFunctionPointerStores(
+     }
+   }
+ 
+-  InjectFuncPointerTracesAtBlocks(TargetsToInstrument,
+-    DebugDump,
+-    StoreInstInfoArray,
+-    InstrumentedCount,
+-    HaveFuncPointerTypeArgs);
++  InjectFuncPointerTracesAtBlocks(TargetsToInstrument, DebugDump,
++                                  StoreInstInfoArray, InstrumentedCount,
++                                  HaveFuncPointerTypeArgs);
+ }
+ 
+ void ModuleSanitizerCoverage::InjectTraceForCmp(
+-- 
+2.43.0
+

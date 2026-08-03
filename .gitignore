@@ -16,6 +16,29 @@ build_syzkaller/syz-executor-test/QEMU-debug-image/
 **/crashes/
 **/instance-*/
 **/instance-lock
+**/syz-manager*.log
+
+#Ignore output analysis files
+**/__uncovered*.py
+**/__covered*.py
+**/multiple_saved_corpus.json
+**/registered_covered_fpointers_saved_because_fpointer.json
+**/registered_uncovered_fpointers_saved_because_fpointer.json
+**/saved_because_fpointer.json
+**/saved_because_fpointer_w_duplicates.json
+**/unique_fpointer_and_signal_minimization_result.json
+**/time_profile_data.json
+**/*parsed_triage_jobs_log.json
+**/*parsed_triage_jobs.json
+**/*parsed_triaged_jobs.json
+**/*parsed_triage.json
+**/*_triage_jobs.json
+**/*_lines.jsonl
+**/*_jsonlines.jsonl
+**/*extracted_triage.jsonl
+**/*_triage_jobs.jsonl
+**/*.png
+**/*.zip
 
 # Python ignores
 __pycache__/

@@ -1,0 +1,51 @@
+2026/06/29 10:53:04 candidates=0 corpus=2314 coverage=30564 exec total=127872 (32/min) pending=0 reproducing=0 
+
+
+################################################
+Unique function pointer store instructions: (count=245)
+Function pointer store instructions that don't show up in exec log: (count=245)
+################################################
+Unique stored function pointers: (count=413)
+Stored function_pointers that don't show up in exec log: (count=413)
+################################################
+Unique functions covered: (count=11940)
+Unique functions covered excluding inlines: (count=10680)
+------------------------------------------------
+Unique functions of fpointer stores: (count=260)
+Function pointer store instructions in funcions different than PCs: (count=41): 
+[('/home/linux/./include/linux/delayed_call.h:21', 'set_delayed_call'), ('/home/linux/./include/linux/delayed_call.h:33', 'clear_delayed_call'), ('/home/linux/./include/linux/delayed_call.h:?', 'clear_delayed_call'), ('/home/linux/./include/linux/hrtimer.h:254', 'hrtimer_init_sleeper_on_stack'), ('/home/linux/./include/linux/irq_work.h:39', 'init_irq_work'), ('/home/linux/./include/linux/poll.h:71', 'do_select'), ('/home/linux/./include/linux/rcupdate.h:1062', 'rcu_head_init'), ('/home/linux/./include/linux/task_work.h:13', 'init_task_work'), ('/home/linux/./include/net/cfg80211.h:5993', 'wiphy_work_init'), ('/home/linux/./include/net/cfg80211.h:6042', 'wiphy_delayed_work_init'), ('/home/linux/block/blk-map.c:518', 'blk_rq_map_kern'), ('/home/linux/block/blk-mq.c:1399', 'blk_execute_rq'), ('/home/linux/drivers/ata/libata-scsi.c:1709', '__ata_scsi_queuecmd'), ('/home/linux/drivers/ata/libata-scsi.c:2651', 'atapi_xlat'), ('/home/linux/drivers/ata/libata-scsi.c:687', '__ata_scsi_queuecmd'), ('/home/linux/drivers/base/core.c:4364', 'device_create'), ('/home/linux/drivers/base/firmware_loader/main.c:1474', 'device_cache_fw_images'), ('/home/linux/drivers/base/firmware_loader/main.c:1536', 'fw_pm_notify'), ('/home/linux/drivers/scsi/scsi_lib.c:1260', 'scsi_init_command'), ('/home/linux/drivers/tty/vt/vt.c:1072', 'vc_allocate'), ('/home/linux/fs/buffer.c:3100', '__block_write_begin_int'), ('/home/linux/fs/buffer.c:449', 'mark_buffer_async_write_endio'), ('/home/linux/fs/ext4/readpage.c:359', 'ext4_mpage_readpages'), ('/home/linux/fs/ext4/super.c:4288', 'ext4_setup_csum_trigger'), ('/home/linux/fs/mpage.c:314', 'do_mpage_readpage'), ('/home/linux/fs/mpage.c:372', 'mpage_readahead'), ('/home/linux/fs/mpage.c:384', 'mpage_readahead'), ('/home/linux/fs/mpage.c:393', 'mpage_read_folio'), ('/home/linux/fs/mpage.c:80', 'mpage_bio_submit_read'), ('/home/linux/fs/namei.c:5203', 'page_get_link'), ('/home/linux/fs/namei.c:669', 'drop_links'), ('/home/linux/fs/select.c:188', 'pollwake'), ('/home/linux/fs/select.c:578', 'do_select'), ('/home/linux/fs/select.c:?', 'do_select'), ('/home/linux/io_uring/io_uring.c:2900', 'io_ring_ctx_wait_and_kill'), ('/home/linux/kernel/stop_machine.c:142', 'stop_one_cpu'), ('/home/linux/kernel/time/hrtimer.c:1983', '__hrtimer_init_sleeper'), ('/home/linux/lib/rhashtable.c:204', 'bucket_table_alloc'), ('/home/linux/net/ipv6/ip6_fib.c:2249', '__fib6_clean_all'), ('/home/linux/net/ipv6/ip6_fib.c:2253', '__fib6_clean_all'), ('/home/linux/net/unix/af_unix.c:2922', 'unix_stream_recvmsg')]
+Function pointer store instructions in funcions different than PCs (ignoring inlines in both): (count=27): 
+[('/home/linux/./include/linux/poll.h:71', 'do_select'), ('/home/linux/block/blk-map.c:518', 'blk_rq_map_kern'), ('/home/linux/block/blk-mq.c:1399', 'blk_execute_rq'), ('/home/linux/drivers/ata/libata-scsi.c:1709', '__ata_scsi_queuecmd'), ('/home/linux/drivers/ata/libata-scsi.c:2651', 'atapi_xlat'), ('/home/linux/drivers/ata/libata-scsi.c:687', '__ata_scsi_queuecmd'), ('/home/linux/drivers/base/core.c:4364', 'device_create'), ('/home/linux/drivers/base/firmware_loader/main.c:1536', 'fw_pm_notify'), ('/home/linux/drivers/scsi/scsi_lib.c:1260', 'scsi_init_command'), ('/home/linux/drivers/tty/vt/vt.c:1072', 'vc_allocate'), ('/home/linux/fs/buffer.c:3100', '__bh_read'), ('/home/linux/fs/buffer.c:3100', '__block_write_begin_int'), ('/home/linux/fs/ext4/readpage.c:359', 'ext4_mpage_readpages'), ('/home/linux/fs/mpage.c:314', 'do_mpage_readpage'), ('/home/linux/fs/mpage.c:372', 'mpage_readahead'), ('/home/linux/fs/mpage.c:384', 'mpage_readahead'), ('/home/linux/fs/mpage.c:393', 'mpage_read_folio'), ('/home/linux/fs/namei.c:5203', 'page_get_link'), ('/home/linux/fs/namei.c:669', 'drop_links'), ('/home/linux/fs/select.c:188', 'pollwake'), ('/home/linux/fs/select.c:578', 'do_select'), ('/home/linux/fs/select.c:?', 'do_select'), ('/home/linux/io_uring/io_uring.c:2900', 'io_ring_ctx_wait_and_kill'), ('/home/linux/kernel/stop_machine.c:142', 'stop_one_cpu'), ('/home/linux/net/ipv6/ip6_fib.c:2249', '__fib6_clean_all'), ('/home/linux/net/ipv6/ip6_fib.c:2253', '__fib6_clean_all'), ('/home/linux/net/unix/af_unix.c:2922', 'unix_stream_recvmsg')]
+------------------------------------------------
+Unique stored functions: (count=412)
+Stored functions that were not executed: (count=352):
+Stored functions that did get executed: (count=60):
+Execution of functions does not depend on inlines: No
+Mapping of uncovered function pointer to instructions that store them saved to __uncovered_pairs.py
+Mapping of covered function pointer to instructions that store them saved to __covered_pairs.py
+################################################
+Mapping of covered function pointers to instructions that save them registered in tests that produced no interesting signal (count=0 (ignored due to filter=61) saved to __covered_pairs_saved_because_fpointer.py
+Mapping of uncovered function pointers to instructions that save them registered in tests that produced no interesting signal (count=12 (ignored due to filter=339) saved to __uncovered_pairs_saved_because_fpointer.py
+------------------------------------------------
+Progs saved with fpointer and skip signal that registered a covered function pointer (count=0) saved to registered_covered_fpointers_saved_because_fpointer.json
+Progs saved with fpointer and skip signal that registered an uncovered function pointer (count=5) saved to registered_uncovered_fpointers_saved_because_fpointer.json
+################################################
+Number of unique <prog, call> triaged: 4578
+Number of progs triaged twice or more: 72
+Number of <prog,call> triages that added an item to the corpus: 2538
+Number of <prog,call> pairs with multiple saved progs (count=25) saved to multiple_saved_corpus.json
+################################################
+Number of unique progs saved in corpus: 2265
+Number of progs saved more than once: 123
+################################################
+Progs saved with fpointer and skip signal (count=5) saved to saved_because_fpointer_w_duplicates.json
+After deduplication, progs saved with fpointer and skip signal (count=5) saved to saved_because_fpointer.json
+Number of progs saved with fpointer and skip signal more than once: 0
+################################################
+Number of minimizations that keep both: 44
+Number of minimizations that obtained an unique fpointer: 36
+Number of minimizations that obtained an unique signal: 2359
+Number of times fpointer minimization was skipped: 2690
+Number of times signal minimization was skipped: 9
+Number of times minimizationa as a whole was skipped 124
+Minimizations that obtained both unique signal and unique fpointer (count=25): saved to unique_fpointer_and_signal_minimization_result.json

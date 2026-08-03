@@ -1,0 +1,173 @@
+{
+    "last_ancestor": {
+        "hash": "2130f682322a1c2ef698e3c27a2b97e89e96142f",
+        "message": "dashboard/app: migrate error page to bootstrap",
+        "branch": "master",
+        "upstream": "https://github.com/google/syzkaller.git"
+    },
+    "difference": {
+        "distance": 40,
+        "commits": [
+            {
+                "hash": "d01f244d7f5ee189f5caf4452f8e289c3dbc04ae",
+                "message": "pkg/execbackend/local.go: add DebugFilter to localManager for compatibilty purposes"
+            },
+            {
+                "hash": "fd1103c566fd7c43742c16e2638a0e7ac2790302",
+                "message": "pkg/fuzzer/fuzzer.go: implement half-prioritization of smash jobs over triage jobs"
+            },
+            {
+                "hash": "20cf6dd4cd4d0daaaa537375bb232a78ecefb67b",
+                "message": "Merge branch 'master' into experiment_syzkaller_base_fpointer_cov"
+            },
+            {
+                "hash": "71fdbd9042ad8555ca4778a73c5069c59eab0ea4",
+                "message": "pkg/fuzzer: track time cost of exec requests in triage jobs"
+            },
+            {
+                "hash": "c39fc59c3ab34ffe0afad6a5d1b9e226c5b0135d",
+                "message": "pkg/fuzzer/fuzzer.go: fix logging by passing job log LogF arg instead of formatted string"
+            },
+            {
+                "hash": "05f37a349202739d834aa787916ad35176887bd2",
+                "message": "pkg/fuzzer/job.go: add logging of PC coverage when saving prog"
+            },
+            {
+                "hash": "2f26d9373e3b66a96951dc390493bb275fdd87c1",
+                "message": "pkg/signal/signal.go: format json output of covered function pointers accordingly"
+            },
+            {
+                "hash": "13977f69865c7a6f8a74963fc17bd93fbb4e93be",
+                "message": "try stupid fix"
+            },
+            {
+                "hash": "17183743ca5ae67a4a2e7da7841d4c3e04a00610",
+                "message": "Merge branch 'capture-corpus-timestamp' into handle_kcov_store_instructions"
+            },
+            {
+                "hash": "246bbbe3fe960f1476ebb908b113416af4cccc48",
+                "message": "pkg/manager/diff.go: delete file accidentaly kept during merge"
+            },
+            {
+                "hash": "d1eb104d943ef7832e171cc791d0e29d80b57df7",
+                "message": "pkg/fuzzer, pkg/signal, pkg/flatrpc: add logging of function pointer stores feedback"
+            },
+            {
+                "hash": "5b0aa1d822647b7e203f3c01b2c869a70f5be358",
+                "message": "Merge branch 'capture-corpus-timestamp' into handle_kcov_store_instructions"
+            },
+            {
+                "hash": "d4bc2a57b6e7e21a1c525d5dfe6816d96269c5f1",
+                "message": "Merge branch 'master' into capture-corpus-timestamp"
+            },
+            {
+                "hash": "6436d2cd1c11806a86f8371b5cea7bc15a34ab18",
+                "message": "executor/executor.cc: report function stores back to host"
+            },
+            {
+                "hash": "4980682eecdd13d2908cd671226bcb4cded277e0",
+                "message": "(WIP): executor/executor.cc: fix confusion between byte size and wourd count size in parse_kcov_buffer"
+            },
+            {
+                "hash": "2d0810c5e543f513997d83ac7489679922198d01",
+                "message": "(WIP): executor/executor.cc: add parsing of new kcov shared buffer"
+            },
+            {
+                "hash": "8e896e2d336667da52a76a23661690ee1275059d",
+                "message": "pkg/flatrpc: run make generate with correct environment"
+            },
+            {
+                "hash": "faa2775e4c777ff760c00f587161b8f962ef5ded",
+                "message": "pkg/flatrpc: make generate_rpc"
+            },
+            {
+                "hash": "fe24ea2a241e270fa43dd05c7c7aee3fc6cf542d",
+                "message": "pkg/flatrpc/flatrpc.fbs: add new coverage data to CallInfoRaw"
+            },
+            {
+                "hash": "260a70616ad8ca87eba7e3aa096ea7dbd31e37b6",
+                "message": "Merge branch 'master' into capture-corpus-timestamp"
+            },
+            {
+                "hash": "59371a1415fb9746f6acc3c8daea99847dfc3dff",
+                "message": "pkg/fuzzer/job.go, pkg/signal: move rawPreview to signal"
+            },
+            {
+                "hash": "327653a53bf5893baa18bf0c90c4531a5306ac1c",
+                "message": "pkg/fuzzer: be less verobse on lower log levels"
+            },
+            {
+                "hash": "81455988ff20886a65c15cb5b959d70dcd67fa78",
+                "message": "Merge branch 'master' of https://github.com/google/syzkaller into capture-corpus-timestamp"
+            },
+            {
+                "hash": "c731974968b8ff3baaf61a028972f2392274a3e6",
+                "message": "pkg/fuzzer: log more details about the progs handled on processResult"
+            },
+            {
+                "hash": "7d36cc45a5ea7f69fc5e351bf22f8e0fe05e3d5e",
+                "message": "pkg/manager/covfilter.go: dump tracked PCs to log at startup"
+            },
+            {
+                "hash": "36941b098f97aafb07b29e86227ad70933220e9c",
+                "message": "Merge branch 'master' of https://github.com/google/syzkaller into capture-corpus-timestamp"
+            },
+            {
+                "hash": "a669a4071c610263d0351c79398a32b7dbd44947",
+                "message": "pkg/fuzzer: log PCs of flagged coverage during triage"
+            },
+            {
+                "hash": "c9a4413c7201fa0757fdc13baaf6f7499998cb1e",
+                "message": "pkg/prog: standardize logging of handled calls in jobs"
+            },
+            {
+                "hash": "3d757785b9741f3e10622e311f3f3e359284a3ef",
+                "message": "pkg:fuzzer use job logging for fault-injection job"
+            },
+            {
+                "hash": "14b93b2d33992d082b00f25bd937ff2c07dd9c80",
+                "message": "pkg/fuzzer: organize job logging by job type and ID"
+            },
+            {
+                "hash": "e58d451910f0fb85e12f61f91ce58acf7e7a785f",
+                "message": "print info based on debug filters"
+            },
+            {
+                "hash": "d551be29161a09d19af20923b4b6ef7689ad3305",
+                "message": "Merge branch 'capture-corpus-timestamp' of github.com:DaniWppner/syzkaller"
+            },
+            {
+                "hash": "b0ab9a361e303f50c15ed67d643eda0b64fff297",
+                "message": "Merge branch 'master' of https://github.com/google/syzkaller"
+            },
+            {
+                "hash": "708697724e26a9a6a762911118d3e20676ffe50f",
+                "message": "pkg/fuzzer/fuzzer.go: log jobInfo after each job is done"
+            },
+            {
+                "hash": "81a77b9b13d8c4d3c7a4d8b15ff82d43650bf6a6",
+                "message": "initialize debug filters"
+            },
+            {
+                "hash": "d577a91586f243f5d2071ded5e354c1c6f6f76a1",
+                "message": "[WIP] add debug filters"
+            },
+            {
+                "hash": "2ef1f8c7b811cdb1a28cc8263999918fb0c1ef7f",
+                "message": "Merge branch 'capture-corpus-timestamp' of https://github.com/DaniWppner/syzkaller"
+            },
+            {
+                "hash": "8935175f869475034a49b0d8ad4d4ce82332af89",
+                "message": "syz-manager: fix default log function for Fuzzer object"
+            },
+            {
+                "hash": "496fd3c3ecfbe475d592c1586cd39344048b9323",
+                "message": "pkg/manager/http.go: diplay timestamp in /input endpoint"
+            },
+            {
+                "hash": "9a9ec0dbfa3c6fe529d9c5bf797838757b5133c3",
+                "message": "pkg/corpus/corpus.go, pkg/manager/http.go: track and display timestamp of corpus items"
+            }
+        ]
+    }
+}

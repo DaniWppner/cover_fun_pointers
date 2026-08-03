@@ -1,0 +1,23 @@
+diff --git a/pkg/fuzzer/job.go b/pkg/fuzzer/job.go
+index 8f07deb76..db648ef47 100644
+--- a/pkg/fuzzer/job.go
++++ b/pkg/fuzzer/job.go
+@@ -185,7 +185,7 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
+ 	if info.newStableSignal.Empty() {
+ 		return
+ 	}
+-
++	log_og_call := call
+ 	p := job.p
+ 	if job.flags&ProgMinimized == 0 {
+ 		p, call = job.minimize(call, info)
+@@ -241,7 +241,8 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
+ 			})
+ 		}
+ 	}
+-	job.info.Logf("added new input for #%d [%s] to the corpus with program:\n%s", call, callName, p.Serialize())
++	job.info.Logf("added new input for #%d [%s] to the corpus with program:\n%s", log_og_call, callName, p.Serialize())
++	job.info.Logf("total cover for call #%d [%s]:\n%s", log_og_call, callName, signal.RawPreview(info.cover.Serialize()))
+ 	input := corpus.NewInput{
+ 		Prog:     p,
+ 		Call:     call,

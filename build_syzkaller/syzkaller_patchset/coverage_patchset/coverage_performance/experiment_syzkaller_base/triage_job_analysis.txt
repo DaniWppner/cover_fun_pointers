@@ -1,0 +1,54 @@
+Last coverage line:
+2026/05/29 11:37:55 candidates=0 corpus=4343 coverage=34139 exec total=122570 (45/min) pending=0 reproducing=0 
+
+Total running time: 
+From 2026/05/27 15:09:15 To 2026/05/29 11:37:58
+Elapsed time: 44:28:43 (44 hours, 28 minutes, 43 seconds)
+
+Would be stop time after minimum running time (20:16:30):
+2026/05/28 11:25:45
+
+Starting from here it was generated using check_stable_coverage.py:
+################################################
+
+
+Number of unique <prog, call> triaged: 459887
+Number of progs triaged twice or more: 213
+Number of <prog,call> triages that added an item to the corpus: 4949
+Number of <prog,call> pairs with multiple saved progs (count=0) saved to multiple_saved_corpus.json
+################################################
+Number of unique progs saved in corpus: 4360
+Number of progs saved more than once: 319
+################################################
+Progs saved with fpointer and skip signal (count=0) saved to saved_because_fpointer_w_duplicates.json
+After deduplication, progs saved with fpointer and skip signal (count=0) saved to saved_because_fpointer.json
+Number of progs saved with fpointer and skip signal more than once: 0
+################################################
+Number of minimizations that keep both: 0
+Number of minimizations that obtained an unique fpointer: 0
+Number of minimizations that obtained an unique signal: 0
+Number of times fpointer minimization was skipped: 0
+Number of times signal minimization was skipped: 0
+Number of times minimizationa as a whole was skipped 0
+Minimizations that obtained both unique signal and unique fpointer (count=0): saved to unique_fpointer_and_signal_minimization_result.json
+################################################
+Unique function pointer store instructions: (count=272)
+Function pointer store instructions that don't show up in exec log: (count=272)
+################################################
+Unique stored function pointers: (count=431)
+Stored function_pointers that don't show up in exec log: (count=431)
+################################################
+Unique functions covered: (count=23076)
+Unique functions covered excluding inlines: (count=20582)
+------------------------------------------------
+Unique functions of fpointer stores: (count=287)
+Function pointer store instructions in funcions different than PCs: (count=11): 
+[('/home/linux/./include/linux/delayed_call.h:21', 'set_delayed_call'), ('/home/linux/./include/linux/fs_pin.h:19', 'init_fs_pin'), ('/home/linux/./include/linux/hrtimer.h:254', 'hrtimer_init_sleeper_on_stack'), ('/home/linux/./include/linux/irq_work.h:39', 'init_irq_work'), ('/home/linux/./include/linux/rcupdate.h:1062', 'rcu_head_init'), ('/home/linux/./include/linux/task_work.h:13', 'init_task_work'), ('/home/linux/drivers/base/firmware_loader/main.c:1474', 'device_cache_fw_images'), ('/home/linux/fs/ext4/super.c:4288', 'ext4_setup_csum_trigger'), ('/home/linux/kernel/futex/syscalls.c:220', 'futex_parse_waitv'), ('/home/linux/kernel/time/hrtimer.c:1983', '__hrtimer_init_sleeper'), ('/home/linux/lib/rhashtable.c:204', 'bucket_table_alloc')]
+Function pointer store instructions in funcions different than PCs (ignoring inlines in both): (count=1): 
+[('/home/linux/kernel/futex/syscalls.c:220', 'futex_parse_waitv')]
+------------------------------------------------
+Unique stored functions: (count=429)
+Stored functions that were not executed: (count=350):
+Stored functions that did get executed: (count=79):
+Execution of functions does not depend on inlines: No
+################################################

@@ -1,0 +1,17 @@
+{
+    "last_ancestor": {
+        "hash": "5db6553c485d9602eacc753c62ae273005657ad3",
+        "message": "pkg/job.go: fix wrong hangling of disjoint minimize results",
+        "branch": "handle_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 1,
+        "commits": [
+            {
+                "hash": "09a0a1d6c460876f54dc33873407cbee58d2740b",
+                "message": "pkg/job.go: fix doHandleCall dispatch on non-minimization-splitted case"
+            }
+        ]
+    }
+}

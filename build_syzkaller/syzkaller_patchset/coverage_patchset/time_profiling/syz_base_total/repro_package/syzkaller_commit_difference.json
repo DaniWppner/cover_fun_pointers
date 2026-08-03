@@ -1,0 +1,12 @@
+{
+    "last_ancestor": {
+        "hash": "2130f682322a1c2ef698e3c27a2b97e89e96142f",
+        "message": "dashboard/app: migrate error page to bootstrap",
+        "branch": "master",
+        "upstream": "https://github.com/google/syzkaller.git"
+    },
+    "difference": {
+        "distance": 0,
+        "commits": []
+    }
+}

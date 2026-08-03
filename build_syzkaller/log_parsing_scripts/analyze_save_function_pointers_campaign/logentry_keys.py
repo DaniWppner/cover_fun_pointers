@@ -1,5 +1,10 @@
 from enum import StrEnum
 
+
+# First element represents file name and line number in the format file_name:lineno
+# Second element represents function containing said line number
+type locInfo = tuple[str, str]
+
 class LOGENTRY_KEYS(StrEnum):
     NEW_FPOINTERS = "new_fpointers"
     NEW_SIGNAL = "new_signal"
@@ -32,8 +37,6 @@ class RESULT_KEYS(StrEnum):
     STABLE_FPOINTERS = "stable_fpointers"
     NEW_STABLE_FPOINTERS = "new_stable_fpointers"
     NEW_STABLE_FPOINTERS_PAYLOAD = "new_stable_fpointers_json"
-    FPOINTER_PAYLOAD_FPOINTER_LOC_KEY = "StoredValueLocation"
-    FPOINTER_PAYLOAD_STOREINST_LOC_KEY = "PCLocation"
     STABLE_SIGNAL = "stable_signal"
     NEW_STABLE_SIGNAL = "new_stable_signal"
     CALL_NAME = "call"
@@ -47,14 +50,26 @@ class RESULT_KEYS(StrEnum):
     COUNT = "count"
     PC_COVER = "PC_COVER"
     TIMESTAMP = "timestamp"
+    TIMESTAMP_BEGIN = "timestamp_begin"
+    TIMESTAMP_END = "timestamp_end"
     TOTAL_JOB_DURATION = "job_duration"
     TOTAL_PROG_EXECUTIONS = "prog_executions"
     FPOINTER_PROG_EXECUTIONS = "prog_executions_because_of_fpcov"
     PROG_EXECUTIONS_JOB_DURATION = "prog_executions_job_duration"
-    FPOINTER_PROG_EXECUTIONS_JOB_DURATION = "test_executions_because_of_fpcov_job_duration"
-    PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS = "test_executions_individual_durations"
-    PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS = "test_executions_individual_durations"    
+    FPOINTER_PROG_EXECUTIONS_JOB_DURATION = "prog_executions_because_of_fpcov_job_duration"
+    PROG_EXECUTIONS_ALL_INDIVIDUAL_DURATIONS = "prog_executions_individual_durations"
+    PROG_EXECUTIONS_FPOINTER_INDIVIDUAL_DURATIONS = "prog_executions_individual_durations_because_of_fpcov"
     TAGS = "tags"
+
+class PC_VALUES(StrEnum):
+    PC_ADDRESS = "PC"
+    PC_LOCATION = "PCLocation"
+
+class FPOINTERS_PAYLOAD_VALUES(StrEnum):
+    FPOINTER_LOC = "StoredValueLocation"
+    FPOINTER_ADDR = "StoredValue"
+    STOREINST_LOC = "PCLocation"
+    STOREINST_ADDR = "PC"
 
 class TAG_RESULT_VALUES(StrEnum):
     FPOINTER_ORIGIN = "fpointer_origin"

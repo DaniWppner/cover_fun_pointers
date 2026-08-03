@@ -1,0 +1,12 @@
+{
+    "last_ancestor": {
+        "hash": "c5df6dd5560c020a6486e4845ba120023c716300",
+        "message": "pkg/cover, pkg/fuzzer: register FPointer coverage immediately, to minimize duplicated triage work",
+        "branch": "handle_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 0,
+        "commits": []
+    }
+}

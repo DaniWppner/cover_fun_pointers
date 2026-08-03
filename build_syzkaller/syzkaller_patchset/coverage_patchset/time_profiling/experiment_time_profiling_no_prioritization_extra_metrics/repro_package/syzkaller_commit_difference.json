@@ -1,0 +1,37 @@
+{
+    "last_ancestor": {
+        "hash": "e091baf08e02edd84e22d5a3e074bef39c5d07f4",
+        "message": "pkg/fuzzer: prioritize and track smashJobs from function pointer coverage origin",
+        "branch": "handle_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 6,
+        "commits": [
+            {
+                "hash": "057239e91148f5246a04212508e23340ef81b62b",
+                "message": "pkg/fuzzer/job.go: fix prog execs triggered during minimize not saving execTime Array"
+            },
+            {
+                "hash": "d5dbc87f3b84e814fe5fbdad93d9417ffcbfed9c",
+                "message": "pkg/fuzzer/job.go: fix translation of execTime Arrays into json"
+            },
+            {
+                "hash": "36f0b15cead62ea55c405f4fa3279fc82a8e092c",
+                "message": "pkg/fuzzer: turn off FPCover operation logging"
+            },
+            {
+                "hash": "bbc5cbed47c58e255d3479bb406580a72b89eb3c",
+                "message": "pkg/fuzzer: track time cost and start/end of individual prog requests during triage jobs"
+            },
+            {
+                "hash": "c04d155c8f45b98458486beb5af55d41f256117c",
+                "message": "pkg/fuzzer: move function pointer coverage smash jobs priority behind triage"
+            },
+            {
+                "hash": "ad052f9471f349c1c851a6721f22f0a0ccd0978f",
+                "message": "pkg/fuzzer: fix formatting of time-profiling debug logs"
+            }
+        ]
+    }
+}

@@ -1,0 +1,40 @@
+Number of unique <prog, call> triaged: 7644
+Number of progs triaged twice or more: 35
+Number of <prog,call> triages that added an item to the corpus: 304
+Number of <prog,call> pairs with multiple saved progs (count=0) saved to multiple_saved_corpus.json
+################################################
+Number of unique progs saved in corpus: 202
+Number of progs saved more than once: 35
+################################################
+Progs saved with fpointer and skip signal (count=0) saved to saved_because_fpointer_w_duplicates.json
+After deduplication, progs saved with fpointer and skip signal (count=0) saved to saved_because_fpointer.json
+Number of progs saved with fpointer and skip signal more than once: 0
+################################################
+Number of minimizations that keep both: 0
+Number of minimizations that obtained an unique fpointer: 0
+Number of minimizations that obtained an unique signal: 0
+Number of times fpointer minimization was skipped: 0
+Number of times signal minimization was skipped: 0
+Number of times minimizationa as a whole was skipped 0
+Minimizations that obtained both unique signal and unique fpointer (count=0): saved to unique_fpointer_and_signal_minimization_result.json
+################################################
+Unique function pointer store instructions: (count=86)
+Function pointer store instructions that don't show up in exec log: (count=86)
+################################################
+Unique stored function pointers: (count=193)
+Stored function_pointers that don't show up in exec log: (count=193)
+################################################
+Unique functions covered: (count=9917)
+Unique functions covered excluding inlines: (count=8754)
+------------------------------------------------
+Unique functions of fpointer stores: (count=101)
+Function pointer store instructions in funcions different than PCs: (count=8): 
+[('/home/linux/./include/linux/delayed_call.h:33', 'clear_delayed_call'), ('/home/linux/./include/linux/delayed_call.h:?', 'clear_delayed_call'), ('/home/linux/./include/linux/hrtimer.h:254', 'hrtimer_init_sleeper_on_stack'), ('/home/linux/./include/linux/task_work.h:13', 'init_task_work'), ('/home/linux/fs/ext4/super.c:4288', 'ext4_setup_csum_trigger'), ('/home/linux/fs/namei.c:669', 'drop_links'), ('/home/linux/kernel/time/hrtimer.c:1983', '__hrtimer_init_sleeper'), ('/home/linux/kernel/time/hrtimer.c:1997', 'hrtimer_init_sleeper')]
+Function pointer store instructions in funcions different than PCs (ignoring inlines in both): (count=0): 
+[]
+------------------------------------------------
+Unique stored functions: (count=193)
+Stored functions that were not executed: (count=180):
+Stored functions that did get executed: (count=13):
+Execution of functions does not depend on inlines: Yes
+################################################

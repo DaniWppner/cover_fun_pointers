@@ -1,0 +1,44 @@
+################################################
+Unique function pointer store instructions: (count=340)
+Function pointer store instructions that don't show up in exec log: (count=340)
+################################################
+Unique stored function pointers: (count=525)
+Stored function_pointers that don't show up in exec log: (count=525)
+################################################
+Unique functions covered: (count=18139)
+------------------------------------------------
+Unique functions of fpointer stores: (count=399)
+Function pointer store instructions in funcions different than PCs: (count=68): 
+[('/src/linux/./arch/x86/include/asm/bitops.h:213', 'constant_test_bit_acquire'), ('/src/linux/./arch/x86/include/asm/bitops.h:245', 'arch_test_bit_acquire'), ('/src/linux/./include/linux/buffer_head.h:449', 'bh_read'), ('/src/linux/./include/linux/mm.h:2138', 'folio_next'), ('/src/linux/./include/linux/perf_event.h:1683', 'perf_event_addr_filters'), ('/src/linux/./include/linux/phy.h:1533', 'phy_clear_bits_mmd'), ('/src/linux/./include/linux/rcupdate.h:810', 'rpc_net_ns'), ('/src/linux/./include/linux/sched.h:2110', 'need_resched'), ('/src/linux/./include/linux/statfs.h:58', 'uuid_to_fsid'), ('/src/linux/./include/linux/thread_info.h:184', 'tif_need_resched'), ('/src/linux/./include/net/cfg80211.h:6825', 'cfg80211_find_ext_elem'), ('/src/linux/./include/net/ip6_fib.h:533', 'fib6_add_gc_list'), ('/src/linux/./include/trace/events/i2c.h:122', 'perf_trace_i2c_result'), ('/src/linux/./include/trace/events/libata.h:668', '__traceiter_ata_sff_hsm_state'), ('/src/linux/./include/trace/events/xdp.h:233', '__traceiter_xdp_cpumap_enqueue'), ('/src/linux/./include/uapi/linux/byteorder/little_endian.h:51', '__le64_to_cpup'), ('/src/linux/block/blk-mq-tag.c:192', 'blk_mq_get_tag'), ('/src/linux/block/blk-mq-tag.c:218', 'blk_mq_get_tag'), ('/src/linux/block/blk-mq.c:3899', 'blk_mq_map_swqueue'), ('/src/linux/block/blk-mq.c:?', 'blk_mq_map_swqueue'), ('/src/linux/block/blk-mq.h:109', 'blk_mq_map_queue'), ('/src/linux/drivers/acpi/processor_idle.c:710', 'acpi_idle_enter_s2idle'), ('/src/linux/drivers/net/net_failover.c:?', 'net_failover_slave_link_change'), ('/src/linux/drivers/scsi/scsi_lib.c:1794', 'scsi_mq_get_rq_budget_token'), ('/src/linux/drivers/tty/tty_io.c:2519', 'tty_get_tiocm'), ('/src/linux/drivers/tty/tty_io.c:3002', 'this_tty'), ('/src/linux/drivers/tty/tty_ldsem.c:272', 'down_write_failed'), ('/src/linux/fs/aio.c:2090', '__x64_sys_io_submit'), ('/src/linux/fs/fs-writeback.c:100', 'wb_io_lists_depopulated'), ('/src/linux/fs/fs-writeback.c:2418', 'dirtytime_interval_handler'), ('/src/linux/fs/posix_acl.c:361', 'posix_acl_from_mode'), ('/src/linux/fs/select.c:726', '__ia32_sys_select'), ('/src/linux/fs/signalfd.c:310', '__ia32_sys_signalfd4'), ('/src/linux/fs/signalfd.c:310', '__se_sys_signalfd4'), ('/src/linux/fs/signalfd.c:317', '__do_sys_signalfd4'), ('/src/linux/fs/timerfd.c:75', 'timerfd_tmrproc'), ('/src/linux/kernel/acct.c:167', 'acct_get'), ('/src/linux/kernel/cgroup/cgroup-v1.c:577', 'cgroup_release_agent_show'), ('/src/linux/kernel/futex/syscalls.c:263', 'futex2_destroy_timeout'), ('/src/linux/kernel/futex/syscalls.c:370', '__se_sys_futex_wait'), ('/src/linux/kernel/futex/syscalls.c:398', '__do_sys_futex_wait'), ('/src/linux/kernel/irq/irqdesc.c:834', '__irq_alloc_descs'), ('/src/linux/kernel/umh.c:408', 'call_usermodehelper_exec'), ('/src/linux/kernel/umh.c:42', 'call_usermodehelper_exec'), ('/src/linux/kernel/umh.c:43', 'call_usermodehelper_exec'), ('/src/linux/kernel/workqueue.c:4625', 'alloc_workqueue_attrs'), ('/src/linux/mm/backing-dev.c:237', 'bdi_debug_register'), ('/src/linux/mm/backing-dev.c:371', 'min_bytes_show'), ('/src/linux/mm/backing-dev.c:381', 'min_bytes_store'), ('/src/linux/mm/filemap.c:1588', 'folio_wait_private_2_killable'), ('/src/linux/mm/mempool.c:117', 'mempool_free'), ('/src/linux/mm/mempool.c:141', 'mempool_free'), ('/src/linux/net/core/net_namespace.c:688', '__put_net'), ('/src/linux/net/core/skbuff.c:3175', 'skb_splice_bits'), ('/src/linux/net/ethtool/ioctl.c:975', 'ethtool_set_rxnfc'), ('/src/linux/net/ethtool/ioctl.c:977', 'ethtool_set_rxnfc'), ('/src/linux/net/ethtool/ioctl.c:981', 'ethtool_set_rxnfc'), ('/src/linux/net/ipv6/addrconf.c:4240', 'addrconf_dad_work'), ('/src/linux/net/ipv6/udp.c:789', 'udpv6_queue_rcv_skb'), ('/src/linux/net/mac80211/mlme.c:4737', 'ieee80211_max_rx_chains'), ('/src/linux/net/mac80211/mlme.c:8684', 'ieee80211_mgd_stop_link'), ('/src/linux/net/mac80211/mlme.c:8686', 'ieee80211_mgd_stop_link'), ('/src/linux/net/sunrpc/clnt.c:1626', 'rpc_max_payload'), ('/src/linux/net/unix/af_unix.c:467', 'unix_dgram_peer_wake_connect'), ('/src/linux/security/keys/proc.c:294', 'proc_key_users_next'), ('/src/linux/security/keys/proc.c:?', 'proc_key_users_start'), ('/src/linux/security/keys/request_key.c:84', 'umh_keys_init'), ('/src/linux/sound/pci/hda/hda_local.h:456', 'snd_hda_get_conn_index')]
+------------------------------------------------
+Unique stored functions: (count=614)
+Stored functions that were not executed: (count=299):
+Stored functions that did get executed: (count=315):
+Mapping of uncovered function pointer to instructions that store them saved to __uncovered_pairs.py
+Mapping of covered function pointer to instructions that store them saved to __covered_pairs.py
+################################################
+Mapping of covered function pointers to instructions that save them registered in tests that produced no interesting signal (count=13 (ignored due to filter=267) saved to __covered_pairs_saved_because_fpointer.py
+Mapping of uncovered function pointers to instructions that save them registered in tests that produced no interesting signal (count=35 (ignored due to filter=210) saved to __uncovered_pairs_saved_because_fpointer.py
+------------------------------------------------
+Progs saved with fpointer and skip signal that registered a covered function pointer (count=11) saved to registered_covered_fpointers_saved_because_fpointer.json
+Progs saved with fpointer and skip signal that registered an uncovered function pointer (count=29) saved to registered_uncovered_fpointers_saved_because_fpointer.json
+################################################
+Number of unique <prog, call> triaged: 11988
+Number of progs triaged twice or more: 166
+Number of <prog,call> triages that added an item to the corpus: 7516
+Number of <prog,call> pairs with multiple saved progs (count=57) saved to multiple_saved_corpus.json
+################################################
+Number of unique progs saved in corpus: 6849
+Number of progs saved more than once: 358
+################################################
+Progs saved with fpointer and skip signal (count=38) saved to saved_because_fpointer_w_duplicates.json
+After deduplication, progs saved with fpointer and skip signal (count=38) saved to saved_because_fpointer.json
+Number of progs saved with fpointer and skip signal more than once: 0
+################################################
+Number of minimizations that keep both: 71
+Number of minimizations that obtained an unique fpointer: 107
+Number of minimizations that obtained an unique signal: 6791
+Number of times fpointer minimization was skipped: 7375
+Number of times signal minimization was skipped: 47
+Number of times minimizationa as a whole was skipped 604
+Minimizations that obtained both unique signal and unique fpointer (count=57): saved to unique_fpointer_and_signal_minimization_result.json

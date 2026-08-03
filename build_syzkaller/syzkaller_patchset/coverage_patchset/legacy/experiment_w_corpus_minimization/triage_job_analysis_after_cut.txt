@@ -1,0 +1,51 @@
+Last coverage line:
+2026/05/27 14:41:38 candidates=0 corpus=945 coverage=19862 exec total=53564 (44/min) pending=0 reproducing=0 
+
+Total running time: 
+From 2026/05/26 18:25:08 To 2026/05/27 14:41:38
+Elapsed time: 20:16:30 (20 hours, 16 minutes, 30 seconds)
+
+Starting from here it was generated using check_stable_coverage.py:
+################################################
+
+
+Number of unique <prog, call> triaged: 3654
+Number of progs triaged twice or more: 485
+Number of <prog,call> triages that added an item to the corpus: 2227
+Number of <prog,call> pairs with multiple saved progs (count=18) saved to multiple_saved_corpus.json
+################################################
+Number of unique progs saved in corpus: 955
+Number of progs saved more than once: 172
+################################################
+Progs saved with fpointer and skip signal (count=1059) saved to saved_because_fpointer_w_duplicates.json
+After deduplication, progs saved with fpointer and skip signal (count=105) saved to saved_because_fpointer.json
+Number of progs saved with fpointer and skip signal more than once: 59
+################################################
+Number of minimizations that keep both: 51
+Number of minimizations that obtained an unique fpointer: 1087
+Number of minimizations that obtained an unique signal: 955
+Number of times fpointer minimization was skipped: 1031
+Number of times signal minimization was skipped: 1114
+Number of times minimizationa as a whole was skipped 152
+Minimizations that obtained both unique signal and unique fpointer (count=18): saved to unique_fpointer_and_signal_minimization_result.json
+################################################
+Unique function pointer store instructions: (count=170)
+Function pointer store instructions that don't show up in exec log: (count=170)
+################################################
+Unique stored function pointers: (count=320)
+Stored function_pointers that don't show up in exec log: (count=320)
+################################################
+Unique functions covered: (count=10811)
+Unique functions covered excluding inlines: (count=9564)
+------------------------------------------------
+Unique functions of fpointer stores: (count=191)
+Function pointer store instructions in funcions different than PCs: (count=14): 
+[('/home/linux/./include/linux/delayed_call.h:21', 'set_delayed_call'), ('/home/linux/./include/linux/hrtimer.h:254', 'hrtimer_init_sleeper_on_stack'), ('/home/linux/./include/linux/irq_work.h:39', 'init_irq_work'), ('/home/linux/./include/linux/rcupdate.h:1062', 'rcu_head_init'), ('/home/linux/./include/linux/task_work.h:13', 'init_task_work'), ('/home/linux/drivers/base/firmware_loader/main.c:1474', 'device_cache_fw_images'), ('/home/linux/fs/ext4/super.c:4288', 'ext4_setup_csum_trigger'), ('/home/linux/fs/mpage.c:80', 'mpage_bio_submit_read'), ('/home/linux/fs/namei.c:5203', 'page_get_link'), ('/home/linux/kernel/relay.c:290', '__relay_reset'), ('/home/linux/kernel/relay.c:403', 'relay_open_buf'), ('/home/linux/kernel/time/hrtimer.c:1983', '__hrtimer_init_sleeper'), ('/home/linux/kernel/time/hrtimer.c:1997', 'hrtimer_init_sleeper'), ('/home/linux/lib/rhashtable.c:204', 'bucket_table_alloc')]
+Function pointer store instructions in funcions different than PCs (ignoring inlines in both): (count=3): 
+[('/home/linux/fs/namei.c:5203', 'page_get_link'), ('/home/linux/fs/namei.c:669', 'drop_links'), ('/home/linux/kernel/relay.c:403', 'relay_open_buf')]
+------------------------------------------------
+Unique stored functions: (count=319)
+Stored functions that were not executed: (count=289):
+Stored functions that did get executed: (count=30):
+Execution of functions does not depend on inlines: Yes
+################################################

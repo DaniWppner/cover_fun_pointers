@@ -1,0 +1,72 @@
+From f1ee68fa230ab2ffc306b482d1eb43eba5b45588 Mon Sep 17 00:00:00 2001
+From: daniel wappner <dwappner@dc.uba.ar>
+Date: Wed, 29 Jul 2026 19:09:55 -0300
+Subject: [PATCH 11/12] fix: don't crash when a generic StoredValue is not a
+ pointer. Handle both assigning of a Literal struct and a struct pointer
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 39 ++++++++++++++-----
+ 1 file changed, 30 insertions(+), 9 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index db6ea112f..9f828b44f 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1143,6 +1143,22 @@ retType getOffsetsFromShallowStructType(StructType *STy) {
+   return std::make_pair(false, Res);
+ }
+ 
++retType getOffsetsFromPointerToShallowStructType(StructType *STy) {
++  retType StructRes = getOffsetsFromShallowStructType(STy);
++  if (StructRes.first) {
++    vectorTypesXOffsets Res;
++    for (TypesXOffsets Item : StructRes.second) {
++      Types ItemTypes = Item.first;
++      Offsets ItemOffsets = Item.second;
++      ItemTypes.push_back(STy);
++      ItemOffsets.push_back(0);
++      Res.push_back(std::make_pair(ItemTypes, ItemOffsets));
++    }
++    return std::make_pair(true, Res);
++  }
++  return std::make_pair(false, vectorTypesXOffsets{});
++}
++
+ retType getOffsetsFromFunctionType(Type *FunctionType) {
+   vectorTypesXOffsets Res = {std::make_pair(Types{FunctionType}, Offsets{0})};
+   return std::make_pair(true, Res);
+@@ -1159,17 +1175,22 @@ retType
+ getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+   for (unsigned i = 0; i < PossibleStoredValues.size(); i++) {
+     Type *StoredType = PossibleStoredValues[i]->getType();
+-    if (!StoredType->isPointerTy())
+-      assert(false && "We only expect function pointer types here.\n");
+-    Type *PointeeType = StoredType->getPointerElementType();
+-    if (PointeeType->isFunctionTy()) {
+-      // Depth 0: naked function pointer
+-      return getOffsetsFromFunctionType(PointeeType);
+-    } // else: must be struct
+-    if (StructType *STy = dyn_cast<StructType>(PointeeType)) {
+-      // Depth 1: struct containing function pointers
++    if (StructType *STy = dyn_cast<StructType>(StoredType)) {
++      // Depth 1: struct possibly containing function pointers
+       return getOffsetsFromShallowStructType(STy);
+     }
++    if (StoredType->isPointerTy()) {
++      Type *PointeeType = StoredType->getPointerElementType();
++      if (PointeeType->isFunctionTy()) {
++        // Depth 0: naked function pointer
++        return getOffsetsFromFunctionType(PointeeType);
++      } // else: must be struct
++      if (StructType *STy = dyn_cast<StructType>(PointeeType)) {
++        // Depth 1 again: pointer to struct possibly containing function
++        // pointers
++        return getOffsetsFromPointerToShallowStructType(STy);
++      }
++    }
+     // TODO: handle more types
+     assert(false && "Unexpected type during function pointer analysis.\n");
+     // unreachable, but makes the compiler complain less
+-- 
+2.43.0
+

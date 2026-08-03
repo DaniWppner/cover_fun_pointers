@@ -1,0 +1,40 @@
+Number of unique <prog, call> triaged: 119952
+Number of progs triaged twice or more: 132
+Number of <prog,call> triages that added an item to the corpus: 1569
+Number of <prog,call> pairs with multiple saved progs (count=0) saved to multiple_saved_corpus.json
+################################################
+Number of unique progs saved in corpus: 1277
+Number of progs saved more than once: 141
+################################################
+Progs saved with fpointer and skip signal (count=0) saved to saved_because_fpointer_w_duplicates.json
+After deduplication, progs saved with fpointer and skip signal (count=0) saved to saved_because_fpointer.json
+Number of progs saved with fpointer and skip signal more than once: 0
+################################################
+Number of minimizations that keep both: 0
+Number of minimizations that obtained an unique fpointer: 0
+Number of minimizations that obtained an unique signal: 0
+Number of times fpointer minimization was skipped: 0
+Number of times signal minimization was skipped: 0
+Number of times minimizationa as a whole was skipped 0
+Minimizations that obtained both unique signal and unique fpointer (count=0): saved to unique_fpointer_and_signal_minimization_result.json
+################################################
+Unique function pointer store instructions: (count=203)
+Function pointer store instructions that don't show up in exec log: (count=203)
+################################################
+Unique stored function pointers: (count=359)
+Stored function_pointers that don't show up in exec log: (count=359)
+################################################
+Unique functions covered: (count=17630)
+Unique functions covered excluding inlines: (count=15775)
+------------------------------------------------
+Unique functions of fpointer stores: (count=219)
+Function pointer store instructions in funcions different than PCs: (count=22): 
+[('/home/linux/./include/linux/hrtimer.h:254', 'hrtimer_init_sleeper_on_stack'), ('/home/linux/./include/linux/rcupdate.h:1062', 'rcu_head_init'), ('/home/linux/./include/linux/task_work.h:13', 'init_task_work'), ('/home/linux/./include/net/cfg80211.h:5993', 'wiphy_work_init'), ('/home/linux/./include/net/cfg80211.h:6042', 'wiphy_delayed_work_init'), ('/home/linux/block/blk-map.c:518', 'blk_rq_map_kern'), ('/home/linux/block/blk-mq.c:1399', 'blk_execute_rq'), ('/home/linux/drivers/ata/libata-scsi.c:2651', 'atapi_xlat'), ('/home/linux/fs/ext4/super.c:4288', 'ext4_setup_csum_trigger'), ('/home/linux/fs/mpage.c:80', 'mpage_bio_submit_read'), ('/home/linux/fs/select.c:188', 'pollwake'), ('/home/linux/fs/seq_file.c:579', 'single_open'), ('/home/linux/fs/seq_file.c:580', 'single_open'), ('/home/linux/fs/seq_file.c:581', 'single_open'), ('/home/linux/fs/seq_file.c:582', 'single_open'), ('/home/linux/kernel/bpf/core.c:2813', 'bpf_prog_free'), ('/home/linux/kernel/stop_machine.c:387', 'stop_one_cpu_nowait'), ('/home/linux/kernel/time/hrtimer.c:1983', '__hrtimer_init_sleeper'), ('/home/linux/lib/rhashtable.c:204', 'bucket_table_alloc'), ('/home/linux/net/core/filter.c:1325', 'bpf_prepare_filter'), ('/home/linux/net/mac80211/sta_info.c:566', '__sta_info_alloc'), ('/home/linux/net/mac80211/sta_info.c:567', '__sta_info_alloc')]
+Function pointer store instructions in funcions different than PCs (ignoring inlines in both): (count=14): 
+[('/home/linux/block/blk-map.c:518', 'blk_rq_map_kern'), ('/home/linux/block/blk-mq.c:1399', 'blk_execute_rq'), ('/home/linux/drivers/ata/libata-scsi.c:2651', 'atapi_xlat'), ('/home/linux/fs/namei.c:669', 'drop_links'), ('/home/linux/fs/select.c:188', 'pollwake'), ('/home/linux/fs/seq_file.c:579', 'single_open'), ('/home/linux/fs/seq_file.c:580', 'single_open'), ('/home/linux/fs/seq_file.c:581', 'single_open'), ('/home/linux/fs/seq_file.c:582', 'single_open'), ('/home/linux/kernel/bpf/core.c:2813', 'bpf_prog_free'), ('/home/linux/kernel/stop_machine.c:387', 'stop_one_cpu_nowait'), ('/home/linux/net/core/filter.c:1325', 'bpf_prepare_filter'), ('/home/linux/net/mac80211/sta_info.c:566', '__sta_info_alloc'), ('/home/linux/net/mac80211/sta_info.c:567', '__sta_info_alloc')]
+------------------------------------------------
+Unique stored functions: (count=358)
+Stored functions that were not executed: (count=303):
+Stored functions that did get executed: (count=55):
+Execution of functions does not depend on inlines: Yes
+################################################
