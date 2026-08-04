@@ -1,7 +1,7 @@
-From c2b413c02645a40395af89d65020ff0e6e838303 Mon Sep 17 00:00:00 2001
+From f4528cce81ddf53cbb1e7b54ab5ef52d1d88c617 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Wed, 29 Jul 2026 16:57:02 -0300
-Subject: [PATCH 07/15] [WIP] TraceShallowFunctionPointerStores implementation
+Subject: [PATCH 07/18] TraceShallowFunctionPointerStores implementation
  DELETEME
 
 ---
@@ -9,7 +9,7 @@ Subject: [PATCH 07/15] [WIP] TraceShallowFunctionPointerStores implementation
  1 file changed, 86 insertions(+), 46 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index 83ef1b210..ba4fc9bbf 100644
+index 83ef1b21002c..ba4fc9bbfee8 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -33,6 +33,7 @@

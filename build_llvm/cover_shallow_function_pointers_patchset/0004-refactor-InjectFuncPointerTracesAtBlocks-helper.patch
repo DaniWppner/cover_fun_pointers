@@ -1,14 +1,14 @@
-From cac6560cf1bf6ad7d6a24c3882cb0293407e78eb Mon Sep 17 00:00:00 2001
+From fee87c120a177c6cca1edd4a1c3edcd718c7a84f Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Mon, 27 Jul 2026 19:02:06 -0300
-Subject: [PATCH 04/15] refactor InjectFuncPointerTracesAtBlocks helper
+Subject: [PATCH 04/18] refactor InjectFuncPointerTracesAtBlocks helper
 
 ---
  .../Instrumentation/SanitizerCoverage.cpp     | 52 +++++++++++++------
  1 file changed, 35 insertions(+), 17 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index 628214949..97f934b0c 100644
+index 6282149495ac..97f934b0c9f7 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -253,6 +253,11 @@ private:

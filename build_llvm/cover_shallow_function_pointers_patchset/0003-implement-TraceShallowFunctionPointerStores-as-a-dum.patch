@@ -1,14 +1,14 @@
-From ffbefd3c25af8c359bfde4d3b620527952e77f0c Mon Sep 17 00:00:00 2001
+From 3ae20a3bcb2d99d036ca3fcddea45692ba93c6e3 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Mon, 27 Jul 2026 18:31:43 -0300
-Subject: [PATCH 03/15] implement TraceShallowFunctionPointerStores as a dummy
+Subject: [PATCH 03/18] implement TraceShallowFunctionPointerStores as a dummy
 
 ---
  .../Instrumentation/SanitizerCoverage.cpp     | 69 +++++++++++++++++++
  1 file changed, 69 insertions(+)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index b532362db..628214949 100644
+index b532362dbde5..6282149495ac 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -25,6 +25,7 @@

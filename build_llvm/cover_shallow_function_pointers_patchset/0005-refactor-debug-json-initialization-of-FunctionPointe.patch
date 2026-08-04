@@ -1,7 +1,7 @@
-From f46d0831ddab906bd2fb1548b42e411a27b7faed Mon Sep 17 00:00:00 2001
+From 8c536a96189c03377f3b4c5505d1a09191bfd7df Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Mon, 27 Jul 2026 19:25:30 -0300
-Subject: [PATCH 05/15] refactor debug json initialization of
+Subject: [PATCH 05/18] refactor debug json initialization of
  FunctionPointerStores InjectTrace functions
 
 ---
@@ -9,7 +9,7 @@ Subject: [PATCH 05/15] refactor debug json initialization of
  1 file changed, 30 insertions(+), 50 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index 97f934b0c..782f21ebc 100644
+index 97f934b0c9f7..782f21ebc9a1 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -257,7 +257,7 @@ private:

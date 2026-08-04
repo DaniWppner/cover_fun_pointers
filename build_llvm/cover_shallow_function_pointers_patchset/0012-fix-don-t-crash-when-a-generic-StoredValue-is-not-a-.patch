@@ -1,7 +1,7 @@
-From f1ee68fa230ab2ffc306b482d1eb43eba5b45588 Mon Sep 17 00:00:00 2001
+From 4371f82a54c3da8df33c1127ef0a30ac806b6df7 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Wed, 29 Jul 2026 19:09:55 -0300
-Subject: [PATCH 12/15] fix: don't crash when a generic StoredValue is not a
+Subject: [PATCH 12/18] fix: don't crash when a generic StoredValue is not a
  pointer. Handle both assigning of a Literal struct and a struct pointer
 
 ---
@@ -9,7 +9,7 @@ Subject: [PATCH 12/15] fix: don't crash when a generic StoredValue is not a
  1 file changed, 30 insertions(+), 9 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index db6ea112f..9f828b44f 100644
+index db6ea112f605..9f828b44f7c9 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -1143,6 +1143,22 @@ retType getOffsetsFromShallowStructType(StructType *STy) {

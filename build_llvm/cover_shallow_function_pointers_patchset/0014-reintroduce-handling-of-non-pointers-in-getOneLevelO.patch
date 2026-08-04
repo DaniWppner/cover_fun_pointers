@@ -1,7 +1,7 @@
-From e313c6a5e7c6355984f38d400e718ce1b506e6da Mon Sep 17 00:00:00 2001
+From dfa404580ed5959e514f124d699fd536eb380b78 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Fri, 31 Jul 2026 10:52:04 -0300
-Subject: [PATCH 14/15] reintroduce handling of non-pointers in
+Subject: [PATCH 14/18] reintroduce handling of non-pointers in
  getOneLevelOffsetsFromAllValues
 
 ---
@@ -9,7 +9,7 @@ Subject: [PATCH 14/15] reintroduce handling of non-pointers in
  1 file changed, 12 insertions(+), 11 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index 499ed8f54..11d7d86d6 100644
+index 499ed8f54eff..11d7d86d6797 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -1179,17 +1179,18 @@ getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {

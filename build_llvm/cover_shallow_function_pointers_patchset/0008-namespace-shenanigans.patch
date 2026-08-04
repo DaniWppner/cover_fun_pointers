@@ -1,14 +1,14 @@
-From 736b2a46effcb3e809955da08147a5b739d79216 Mon Sep 17 00:00:00 2001
+From 55949217069347ed98013e4941646999fefdcdcb Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Wed, 29 Jul 2026 17:19:40 -0300
-Subject: [PATCH 08/15] namespace shenanigans
+Subject: [PATCH 08/18] namespace shenanigans
 
 ---
  .../Instrumentation/SanitizerCoverage.cpp     | 426 +++++++++---------
  1 file changed, 218 insertions(+), 208 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index ba4fc9bbf..a6cce5bdd 100644
+index ba4fc9bbfee8..a6cce5bdd15b 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -15,6 +15,7 @@

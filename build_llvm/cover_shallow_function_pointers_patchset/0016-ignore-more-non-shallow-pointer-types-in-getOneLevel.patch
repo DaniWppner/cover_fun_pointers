@@ -1,7 +1,7 @@
-From 0b4cf0ad7b7e614366a3b7e652e91d015ebb258a Mon Sep 17 00:00:00 2001
+From 85cbefd16879d0ad23cfdf552193c55f158679e1 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Mon, 3 Aug 2026 16:01:58 -0300
-Subject: [PATCH] ignore more non shallow pointer types in
+Subject: [PATCH 16/18] ignore more non shallow pointer types in
  getOneLevelOffsetsFromAllValues
 
 ---
@@ -9,7 +9,7 @@ Subject: [PATCH] ignore more non shallow pointer types in
  1 file changed, 10 insertions(+), 3 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index 08ef4e9d2..efad69b43 100644
+index 08ef4e9d257b..efad69b4393b 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -1185,17 +1185,24 @@ getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
