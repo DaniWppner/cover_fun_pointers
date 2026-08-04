@@ -1,7 +1,7 @@
 From dfa404580ed5959e514f124d699fd536eb380b78 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Fri, 31 Jul 2026 10:52:04 -0300
-Subject: [PATCH 14/18] reintroduce handling of non-pointers in
+Subject: [PATCH 14/19] reintroduce handling of non-pointers in
  getOneLevelOffsetsFromAllValues
 
 ---

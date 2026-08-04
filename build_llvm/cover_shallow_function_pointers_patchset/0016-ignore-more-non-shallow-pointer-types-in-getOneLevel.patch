@@ -1,7 +1,7 @@
 From 85cbefd16879d0ad23cfdf552193c55f158679e1 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Mon, 3 Aug 2026 16:01:58 -0300
-Subject: [PATCH 16/18] ignore more non shallow pointer types in
+Subject: [PATCH 16/19] ignore more non shallow pointer types in
  getOneLevelOffsetsFromAllValues
 
 ---

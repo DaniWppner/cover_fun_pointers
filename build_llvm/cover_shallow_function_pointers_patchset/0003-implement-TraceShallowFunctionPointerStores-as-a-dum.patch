@@ -1,7 +1,7 @@
 From 3ae20a3bcb2d99d036ca3fcddea45692ba93c6e3 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Mon, 27 Jul 2026 18:31:43 -0300
-Subject: [PATCH 03/18] implement TraceShallowFunctionPointerStores as a dummy
+Subject: [PATCH 03/19] implement TraceShallowFunctionPointerStores as a dummy
 
 ---
  .../Instrumentation/SanitizerCoverage.cpp     | 69 +++++++++++++++++++

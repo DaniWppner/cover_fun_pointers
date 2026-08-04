@@ -1,7 +1,7 @@
 From a9a97f9ae22dfb6e6991431e186950146147a0bc Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Thu, 23 Apr 2026 14:50:19 -0300
-Subject: [PATCH 01/18] add pass that instruments naked function pointer stores
+Subject: [PATCH 01/19] add pass that instruments naked function pointer stores
  with coverage callback
 
 ---

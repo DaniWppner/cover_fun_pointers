@@ -1,0 +1,33 @@
+From abd9d541f85398fa534a44852887bdb4ee9fac17 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Tue, 4 Aug 2026 17:58:04 -0300
+Subject: [PATCH 19/19] fix safety check by injecting Load when the pointer IS
+ NOT an error
+
+---
+ llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 33b2b86ff508..762eb7ec1341 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1329,13 +1329,13 @@ void ModuleSanitizerCoverage::InjectFuncPointerCallbackAtShallowStruct(
+   // [max(unsigned long)-MAX_ERRNO-1, max(unsigned long)] for both NULL and ERR_PTR.
+   Value *BasePointer = IRB.CreatePtrToInt(StoredValue, IntptrTy);
+   Value *PossibleErrorPtr = IRB.CreateSub(BasePointer, ConstantInt::get(IntptrTy, 1));
+-  Value *IsError = IRB.CreateICmpUGE(
++  Value *IsNotError = IRB.CreateICmpULT(
+     PossibleErrorPtr,
+     ConstantInt::get(IntptrTy,
+       APInt::getMaxValue(IntptrTy->getIntegerBitWidth()) - (LINUX_MAX_ERRNO + 1)
+     )
+   );
+-  Instruction *ThenInst = SplitBlockAndInsertIfThen(IsError, Target.BB->getTerminator(), false);
++  Instruction *ThenInst = SplitBlockAndInsertIfThen(IsNotError, Target.BB->getTerminator(), false);
+ 
+   // Populate safeguarded block with the callback
+   IRB.SetInsertPoint(ThenInst);
+-- 
+2.43.0
+

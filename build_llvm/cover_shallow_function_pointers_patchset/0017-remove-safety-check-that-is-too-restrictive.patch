@@ -1,7 +1,7 @@
 From bc250443cee510279caf131bd4620c444e8b38fa Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Mon, 3 Aug 2026 18:06:19 -0300
-Subject: [PATCH 17/18] remove safety check that is too restrictive
+Subject: [PATCH 17/19] remove safety check that is too restrictive
 
 ---
  llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp | 2 --

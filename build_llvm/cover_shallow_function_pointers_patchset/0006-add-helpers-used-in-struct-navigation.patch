@@ -1,7 +1,7 @@
 From 301df4c140167bafcc4d3b72fd6ea8471d2a7868 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Mon, 27 Jul 2026 20:27:38 -0300
-Subject: [PATCH 06/18] add helpers used in struct navigation
+Subject: [PATCH 06/19] add helpers used in struct navigation
 
 ---
  .../Instrumentation/SanitizerCoverage.cpp     | 183 ++++++++++++++++++

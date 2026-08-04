@@ -1,7 +1,7 @@
 From 9d0807f1df58cd31b95d1f8f83af0592228e48fe Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Wed, 29 Jul 2026 19:26:58 -0300
-Subject: [PATCH 13/18] fix: don't include the path to a struct twice on struct
+Subject: [PATCH 13/19] fix: don't include the path to a struct twice on struct
  pointer navigation
 
 ---

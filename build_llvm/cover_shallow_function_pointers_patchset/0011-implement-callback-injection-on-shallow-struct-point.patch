@@ -1,7 +1,7 @@
 From 7a2787f3c1aae1a158c91ea9c95be72b08b4db3a Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Wed, 29 Jul 2026 18:38:38 -0300
-Subject: [PATCH 11/18] implement callback injection on shallow struct
+Subject: [PATCH 11/19] implement callback injection on shallow struct
  pointers, which breaks kernel memory access assumptions
 
 ---

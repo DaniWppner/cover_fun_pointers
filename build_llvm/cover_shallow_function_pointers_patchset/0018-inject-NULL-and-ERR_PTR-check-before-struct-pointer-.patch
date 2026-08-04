@@ -1,7 +1,7 @@
 From 611f586d573c4f7f14de2f8a52ac6a318a80b2b9 Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Tue, 4 Aug 2026 15:53:34 -0300
-Subject: [PATCH 18/18] inject NULL and ERR_PTR check before struct pointer
+Subject: [PATCH 18/19] inject NULL and ERR_PTR check before struct pointer
  dereference
 
 ---
