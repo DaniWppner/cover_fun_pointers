@@ -69,7 +69,7 @@ def check_easy_stats(prog2log: dict[str, dict[str, Any]]) -> None:
     print(
         f"Number of <prog,call> triages that added an item to the corpus: {n_saved_progs}"
     )
-    multiple_corpus_fout = Path.cwd() / "multiple_saved_corpus.json"
+    multiple_corpus_fout = OUTDIR / "multiple_saved_corpus.json"
     print(
         f"Number of <prog,call> pairs with multiple saved progs (count={len(multiple_saved_progs)}) saved to {multiple_corpus_fout.name}"
     )
@@ -202,7 +202,7 @@ def check_saved_because_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
     ) = deduplicate_saved_progs(saved_because_skip_signal)
 
     saved_because_fpointer_Wduplicate_fout = (
-        Path.cwd() / "saved_because_fpointer_w_duplicates.json"
+        OUTDIR / "saved_because_fpointer_w_duplicates.json"
     )
     print(
         f"Progs saved with fpointer and skip signal (count={len(saved_because_skip_signal)})",
@@ -211,7 +211,7 @@ def check_saved_because_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
     with open(saved_because_fpointer_Wduplicate_fout, "w") as f:
         json.dump(saved_because_skip_signal, f, indent=2, default=str)
 
-    saved_deduplicate_fout = Path.cwd() / "saved_because_fpointer.json"
+    saved_deduplicate_fout = OUTDIR / "saved_because_fpointer.json"
     print(
         f"After deduplication, progs saved with fpointer and skip signal (count={len(deduplicate_interesting)})",
         f"saved to {saved_deduplicate_fout.name}"
@@ -260,7 +260,7 @@ def check_minimization_stats(prog2log: dict[str, dict[str, Any]]) -> None:
     print(f"Number of times signal minimization was skipped: {n_skip_signal}")
     print(f"Number of times minimizationa as a whole was skipped {n_skip_all}")
     both_unique_fout = (
-        Path.cwd() / "unique_fpointer_and_signal_minimization_result.json"
+        OUTDIR / "unique_fpointer_and_signal_minimization_result.json"
     )
     print(
         f"Minimizations that obtained both unique signal and unique fpointer (count={len(unique_signal_and_fpointer)}): "
@@ -306,7 +306,7 @@ def write_covered_vs_uncovered_fpointers(prog2log: dict[str, dict[str, Any]],
         fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs,
     )
     assert skip_count == 0
-    uncovered_fpointers_file = Path.cwd() / "__uncovered_pairs.py"
+    uncovered_fpointers_file = OUTDIR / "__uncovered_pairs.py"
     with open(uncovered_fpointers_file, "w") as f:
         print(uncovered_fpointers_out, file=f)
     print(f"Mapping of uncovered function pointer to instructions that store them saved to {uncovered_fpointers_file.name}")
@@ -315,7 +315,7 @@ def write_covered_vs_uncovered_fpointers(prog2log: dict[str, dict[str, Any]],
         fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs
     )
     assert skip_count == 0
-    covered_fpointers_file = Path.cwd() / "__covered_pairs.py"
+    covered_fpointers_file = OUTDIR / "__covered_pairs.py"
     with open(covered_fpointers_file, "w") as f:
         print(covered_fpointers_out, file=f)
     print(f"Mapping of covered function pointer to instructions that store them saved to {covered_fpointers_file.name}")
@@ -347,7 +347,7 @@ def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict[str, A
         skip_signal_fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs
     )
 
-    covered_fpointers_because_skip_signal_file = Path.cwd() / "__covered_pairs_saved_because_fpointer.py"
+    covered_fpointers_because_skip_signal_file = OUTDIR / "__covered_pairs_saved_because_fpointer.py"
     with open(covered_fpointers_because_skip_signal_file, "w") as f:
         print(covered_fpointers_saved_because_skip_signal, file=f)
     print(
@@ -356,7 +356,7 @@ def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict[str, A
         f"(ignored due to filter={missed_covered}) saved to {covered_fpointers_because_skip_signal_file.name}"
         )
 
-    uncovered_fpointers_because_skip_signal_file = Path.cwd() / "__uncovered_pairs_saved_because_fpointer.py"
+    uncovered_fpointers_because_skip_signal_file = OUTDIR / "__uncovered_pairs_saved_because_fpointer.py"
     with open(uncovered_fpointers_because_skip_signal_file, "w") as f:
         print(uncovered_fpointers_saved_because_skip_signal, file=f)
     print(
@@ -380,14 +380,14 @@ def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict[str, A
                                                      fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC][0] in uncovered_fpointer_locs
                                                      for fPointer_entry in e.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, [])
                                                  ))
-    covered_fpointers_subdict_fout = Path.cwd() / "registered_covered_fpointers_saved_because_fpointer.json"
+    covered_fpointers_subdict_fout = OUTDIR / "registered_covered_fpointers_saved_because_fpointer.json"
     with open(covered_fpointers_subdict_fout, "w") as f:
         json.dump(covered_fpointers_subdict, f, indent=2, default=str)
     print("Progs saved with fpointer and skip signal that registered a covered function pointer",
          f"(count={len(covered_fpointers_subdict)}) saved to {covered_fpointers_subdict_fout.name}"
     )
 
-    uncovered_fpointers_subdict_fout = Path.cwd() / "registered_uncovered_fpointers_saved_because_fpointer.json"
+    uncovered_fpointers_subdict_fout = OUTDIR / "registered_uncovered_fpointers_saved_because_fpointer.json"
     with open(uncovered_fpointers_subdict_fout, "w") as f:
         json.dump(uncovered_fpointers_subdict, f, indent=2, default=str)
     print("Progs saved with fpointer and skip signal that registered an uncovered function pointer",
@@ -476,10 +476,7 @@ def print_source_code_diffs(
     #  appear in a function that is not covered by any of the
     #  PCs in the general log of reported instructions?
     print(f"Unique functions of fpointer stores: (count={len(storeinst_locs)})")
-    print(
-        f"Function pointer store instructions in functions different than PCs: (count={len(store_inst_diff)}):",
-        f"\n{sorted(store_inst_diff)}",
-    )
+    print(f"Function pointer store instructions in functions different than PCs: (count={len(store_inst_diff)}):")
     print("------------------------------------------------")
     print(colored(f"Unique stored functions: (count={len(fpointer_locs)})"))
     print(f"Stored functions that were not executed: (count={len(stored_value_diff)}):")
@@ -745,6 +742,8 @@ if __name__ == "__main__":
             file=sys.stderr,
         )
         sys.exit(1)
+
+    OUTDIR = unified_json_path.parent / "results"
 
     with open(unified_json_path, 'r') as f:
         __contents = f.read()
