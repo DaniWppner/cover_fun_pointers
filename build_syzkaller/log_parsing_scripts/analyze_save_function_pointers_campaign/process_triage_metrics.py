@@ -555,21 +555,23 @@ def get_unique_covered_locations(prog2log: dict[str, dict[str, Any]]) -> set[loc
     return all_pc_locs
 
 
-def get_function_pointer_coverage_timeline(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict[locInfo, tuple[datetime, datetime, int]]]:
+def get_function_pointer_coverage_timeline(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict[locInfo, tuple[datetime, datetime, int, list[str]]]]:
     """
     Args:
         prog2log: dictionary with the standard format for triage entries of each prog|call pair.
 
     Returns:
-        dict[str, dict[locInfo, tuple[datetime, datetime, int]]]: A dictionary from top-level function names
+        dict[str, dict[locInfo, tuple[datetime, datetime, int, list[str]]]]: A dictionary from function names
             to dictionaries of locInfos executed within that function.
-            Each value in the nested dictionaries is a tuple with three elements:
+
+            Each value in the nested dictionaries is a tuple with four elements:
                 min_timestamp_begin: the earliest start timestamp among triage jobs that covered this locInfo
                 min_timestamp_end: the earliest end timestamp among triage jobs that covered this locInfo
                 count: the total number of triage jobs that covered this locInfo
+                job_ids: list of triage job ids that covered this locInfo
     """
-    function_cover_map: dict[str, dict[locInfo, tuple[datetime, datetime, int]]] = dict()
-    for entry in prog2log.values():
+    function_cover_map: dict[str, dict[locInfo, tuple[datetime, datetime, int, list[str]]]] = dict()
+    for job_key, entry in prog2log.items():
         if RESULT_KEYS.PC_COVER not in entry:
             continue
         t_start = entry[RESULT_KEYS.TIMESTAMP_BEGIN]
@@ -586,44 +588,44 @@ def get_function_pointer_coverage_timeline(prog2log: dict[str, dict[str, Any]]) 
             loc_dict = function_cover_map[func_name]
 
             if top_level_loc not in loc_dict:
-                # will get +1 in just a second
-                loc_dict[top_level_loc] = (t_start, t_end, 0)
+                loc_dict[top_level_loc] = (t_start, t_end, 1, [job_key])
             else:
-                # will be t_start, t_end if this was the first entry.
-                old_start, old_end, current_count = loc_dict[top_level_loc]
+                old_start, old_end, current_count, job_keys = loc_dict[top_level_loc]
                 new_start = min(old_start, t_start)
                 new_end = min(old_end, t_end)
-                loc_dict[top_level_loc] = (new_start, new_end, current_count + 1)
+                if job_key not in job_keys:
+                    job_keys.append(job_key)
+                loc_dict[top_level_loc] = (new_start, new_end, current_count + 1, job_keys)
     return function_cover_map
 
 
 def get_fPointers_covered_accross_timeline(
     prog2log: dict[str, dict[str, Any]],
-    fPointer_coverage_timeline: dict[str, dict[locInfo, tuple[datetime, datetime, int]]]
-) -> tuple[set[locInfo], set[locInfo], set[locInfo]]:
+    fPointer_coverage_timeline: dict[str, dict[locInfo, tuple[datetime, datetime, int, list[str]]]]
+) -> tuple[set[locInfo], set[locInfo], dict[locInfo, dict[str, list[str]]]]:
     """
     Args:
         prog2log: dictionary with the standard format for triage entries of each prog|call pair.
         fPointer_coverage_timeline: The output of get_function_pointer_coverage_timeline.
 
     Returns:
-        tuple[set[locInfo], set[locInfo], set[locInfo]]: A tuple with three elements:
+        tuple[set[locInfo], set[locInfo], dict[locInfo, dict[str, list[str]]]]: A tuple with three elements:
             not_covered_in_this_triage: Function pointers that were not executed during the triage that stored them.
             not_covered_yet: Function pointers that had never been executed up to the point where they were stored.
-            covered_strictly_after: Function pointers that were executed only after the point where they were stored.
+            covered_strictly_after: Mapping from function pointers executed only after the point where they were stored to a dictionary containing lists of triage job IDs that stored them and covered them.
     """
     not_covered_in_this_triage: set[locInfo] = set()
     not_covered_yet: set[locInfo] = set()
-    covered_strictly_after: set[locInfo] = set()
+    covered_strictly_after: dict[locInfo, dict[str, list[str]]] = dict()
 
-    for entries in prog2log.values():
+    for job_key, entries in prog2log.items():
         job_end = entries[RESULT_KEYS.TIMESTAMP_END]
         job_covered_funcs: set[str] = set()
         if RESULT_KEYS.PC_COVER in entries:
             for pc_entry in entries[RESULT_KEYS.PC_COVER]:
                 job_covered_funcs.add(pc_entry[PC_VALUES.PC_LOCATION][0][1])
 
-        for fPointer_entry in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD]:
+        for fPointer_entry in entries.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, []):
             fp_loc = fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC][0]
             func_name = fp_loc[1]
 
@@ -633,11 +635,23 @@ def get_fPointers_covered_accross_timeline(
             if func_name not in fPointer_coverage_timeline:
                 not_covered_yet.add(fp_loc)
             else:
-                min_start = min(start for start, end, count in fPointer_coverage_timeline[func_name].values())
+                min_start = min(start for start, end, count, jobs in fPointer_coverage_timeline[func_name].values())
                 if min_start > job_end:
                     # hacky hack: not covered yet is the set of never covered + the set of covered striclty after.
                     not_covered_yet.add(fp_loc)
-                    covered_strictly_after.add(fp_loc)
+                    if fp_loc not in covered_strictly_after:
+                        covering_jobs = []
+                        for _, _, _, jobs in fPointer_coverage_timeline[func_name].values():
+                            for j in jobs:
+                                if j not in covering_jobs:
+                                    covering_jobs.append(j)
+                        covered_strictly_after[fp_loc] = {
+                            "storing_jobs": [job_key],
+                            "executing_jobs": covering_jobs
+                        }
+                    else:
+                        if job_key not in covered_strictly_after[fp_loc]["storing_jobs"]:
+                            covered_strictly_after[fp_loc]["storing_jobs"].append(job_key)
 
     return not_covered_in_this_triage, not_covered_yet, covered_strictly_after
 
@@ -720,6 +734,20 @@ def check_fPointers_covered_after_save(prog2log: dict[str, dict[str, Any]]) -> N
     print(f"Function pointers covered after the test for that function pointer (with no other interesting signal):"+
           f"(count={len(covered_strictly_after_skip_signal)})")
 
+    skip_signal_json_ready = [
+        {
+            "function_pointer": fp_loc[1],
+            "location": fp_loc,
+            "storing_jobs": data["storing_jobs"],
+            "executing_jobs": data["executing_jobs"]
+        }
+        for fp_loc, data in covered_strictly_after_skip_signal.items()
+    ]
+    skip_signal_fout = OUTDIR / "covered_strictly_after_saved_because_fpointer.json"
+    with open(skip_signal_fout, "w") as f:
+        json.dump(skip_signal_json_ready, f, indent=2, default=str)
+    print(f"Wrote storing and executing job matches to {skip_signal_fout.name}")
+
     saves_fPointer = filter_many_cond(prog2log, has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER))
     not_covered_in_saves_fpointer, not_covered_before_saves_fPointer, covered_strictly_after_saves_fpointer = get_fPointers_covered_accross_timeline(
         saves_fPointer, fPointer_coverage_timeline
@@ -731,6 +759,20 @@ def check_fPointers_covered_after_save(prog2log: dict[str, dict[str, Any]]) -> N
           f"(count={len(not_covered_before_saves_fPointer)})")
     print(f"Function pointers covered after the test in the test that saved them:"+
           f"(count={len(covered_strictly_after_saves_fpointer)})")
+
+    saves_fpointer_json_ready = [
+        {
+            "function_pointer": fp_loc[1],
+            "location": fp_loc,
+            "storing_jobs": data["storing_jobs"],
+            "executing_jobs": data["executing_jobs"]
+        }
+        for fp_loc, data in covered_strictly_after_saves_fpointer.items()
+    ]
+    saves_fpointer_fout = OUTDIR / "covered_strictly_after_saved_including_fpointer.json"
+    with open(saves_fpointer_fout, "w") as f:
+        json.dump(saves_fpointer_json_ready, f, indent=2, default=str)
+    print(f"Wrote storing and executing job matches to {saves_fpointer_fout.name}")
 
 
 if __name__ == "__main__":
