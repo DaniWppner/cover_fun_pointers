@@ -58,8 +58,8 @@ def unify_per_prog(json_lines_file: Path) -> dict[str, dict[str, Any]]:
             data_key = f"{prog_id}|{call_id}"
             triage_id = log_entry.pop(RESULT_KEYS.TRIAGEID)
 
-            # before using data_key, let's check if we should update it
-            # does this break the "skip repeated traiges rule"?
+            # before using data_key, let's check if we should update it.
+            # (does this break the "skip repeated triages rule"?)
             data_key = override_if_awaiting(
                 data_key,
                 awaiting_corpus_entry,
@@ -79,17 +79,12 @@ def unify_per_prog(json_lines_file: Path) -> dict[str, dict[str, Any]]:
 
             no_new: bool = data_key in result_dict
 
-            # If it is not the first occurence, we want to check that triage_id is the same
-            # If it is not, that means we have identical <prog, call> pairs in different triages
+            # If it is not the first occurence of data_key, we want to check that triage_id is the same.
+            # If it is not, that means we have identical <prog, call> pairs in different triages.
             # This probably means that on two different instances the fuzzer generated the same prog
             # and obtained similar (flaky?) coverage to triage.
             # Let's only log the results for the first time the prog gets triaged,
             # but let's also make sure to increase the count.
-            #
-            # FIXME: THis breaks in the way that programs triaged multiple times due to race conditions
-            # might have the results on the second or greater iteration ignored.
-            # In particular for saved_prog, which have a different <prog, call> pair id this creates
-            # duplicate entries.
             if no_new and triage_id not in result_dict[data_key][RESULT_KEYS.TRIAGEID]:
                 result_dict[data_key][RESULT_KEYS.TRIAGEID].append(triage_id)
                 result_dict[data_key][RESULT_KEYS.COUNT] += 1
@@ -97,7 +92,7 @@ def unify_per_prog(json_lines_file: Path) -> dict[str, dict[str, Any]]:
             if no_new and result_dict[data_key][RESULT_KEYS.COUNT] > 1:
                 ## Before we ignore this duplicate entry, queue whatever we're missing
                 ## just in case, so that the next entry that would get its key updated
-                ## can be recongnized as duplicate properly and be ignored
+                ## can be recognized as duplicate properly and be ignored.
                 if RESULT_KEYS.MINIMIZATION_RESULT in log_entry:
                     minim_entry = log_entry.pop(RESULT_KEYS.MINIMIZATION_RESULT)
                     if successful_minimize(minim_entry):
@@ -179,6 +174,20 @@ def unify_per_prog(json_lines_file: Path) -> dict[str, dict[str, Any]]:
                     result_dict[data_key][RESULT_KEYS.TAGS] = entry_tags
                 else:
                     log_entry[RESULT_KEYS.TAGS] = entry_tags
+
+            # Get the union for PC_COVER.
+            # Ideally we only get duplicate PC_COVER in the case of minimization split.
+            # Nevertheless, when two different prog_id + call pairs generate the same program after minimization,
+            # this will result in two different triage subjobs mapping into the same json entry (thanks to override_if_awaiting).
+            # FIXME: This is a bug; but handling it by joining their PC_COVERAGE together seems fine for now.
+            if RESULT_KEYS.PC_COVER in log_entry:
+                cover_payload = log_entry.pop(RESULT_KEYS.PC_COVER)
+                if no_new and RESULT_KEYS.PC_COVER in result_dict[data_key]:
+                    old_payload = set(result_dict[data_key][RESULT_KEYS.PC_COVER])
+                    old_payload.update(cover_payload)
+                    result_dict[data_key][RESULT_KEYS.PC_COVER] = list(old_payload)
+                else:
+                    log_entry[RESULT_KEYS.PC_COVER] = cover_payload
 
             if not no_new:
                 log_entry[RESULT_KEYS.ORIGINAL_PROG] = curr_original_prog
