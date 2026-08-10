@@ -279,10 +279,26 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
     uncovered_fpointer_locs, covered_fpointer_locs = locInfo_fname_diff(fpointer_locs, all_pc_locs)
 
     print(colored("################################################", "cyan"))
-    print_source_code_diffs(all_pc_locs, storeinst_locs, store_inst_diff, fpointer_locs, uncovered_fpointer_locs, covered_fpointer_locs)
-    write_covered_vs_uncovered_fpointers(prog2log, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs, uncovered_fpointer_locs)
+
+    print_source_code_diffs(all_pc_locs,
+                            storeinst_locs,
+                            store_inst_diff,
+                            fpointer_locs,
+                            uncovered_fpointer_locs,
+                            covered_fpointer_locs)
+
+    write_covered_vs_uncovered_fpointers(prog2log,
+                                         fpointer_addr2loc,
+                                         storeinst_addr2loc,
+                                         covered_fpointer_locs,
+                                         uncovered_fpointer_locs)
     print(colored("################################################", "cyan"))
-    check_saved_because_skip_signal_vs_fpointers(prog2log, fpointer_addr2loc, storeinst_addr2loc, covered_fpointer_locs, uncovered_fpointer_locs)
+
+    check_saved_because_skip_signal_vs_fpointers(prog2log,
+                                                 fpointer_addr2loc,
+                                                 storeinst_addr2loc,
+                                                 covered_fpointer_locs,
+                                                 uncovered_fpointer_locs)
 
 def write_covered_vs_uncovered_fpointers(prog2log: dict[str, dict[str, Any]],
                                         fpointer_addr2loc: dict[str, list[locInfo]],
@@ -561,8 +577,8 @@ def get_function_pointer_coverage_timeline(prog2log: dict[str, dict[str, Any]]) 
         for pc_entry in entry[RESULT_KEYS.PC_COVER]:
             locs = pc_entry[PC_VALUES.PC_LOCATION]
             # locs is a list of locInfo representing the inline stack.
-            # locs[0] corresponds to the current, non-inlined executing function.
-            top_level_loc = locs[0]
+            # locs[-1] corresponds to the current, non-inlined executing function.
+            top_level_loc = locs[-1]
             func_name = top_level_loc[1]
 
             if func_name not in function_cover_map:
@@ -672,9 +688,9 @@ def filter_fpointer2storeinst_by_source_locations(
             skip_count: The number of `interesting_fpointer_locs` that did not match any function pointer in `fpointer2storeinst`.
     """
     interesting_fpointer2loc = {
-        fpointer: locs[0]
+        fpointer: locs[-1]
         for fpointer, locs in fpointer_addr2loc.items()
-        if locs[0] in interesting_fpointer_locs
+        if locs[-1] in interesting_fpointer_locs
     }
     skip_count = 0
     output_dict: dict[locInfo, set[locInfo]] = dict()
