@@ -266,11 +266,7 @@ def update_queues(
     # additionally, if the prog is entering because of pointer coverage
     # we need to capture the raw pc coverage
     assert len(minim_entry) == 1
-    if minim_entry[0][RESULT_KEYS.MINIMIZATION_RES_TYPE] in [
-        MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_NODIFF,
-        MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER,
-    ]:
-        awaiting_pc_cover[get_ceq_key(prog_id, triage_id)] = data_key
+    awaiting_pc_cover[get_ceq_key(prog_id, triage_id)] = data_key
 
 
 def override_if_awaiting(
