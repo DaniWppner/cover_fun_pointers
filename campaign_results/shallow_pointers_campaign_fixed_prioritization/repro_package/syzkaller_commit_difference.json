@@ -1,0 +1,12 @@
+{
+    "last_ancestor": {
+        "hash": "047960f74a047d875ea01db69eac64896c3433d5",
+        "message": "pkg/fuzzer/job.go: always print the raw PC coverage of saved progs, not only when it sees new FuncPointer coverage",
+        "branch": "handle_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 0,
+        "commits": []
+    }
+}
