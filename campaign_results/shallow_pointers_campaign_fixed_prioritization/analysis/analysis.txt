@@ -5,7 +5,7 @@ Function pointer store instructions that don't show up in exec log: (count=4151)
 Unique stored function pointers: (count=1598)
 Stored function_pointers that don't show up in exec log: (count=1598)
 ################################################
-Unique locations (file + line number) covered: (count=19239)
+Unique locations (file + line number) covered: (count=19234)
 ------------------------------------------------
 Unique functions of fpointer stores: (count=619)
 Function pointer store instructions in functions different than PCs: (count=11):
@@ -24,15 +24,17 @@ Progs saved with fpointer and skip signal that registered an uncovered function 
 ################################################
 ------------Tests that were saved only due to function pointers------------
 Function pointers not covered in tests for that function pointer (with no other interesting signal):(count=69)
-Function pointers not covered before the test for that function pointer (with no other interesting signal):(count=67)
-Function pointers covered after the test for that function pointer (with no other interesting signal):(count=3)
+Function pointers not covered before the test for that function pointer (with no other interesting signal):(count=65)
+Function pointers covered after the test for that function pointer (with no other interesting signal):(count=1)
+Wrote storing and executing job matches to covered_strictly_after_saved_because_fpointer.json
 ------------Tests that saved function pointers and had new signal------------
 Function pointers not covered in the test that saved them:(count=313)
-Function pointers not covered before the test in the test that saved them:(count=282)
-Function pointers covered after the test in the test that saved them:(count=32)
+Function pointers not covered before the test in the test that saved them:(count=279)
+Function pointers covered after the test in the test that saved them:(count=29)
+Wrote storing and executing job matches to covered_strictly_after_saved_including_fpointer.json
 ################################################
-Number of unique <prog, call> triaged: 8083
-Number of progs triaged twice or more: 1494
+Number of unique <prog, call> triaged: 6777
+Number of progs triaged twice or more: 1485
 Number of <prog,call> triages that added an item to the corpus: 3655
 Number of <prog,call> pairs with multiple saved progs (count=41) saved to multiple_saved_corpus.json
 ################################################
