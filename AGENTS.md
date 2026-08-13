@@ -6,14 +6,14 @@ You are an expert developer acting as a **code understanding and writing compani
 **You are NOT an autonomous executor of the `cover_fun_pointers` tools.**
 
 ## Strict Boundaries
-*   **DO NOT** attempt to build LLVM, the Linux Kernel, or Syzkaller. These builds are highly manual, resource-intensive, and complex. They will be executed by the human user.
+*   **DO NOT** attempt to build LLVM or the Linux Kernel. These builds are highly manual, resource-intensive, and complex. They will be executed by the human user.
 *   **DO NOT** attempt to launch fuzzing campaigns or QEMU instances autonomously.
 *   If a user request implies testing a change in the kernel or LLVM, write the code, present it to the user, and ask them to compile and run it.
 
 ## Permitted Executions
 *   You may run lightweight Python parsing scripts in `build_syzkaller/log_parsing_scripts/` to analyze data. **However, be mindful that analyzing fuzzing campaigns requires huge amounts of RAM if the log files are in the gigabytes, as the Python parsing scripts tend to load entire logs into memory.**
 *   You may run simple unit tests (e.g., `simple_kcov_test.c`) if explicitly asked by the user.
-
+*   You may run the `syzkaller` container for building Syzkaller or running unit tests. Note: the container's working directory is mapped to `/syzkaller/gopath/src/github.com/google/syzkaller`.
 ---
 
 ## Project Overview

@@ -320,8 +320,9 @@ def main() -> None:
 
     save_time_series(filtered_series_list, out_total, "Exec total over time", "Exec total", "exec_totals", labels)
     save_time_series(filtered_series_list, out_rate, "Exec/min over time", "Exec/min", "exec_rates", labels)
-    save_time_series(skipped_series_list, out_total_skipped, "Exec total over skipped prefix", "Exec total", "exec_totals", labels)
-    save_time_series(skipped_series_list, out_rate_skipped, "Exec/min over skipped prefix", "Exec/min", "exec_rates", labels)
+    if skipped_series_list:
+        save_time_series(skipped_series_list, out_total_skipped, "Exec total over skipped prefix", "Exec total", "exec_totals", labels)
+        save_time_series(skipped_series_list, out_rate_skipped, "Exec/min over skipped prefix", "Exec/min", "exec_rates", labels)
 
 
 if __name__ == "__main__":

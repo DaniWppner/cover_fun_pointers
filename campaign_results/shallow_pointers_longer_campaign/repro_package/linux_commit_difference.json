@@ -1,0 +1,16 @@
+{
+    "last_ancestor": {
+        "hash": "0c3836482481200ead7b416ca80c68a29cfdaabd",
+        "message": "Linux 6.10",
+        "tag": "v6.10"
+    },
+    "difference": {
+        "distance": 1,
+        "commits": [
+            {
+                "hash": "266e700283a0fc3fe02e1056a06f43021fea7610",
+                "message": "apply kcov patch"
+            }
+        ]
+    }
+}
