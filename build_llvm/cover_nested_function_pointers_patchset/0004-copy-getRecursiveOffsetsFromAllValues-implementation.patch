@@ -1,0 +1,151 @@
+From 697a3d2a03b3ffe30036ad4a46ce34b5a1d8cc68 Mon Sep 17 00:00:00 2001
+From: daniel wappner <dwappner@dc.uba.ar>
+Date: Fri, 14 Aug 2026 16:01:41 -0300
+Subject: [PATCH 4/4] copy getRecursiveOffsetsFromAllValues implementation from
+ old patchset
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 106 +++++++++++++++++-
+ 1 file changed, 104 insertions(+), 2 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 320ac1ef1..f526a13ef 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1044,7 +1044,7 @@ void ModuleSanitizerCoverage::InjectTraceForLoadsAndStores(
+ namespace {
+ // Unused, for debugging purposes
+ template <typename T>
+-static void ShowPointerVector(std::vector<T *> genericVector) {
++static void showPointerVector(std::vector<T *> genericVector) {
+   errs() << "(size " << genericVector.size() << ") \n{\n";
+   for (unsigned i = 0; i < genericVector.size(); i++) {
+     errs() << *genericVector[i] << "\n";
+@@ -1053,7 +1053,7 @@ static void ShowPointerVector(std::vector<T *> genericVector) {
+ }
+ 
+ // Unused, for debugging purposes
+-template <typename T> void ShowElementVector(std::vector<T> genericVector) {
++template <typename T> void showElementVector(std::vector<T> genericVector) {
+   errs() << "(size " << genericVector.size() << ") \n{\n";
+   for (unsigned i = 0; i < genericVector.size(); i++) {
+     errs() << genericVector[i] << "\n";
+@@ -1175,6 +1175,80 @@ retType getOffsetsFromFunctionType(Type *FunctionType) {
+   return std::make_pair(true, Res);
+ }
+ 
++retType handleTypeRecursiveImpl(Type *Ty, Types &Visited);
++
++retType recursivelyHandlePointerType(PointerType *Ty, Types &Visited) {
++  Type *OrigType = Ty->getPointerElementType();
++  return handleTypeRecursiveImpl(OrigType, Visited);
++}
++
++retType recursivelyHandleStructType(StructType *OriginalStruct,
++                                           Types &Visited) {
++  unsigned NumElements = OriginalStruct->getNumElements();
++  bool Any = false;
++  vectorTypesXOffsets AllRes = {};
++  for (unsigned i = 0; i < NumElements; i++) {
++    Type *ElemType = OriginalStruct->getElementType(i);
++
++    if (std::find(Visited.begin(), Visited.end(), ElemType) != Visited.end()) {
++      // We have a cyclical data structure
++      continue;
++    }
++
++    retType ResPos = handleTypeRecursiveImpl(ElemType, Visited);
++    Any = Any || ResPos.first;
++    vectorTypesXOffsets ThisTypesXOffsets = ResPos.second;
++    if (ResPos.first) {
++      if (ThisTypesXOffsets.size() == 0) {
++        assert(false && "If the contained type can be stripped to a function "
++                        "pointer the offset list should not be empty anymore");
++        // this_types_offsets.push_back(std::make_pair(Types{}, Offsets{}));
++      }
++      for (unsigned j = 0; j < ThisTypesXOffsets.size(); j++) {
++        Types ThisTypesJ = ThisTypesXOffsets[j].first;
++        Offsets ThisOffsetsJ = ThisTypesXOffsets[j].second;
++        ThisTypesJ.insert(ThisTypesJ.begin(), OriginalStruct);
++        ThisOffsetsJ.insert(ThisOffsetsJ.begin(), i);
++        ThisTypesXOffsets[j] = std::make_pair(ThisTypesJ, ThisOffsetsJ);
++      }
++      AllRes.insert(AllRes.end(), ThisTypesXOffsets.begin(),
++                            ThisTypesXOffsets.end());
++    }
++  }
++  return std::make_pair(Any, AllRes);
++}
++
++
++retType handleTypeRecursiveImpl(Type *Ty, Types &Visited) {
++
++  Visited.push_back(Ty);
++
++  if (!(Ty->isPointerTy() || Ty->isStructTy())) {
++    if (Ty->isFunctionTy()) {
++      return std::make_pair(
++          true, vectorTypesXOffsets{std::make_pair(Types{Ty}, Offsets{0})});
++    } else {
++      return std::make_pair(false, vectorTypesXOffsets{});
++    }
++  }
++  if (Ty->isPointerTy())
++    return recursivelyHandlePointerType(dyn_cast<PointerType>(Ty), Visited);
++  else if (StructType *OriginalStruct = dyn_cast<StructType>(Ty))
++    return recursivelyHandleStructType(OriginalStruct, Visited);
++  else {
++    // TODO: handle more types
++    assert(false && "Unexpected type during function pointer analysis.\n");
++    // unreachable, but makes the compiler complain less
++    return std::make_pair(false, vectorTypesXOffsets{});
++  }
++}
++
++retType handleTypeRecursive(Type *Ty) {
++  Types Visited = {};
++  return handleTypeRecursiveImpl(Ty, Visited);
++}
++
++
+ /*
+ Returns:
+   - bool: whether the type can be stripped to a function pointer with some
+@@ -1225,6 +1299,34 @@ getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+   return std::make_pair(false, vectorTypesXOffsets{});
+ }
+ 
++retType
++getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
++  int any = 0;
++  std::vector<retType> res = {};
++  std::vector<int> positiveResultIdxs = {};
++
++  for (unsigned i = 0; i < possibleStoredValues.size(); i++) {
++    Type *StoredType = possibleStoredValues[i]->getType();
++    retType partial_res = handleTypeRecursive(StoredType);
++
++    if (partial_res.first) {
++      any += 1;
++      positiveResultIdxs.push_back(i);
++    }
++    res.push_back(partial_res);
++  }
++
++  // TO DO: not have this weakness
++  assert(any <= 1 && "We cannot handle more than one intermeidate value "
++                     "reaching a function pointer");
++  if (any > 0) {
++    // assume positiveResultIdxs.size() == 1.
++    return std::make_pair(true, res[positiveResultIdxs[0]].second);
++  } else {
++    return std::make_pair(false, vectorTypesOffsets{});
++  }
++}
++
+ bool putFunctionArgFuncTypesIntoJson(Function &F, json::Object &RootJson) {
+   SmallVector<Type *> FuncPointerArgTypes = {};
+   FunctionType *FType = F.getFunctionType();
+-- 
+2.43.0
+

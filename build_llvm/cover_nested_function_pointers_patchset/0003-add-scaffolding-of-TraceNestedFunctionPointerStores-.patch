@@ -1,7 +1,7 @@
 From d0093f5476763f3c031b5b4defaffe3bcf86c6bd Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Fri, 14 Aug 2026 15:27:13 -0300
-Subject: [PATCH 3/3] add scaffolding of TraceNestedFunctionPointerStores, pass
+Subject: [PATCH 3/4] add scaffolding of TraceNestedFunctionPointerStores, pass
  that instruments stores of function pointers in structs nested abritrarily
  many times
 

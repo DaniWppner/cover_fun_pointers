@@ -1,7 +1,7 @@
 From c3e407fa547b8a37a27ee9bf63c06322dc7bcbb1 Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Fri, 14 Aug 2026 13:34:25 -0300
-Subject: [PATCH 2/3] instrument shallow stores of structs containing function
+Subject: [PATCH 2/4] instrument shallow stores of structs containing function
  pointers with coverage callback
 
 ---
