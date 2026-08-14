@@ -1,7 +1,7 @@
-From 697a3d2a03b3ffe30036ad4a46ce34b5a1d8cc68 Mon Sep 17 00:00:00 2001
+From 06693e79804fe73504100ecbe95efb8f1cc66e24 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Fri, 14 Aug 2026 16:01:41 -0300
-Subject: [PATCH 4/4] copy getRecursiveOffsetsFromAllValues implementation from
+Subject: [PATCH 4/5] copy getRecursiveOffsetsFromAllValues implementation from
  old patchset
 
 ---
@@ -9,7 +9,7 @@ Subject: [PATCH 4/4] copy getRecursiveOffsetsFromAllValues implementation from
  1 file changed, 104 insertions(+), 2 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index 320ac1ef1..f526a13ef 100644
+index 320ac1ef1980..f526a13efef6 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -1044,7 +1044,7 @@ void ModuleSanitizerCoverage::InjectTraceForLoadsAndStores(

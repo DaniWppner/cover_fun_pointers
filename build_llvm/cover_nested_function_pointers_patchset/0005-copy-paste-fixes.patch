@@ -1,0 +1,36 @@
+From a0b802fea0a399b0bd26c320ed744aa1a2ee5748 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Fri, 14 Aug 2026 16:06:34 -0300
+Subject: [PATCH 5/5] copy&paste fixes
+
+---
+ llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index f526a13efef6..e36cad45527d 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1305,8 +1305,8 @@ getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+   std::vector<retType> res = {};
+   std::vector<int> positiveResultIdxs = {};
+ 
+-  for (unsigned i = 0; i < possibleStoredValues.size(); i++) {
+-    Type *StoredType = possibleStoredValues[i]->getType();
++  for (unsigned i = 0; i < PossibleStoredValues.size(); i++) {
++    Type *StoredType = PossibleStoredValues[i]->getType();
+     retType partial_res = handleTypeRecursive(StoredType);
+ 
+     if (partial_res.first) {
+@@ -1323,7 +1323,7 @@ getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+     // assume positiveResultIdxs.size() == 1.
+     return std::make_pair(true, res[positiveResultIdxs[0]].second);
+   } else {
+-    return std::make_pair(false, vectorTypesOffsets{});
++    return std::make_pair(false, vectorTypesXOffsets{});
+   }
+ }
+ 
+-- 
+2.43.0
+

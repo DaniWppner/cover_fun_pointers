@@ -1,7 +1,7 @@
-From 89d5b87965c233ad80d6a475bf11e84217ddbf57 Mon Sep 17 00:00:00 2001
+From 8c326a735883291a16ad90826dfed5d3acb00d45 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Thu, 23 Apr 2026 14:50:19 -0300
-Subject: [PATCH 1/4] add pass that instruments naked function pointer stores
+Subject: [PATCH 1/5] add pass that instruments naked function pointer stores
  with coverage callback
 
 ---
@@ -15,7 +15,7 @@ Subject: [PATCH 1/4] add pass that instruments naked function pointer stores
  7 files changed, 168 insertions(+), 30 deletions(-)
 
 diff --git a/clang/include/clang/Basic/CodeGenOptions.def b/clang/include/clang/Basic/CodeGenOptions.def
-index 0da875525..5183e8f2b 100644
+index 0da875525c0c..5183e8f2b7d6 100644
 --- a/clang/include/clang/Basic/CodeGenOptions.def
 +++ b/clang/include/clang/Basic/CodeGenOptions.def
 @@ -273,6 +273,7 @@ CODEGENOPT(SanitizeCoverageNoPrune, 1, 0) ///< Disable coverage pruning.
@@ -27,7 +27,7 @@ index 0da875525..5183e8f2b 100644
  CODEGENOPT(SimplifyLibCalls  , 1, 1) ///< Set when -fbuiltin is enabled.
  CODEGENOPT(SoftFloat         , 1, 0) ///< -soft-float.
 diff --git a/clang/include/clang/Basic/CodeGenOptions.h b/clang/include/clang/Basic/CodeGenOptions.h
-index 128ca2f5d..454596f77 100644
+index 128ca2f5df3c..454596f7728c 100644
 --- a/clang/include/clang/Basic/CodeGenOptions.h
 +++ b/clang/include/clang/Basic/CodeGenOptions.h
 @@ -477,7 +477,8 @@ public:
@@ -41,7 +41,7 @@ index 128ca2f5d..454596f77 100644
  };
  
 diff --git a/clang/include/clang/Driver/Options.td b/clang/include/clang/Driver/Options.td
-index e0d215840..bd6fc178c 100644
+index e0d215840714..bd6fc178c70d 100644
 --- a/clang/include/clang/Driver/Options.td
 +++ b/clang/include/clang/Driver/Options.td
 @@ -5217,6 +5217,10 @@ def fsanitize_coverage_trace_stores
@@ -56,7 +56,7 @@ index e0d215840..bd6fc178c 100644
      : Joined<["-"], "fpatchable-function-entry-offset=">, MetaVarName<"<M>">,
        HelpText<"Generate M NOPs before function entry">,
 diff --git a/clang/lib/CodeGen/BackendUtil.cpp b/clang/lib/CodeGen/BackendUtil.cpp
-index a4d330c0b..e9dd7c718 100644
+index a4d330c0ba93..e9dd7c718d22 100644
 --- a/clang/lib/CodeGen/BackendUtil.cpp
 +++ b/clang/lib/CodeGen/BackendUtil.cpp
 @@ -255,6 +255,7 @@ getSancovOptsFromCGOpts(const CodeGenOptions &CGOpts) {
@@ -68,7 +68,7 @@ index a4d330c0b..e9dd7c718 100644
  }
  
 diff --git a/clang/lib/Driver/SanitizerArgs.cpp b/clang/lib/Driver/SanitizerArgs.cpp
-index 403fac76f..29333f358 100644
+index 403fac76f060..29333f358186 100644
 --- a/clang/lib/Driver/SanitizerArgs.cpp
 +++ b/clang/lib/Driver/SanitizerArgs.cpp
 @@ -94,6 +94,7 @@ enum CoverageFeature {
@@ -117,7 +117,7 @@ index 403fac76f..29333f358 100644
      if (F == 0 && DiagnoseErrors)
        D.Diag(clang::diag::err_drv_unsupported_option_argument)
 diff --git a/llvm/include/llvm/Transforms/Instrumentation.h b/llvm/include/llvm/Transforms/Instrumentation.h
-index a288a3972..50a4d3912 100644
+index a288a3972c3d..50a4d391256c 100644
 --- a/llvm/include/llvm/Transforms/Instrumentation.h
 +++ b/llvm/include/llvm/Transforms/Instrumentation.h
 @@ -171,6 +171,7 @@ struct SanitizerCoverageOptions {
@@ -129,7 +129,7 @@ index a288a3972..50a4d3912 100644
    SanitizerCoverageOptions() = default;
  };
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index d3b60c7ad..d1c7fe74a 100644
+index d3b60c7add34..d1c7fe74a1b4 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -19,6 +19,7 @@
