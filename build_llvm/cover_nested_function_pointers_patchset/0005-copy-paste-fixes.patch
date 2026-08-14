@@ -1,7 +1,7 @@
 From a0b802fea0a399b0bd26c320ed744aa1a2ee5748 Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Fri, 14 Aug 2026 16:06:34 -0300
-Subject: [PATCH 5/5] copy&paste fixes
+Subject: [PATCH 5/6] copy&paste fixes
 
 ---
  llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp | 6 +++---

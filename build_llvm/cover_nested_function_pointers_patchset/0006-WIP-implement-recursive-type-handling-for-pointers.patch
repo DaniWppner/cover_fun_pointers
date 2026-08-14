@@ -1,0 +1,226 @@
+From 709dccb6c9866c006283ca1a19249b076d406fe0 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Fri, 14 Aug 2026 18:21:44 -0300
+Subject: [PATCH 6/6] (WIP): implement recursive type handling for pointers
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 125 +++++++++++-------
+ 1 file changed, 76 insertions(+), 49 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index e36cad45527d..efd0596a07ec 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -51,6 +51,7 @@
+ #include "llvm/Transforms/Instrumentation.h"
+ #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+ #include "llvm/Transforms/Utils/ModuleUtils.h"
++#include <random>
+ #include <utility>
+ 
+ using namespace llvm;
+@@ -1154,8 +1155,7 @@ retType getOffsetsFromShallowStructType(StructType *STy) {
+   return std::make_pair(false, Res);
+ }
+ 
+-retType getOffsetsFromPointerToShallowStructType(StructType *STy) {
+-  retType StructRes = getOffsetsFromShallowStructType(STy);
++retType makePointerToStructResFromStructRes(const retType& StructRes, StructType* STy) {
+   if (StructRes.first) {
+     vectorTypesXOffsets Res;
+     for (TypesXOffsets Item : StructRes.second) {
+@@ -1175,20 +1175,20 @@ retType getOffsetsFromFunctionType(Type *FunctionType) {
+   return std::make_pair(true, Res);
+ }
+ 
++// declared here for recursion purposes.
+ retType handleTypeRecursiveImpl(Type *Ty, Types &Visited);
+ 
+-retType recursivelyHandlePointerType(PointerType *Ty, Types &Visited) {
+-  Type *OrigType = Ty->getPointerElementType();
+-  return handleTypeRecursiveImpl(OrigType, Visited);
+-}
+-
+-retType recursivelyHandleStructType(StructType *OriginalStruct,
+-                                           Types &Visited) {
+-  unsigned NumElements = OriginalStruct->getNumElements();
++retType recursivelyHandleStructType(StructType *STy, Types &Visited) {
++  unsigned NumElements = STy->getNumElements();
+   bool Any = false;
+   vectorTypesXOffsets AllRes = {};
++  Visited.push_back(STy);
++
++  // Revisit this function
++
++  /*
+   for (unsigned i = 0; i < NumElements; i++) {
+-    Type *ElemType = OriginalStruct->getElementType(i);
++    Type *ElemType = STy->getElementType(i);
+ 
+     if (std::find(Visited.begin(), Visited.end(), ElemType) != Visited.end()) {
+       // We have a cyclical data structure
+@@ -1207,7 +1207,7 @@ retType recursivelyHandleStructType(StructType *OriginalStruct,
+       for (unsigned j = 0; j < ThisTypesXOffsets.size(); j++) {
+         Types ThisTypesJ = ThisTypesXOffsets[j].first;
+         Offsets ThisOffsetsJ = ThisTypesXOffsets[j].second;
+-        ThisTypesJ.insert(ThisTypesJ.begin(), OriginalStruct);
++        ThisTypesJ.insert(ThisTypesJ.begin(), STy);
+         ThisOffsetsJ.insert(ThisOffsetsJ.begin(), i);
+         ThisTypesXOffsets[j] = std::make_pair(ThisTypesJ, ThisOffsetsJ);
+       }
+@@ -1216,31 +1216,58 @@ retType recursivelyHandleStructType(StructType *OriginalStruct,
+     }
+   }
+   return std::make_pair(Any, AllRes);
++  */
+ }
+ 
++retType recursivelyHandlePointerType(PointerType *Ty, Types &Visited) {
++  Visited.push_back(Ty);
++  Type *PointeeType = Ty->getPointerElementType();
++  //recursive case
++  if (StructType *STy = dyn_cast<StructType>(PointeeType)){
++    retType StructRes = recursivelyHandleStructType(STy, Visited);
++    return makePointerToStructResFromStructRes(StructRes, STy);
++  }
++  // base cases
++  if (PointeeType->isFunctionTy())
++    // success!
++    return getOffsetsFromFunctionType(PointeeType);
++  if (PointeeType->isIntegerTy())
++    // we cannot get function pointers from a pointer to int. Dead end.
++    return std::make_pair(false, vectorTypesXOffsets{});
++  if (PointeeType->isPointerTy())
++    // We don't handle double/triple/nested pointer types in this implementation.
++    // Double nested pointer types normally represent arrays.
++    // Triple nested pointer types _could_ exist and represent arrays of arrays.
++    // The minimal version of the tool doesn't need to support this to exist.
++    // TODO: handle this.
++    return std::make_pair(false, vectorTypesXOffsets{});
++  if (PointeeType->isArrayTy())
++    // We don't handle this, see above.
++    // TODO: handle this.
++    return std::make_pair(false, vectorTypesXOffsets{});
+ 
+-retType handleTypeRecursiveImpl(Type *Ty, Types &Visited) {
++  // This sould be all the pointer types we expect to encounter.
++  // Let's panic if we encounter anything else.
++  std::string ErrMsg;
++  raw_string_ostream ROS(ErrMsg);
++  ROS << "Unexpected type during function pointer analysis " << *PointeeType << " .\n";
++  report_fatal_error(StringRef(ErrMsg));
++  // unreachable, but makes the compiler complain less
++  return std::make_pair(false, vectorTypesXOffsets{});
++}
+ 
+-  Visited.push_back(Ty);
+ 
+-  if (!(Ty->isPointerTy() || Ty->isStructTy())) {
+-    if (Ty->isFunctionTy()) {
+-      return std::make_pair(
+-          true, vectorTypesXOffsets{std::make_pair(Types{Ty}, Offsets{0})});
+-    } else {
+-      return std::make_pair(false, vectorTypesXOffsets{});
+-    }
+-  }
+-  if (Ty->isPointerTy())
+-    return recursivelyHandlePointerType(dyn_cast<PointerType>(Ty), Visited);
+-  else if (StructType *OriginalStruct = dyn_cast<StructType>(Ty))
++retType handleTypeRecursiveImpl(Type *Ty, Types &Visited) {
++  if (StructType *OriginalStruct = dyn_cast<StructType>(Ty))
++    // recursive: need to look into the struct's fields
+     return recursivelyHandleStructType(OriginalStruct, Visited);
+-  else {
+-    // TODO: handle more types
+-    assert(false && "Unexpected type during function pointer analysis.\n");
+-    // unreachable, but makes the compiler complain less
++
++  if (!Ty->isPointerTy())
++    // not a struct nor a pointer: this is a dead end.
+     return std::make_pair(false, vectorTypesXOffsets{});
+-  }
++
++  //else: assume Pointer
++  return recursivelyHandlePointerType(dyn_cast<PointerType>(Ty), Visited);
+ }
+ 
+ retType handleTypeRecursive(Type *Ty) {
+@@ -1268,17 +1295,18 @@ getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+       continue;
+     // else: assume Pointer
+     Type *PointeeType = StoredType->getPointerElementType();
+-    if (PointeeType->isIntegerTy())
+-      // pointer to int is usually not a type signature we can get function pointers from
+-      continue;
+     if (PointeeType->isFunctionTy()) {
+       // Depth 0: naked function pointer
+       return getOffsetsFromFunctionType(PointeeType);
+     } // else: must be struct
+     if (StructType *STy = dyn_cast<StructType>(PointeeType)) {
+       // Depth 1+: pointer to struct possibly containing function pointers
+-      return getOffsetsFromPointerToShallowStructType(STy);
++      retType StructRes = getOffsetsFromShallowStructType(STy);
++      return makePointerToStructResFromStructRes(StructRes, STy);
+     }
++    if (PointeeType->isIntegerTy())
++      // pointer to int is usually not a type signature we can get function pointers from
++      continue;
+     if (PointeeType->isPointerTy())
+       // we cannot handle double/triple/nested pointer types in this implementation
+       // TODO: handle this in nested version
+@@ -1301,30 +1329,29 @@ getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+ 
+ retType
+ getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+-  int any = 0;
+-  std::vector<retType> res = {};
+-  std::vector<int> positiveResultIdxs = {};
++  int Any = 0;
++  std::vector<retType> Res = {};
++  std::vector<int> PositiveResultIdxs = {};
+ 
+   for (unsigned i = 0; i < PossibleStoredValues.size(); i++) {
+     Type *StoredType = PossibleStoredValues[i]->getType();
+-    retType partial_res = handleTypeRecursive(StoredType);
++    retType PartialRes = handleTypeRecursive(StoredType);
+ 
+-    if (partial_res.first) {
+-      any += 1;
+-      positiveResultIdxs.push_back(i);
++    if (PartialRes.first) {
++      Any += 1;
++      PositiveResultIdxs.push_back(i);
+     }
+-    res.push_back(partial_res);
++    Res.push_back(PartialRes);
+   }
+ 
+   // TO DO: not have this weakness
+-  assert(any <= 1 && "We cannot handle more than one intermeidate value "
++  assert(Any <= 1 && "We cannot handle more than one intermediate value "
+                      "reaching a function pointer");
+-  if (any > 0) {
+-    // assume positiveResultIdxs.size() == 1.
+-    return std::make_pair(true, res[positiveResultIdxs[0]].second);
+-  } else {
+-    return std::make_pair(false, vectorTypesXOffsets{});
++  if (Any > 0) {
++    // assume PositiveResultIdxs.size() == 1.
++    return std::make_pair(true, Res[PositiveResultIdxs[0]].second);
+   }
++  return std::make_pair(false, vectorTypesXOffsets{});
+ }
+ 
+ bool putFunctionArgFuncTypesIntoJson(Function &F, json::Object &RootJson) {
+@@ -1575,7 +1602,7 @@ void ModuleSanitizerCoverage::InjectTraceForNestedFunctionPointerStores(
+     if (StoredValue->getType()->isPointerTy()) {
+       SmallVector<Value *, 8> AllIntermediateValues =
+           getAllValuesThatWouldBeStripped(StoredValue);
+-      retType NestedOffsets; // = obtained by helper function that uses AllIntermediateValues (TO DO);
++      retType NestedOffsets = getRecursiveOffsetsFromAllValues(AllIntermediateValues);
+       if (NestedOffsets.first) {
+         BasicBlock *BlockOfSI = SI->getParent();
+         for (TypesXOffsets Item : NestedOffsets.second) {
+-- 
+2.43.0
+
