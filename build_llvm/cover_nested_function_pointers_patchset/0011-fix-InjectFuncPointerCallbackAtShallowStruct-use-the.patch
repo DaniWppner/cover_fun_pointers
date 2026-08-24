@@ -1,0 +1,119 @@
+From f4d3525ec7f0d23daac522c6965f645adbd1c237 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Mon, 24 Aug 2026 16:19:10 -0300
+Subject: [PATCH 11/13] fix InjectFuncPointerCallbackAtShallowStruct: use the
+ same semantics on retType as getRecursiveOffsetsFromAllValues
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 46 +++++++++++--------
+ 1 file changed, 28 insertions(+), 18 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index c69712a3dcde..beec752da39f 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1149,7 +1149,14 @@ retType getOffsetsFromShallowStructType(StructType *STy) {
+     Type *ElemType = STy->getElementType(j);
+     if (ElemType->isPointerTy() &&
+         ElemType->getPointerElementType()->isFunctionTy()) {
+-      Res.push_back(std::make_pair(Types{ElemType}, Offsets{j}));
++      Type *FTyPointer = ElemType;
++      Type *FTy = ElemType->getPointerElementType();
++      Res.push_back(std::make_pair(
++        // To get from the function pointer to the function address dereference the pointer at index 0.
++        // To get from the base of the struct to the function pointer, index the struct at j.
++        Types{FTy, FTyPointer},
++        Offsets{0, j}
++      ));
+     }
+   }
+   if (!Res.empty()) {
+@@ -1164,6 +1171,7 @@ retType makePointerToStructResFromStructRes(const retType& StructRes, StructType
+     for (TypesXOffsets Item : StructRes.second) {
+       Types ItemTypes = Item.first;
+       Offsets ItemOffsets = Item.second;
++      // To get from the struct pointer to the base of the struct, dereference the pointer at index 0.
+       ItemTypes.push_back(STy);
+       ItemOffsets.push_back(0);
+       Res.push_back(std::make_pair(ItemTypes, ItemOffsets));
+@@ -1174,6 +1182,7 @@ retType makePointerToStructResFromStructRes(const retType& StructRes, StructType
+ }
+ 
+ retType getOffsetsFromFunctionPointerType(Type *FunctionType) {
++  // To get from the function pointer to the function address dereference the pointer at index 0.
+   vectorTypesXOffsets Res = {std::make_pair(Types{FunctionType}, Offsets{0})};
+   return std::make_pair(true, Res);
+ }
+@@ -1294,11 +1303,6 @@ pointer.
+ retType getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+   for (unsigned i = 0; i < PossibleStoredValues.size(); i++) {
+     Type *StoredType = PossibleStoredValues[i]->getType();
+-    // THIS NEVER HAPPENS, CAN DELETE
+-    if (StructType *STy = dyn_cast<StructType>(StoredType)) {
+-      // Depth 1: struct possibly containing function pointers
+-      return getOffsetsFromShallowStructType(STy);
+-    }
+     if (!StoredType->isPointerTy())
+       continue;
+     // else: assume Pointer
+@@ -1438,8 +1442,8 @@ void ModuleSanitizerCoverage::InjectShallowOrNakedFuncPointerCallback(
+      * struct, and load it to get the actual function pointer.
+      */
+     assert(
+-        Target.OffsetChain.size() == 2 &&
+-        "Currently only Offset chain of size 2 (depth 1 structs) is supported");
++        Target.OffsetChain.size() == 3 &&
++        "Currently only Offset chain of size 3 (depth 1 structs) is supported");
+     InjectFuncPointerCallbackAtShallowStruct(Target);
+   }
+ }
+@@ -1480,30 +1484,36 @@ Value *ModuleSanitizerCoverage::InjectStructElemLoad(IRBuilder<> &IRB, Value *St
+   Instruction *ThenInst = SplitBlockAndInsertIfThen(IsNotError, IRB.GetInsertBlock()->getTerminator(), false);
+ 
+   // Populate safeguarded block with the LoadInst
++  IntegerType* GEPInt32Ty = Type::getInt32Ty(StructPointer->getContext());
+   IRB.SetInsertPoint(ThenInst);
+-  Value *ContainedPtrAddress = IRB.CreateInBoundsGEP(
++  Value *ElemAddress = IRB.CreateInBoundsGEP(
+       StructType, StructPointer,
+-      {ConstantInt::get(Type::getInt32Ty(StructPointer->getContext()), 0),
+-       ConstantInt::get(Type::getInt32Ty(StructPointer->getContext()), ElemOffset)});
+-  Value *Elem = IRB.CreateLoad(ElemType, ContainedPtrAddress);
++      {
++        ConstantInt::get(GEPInt32Ty, 0),
++        ConstantInt::get(GEPInt32Ty, ElemOffset)
++      });
++  Value *Elem = IRB.CreateLoad(ElemType, ElemAddress);
+   return Elem;
+ }
+ 
+-void ModuleSanitizerCoverage::InjectFuncPointerCallbackAtShallowStruct(
+-    TraceInstrumentTarget Target) {
++void ModuleSanitizerCoverage::InjectFuncPointerCallbackAtShallowStruct(TraceInstrumentTarget Target) {
+ 
+   Value *StoredValue = Target.SI->getValueOperand()->stripPointerCastsAndAliases();
+   Value *StorePtr = Target.SI->getPointerOperand();
+-  unsigned Offset = Target.OffsetChain[0];
+-  Type *ContainedType = Target.TypeChain[0];
+-  Type *StructType = Target.TypeChain[1];
++  unsigned Offset = Target.OffsetChain[1];
++  Type *FPointerType = Target.TypeChain[1];
++  Type *StructType = Target.TypeChain[2];
++  // Here we assume:
++  //    TypeChain has the form {FType, Pointer to FType, StructType}
++  //    OffsetChain has the form {0, Index in the Struct, 0}
++  //    StoredValue is a a pointer to the base of a StructType.
+ 
+   IRBuilder<> IRB(Target.BB->getTerminator());
+   DebugLoc EntryLoc = Target.SI->getDebugLoc();
+   if (EntryLoc)
+     IRB.SetCurrentDebugLocation(EntryLoc);
+   Value * ShallowStructPointer = castMiscPointerIntoItsStructType(IRB, StoredValue, StructType);
+-  Value * FunctionPtr = InjectStructElemLoad(IRB, ShallowStructPointer, StructType, ContainedType, Offset);
++  Value * FunctionPtr = InjectStructElemLoad(IRB, ShallowStructPointer, StructType, FPointerType, Offset);
+   InjectFuncPointerCallback(StorePtr, FunctionPtr, IRB);
+ }
+ 
+-- 
+2.43.0
+

@@ -1,0 +1,89 @@
+From 7a47986fdba07f03b9be17a4119cbce36934bc51 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Mon, 24 Aug 2026 16:40:21 -0300
+Subject: [PATCH 12/13] generalize InjectStructElemLoad to handle non-pointer
+ offset chains
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 31 ++++++++++++-------
+ 1 file changed, 20 insertions(+), 11 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index beec752da39f..2cdf86ccff0e 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -306,7 +306,7 @@ private:
+                                       IRBuilder<> &Builder);
+   Value *InjectStructElemLoad(IRBuilder<> &IRB, Value *StructPointer,
+                               Type *StructType, Type *ElemType,
+-                              unsigned ElemOffset);
++                              ArrayRef<unsigned> Offsets);
+   void InjectTraceForSwitch(Function &F,
+                             ArrayRef<Instruction *> SwitchTraceTargets);
+   bool InjectCoverage(Function &F, ArrayRef<BasicBlock *> AllBlocks,
+@@ -1464,9 +1464,17 @@ CallInst *ModuleSanitizerCoverage::InjectFuncPointerCallback(
+   return Res;
+ }
+ 
++// Receives a pointer to a Struct, which may be invalid, and a series of offsets.
++// The offsets are used to index into the nested structure of Structs to reach a
++// given element, as long as none of the intermediate elements is a pointer.
++//
++// Returns:
++//    The Value* result of the Load instruction accessing the desired element.
++// Modifies:
++//    IRB; which now points to the BasicBlock on the branch condition of the Struct pointer being valid.
+ Value *ModuleSanitizerCoverage::InjectStructElemLoad(IRBuilder<> &IRB, Value *StructPointer, 
+                                                     Type *StructType, Type *ElemType,
+-                                                    unsigned ElemOffset) {
++                                                    ArrayRef<unsigned> Offsets) {
+   unsigned long LINUX_MAX_ERRNO = 4095;
+ 
+   // The hacky hack here is that NULL=0 and ERR_PTR values live in the
+@@ -1483,15 +1491,16 @@ Value *ModuleSanitizerCoverage::InjectStructElemLoad(IRBuilder<> &IRB, Value *St
+   );
+   Instruction *ThenInst = SplitBlockAndInsertIfThen(IsNotError, IRB.GetInsertBlock()->getTerminator(), false);
+ 
+-  // Populate safeguarded block with the LoadInst
++
++  // Convert the array of offsets into LLVM ConstantInt offsets.
+   IntegerType* GEPInt32Ty = Type::getInt32Ty(StructPointer->getContext());
++  SmallVector<Value*, 8> GEPOffsetChain{Offsets.size(), nullptr};
++  for (unsigned i =0; i< Offsets.size(); i++){
++    GEPOffsetChain[i] = ConstantInt::get(GEPInt32Ty, Offsets[i]);
++  }
++  // Populate the safeguarded block with the LoadInst.
+   IRB.SetInsertPoint(ThenInst);
+-  Value *ElemAddress = IRB.CreateInBoundsGEP(
+-      StructType, StructPointer,
+-      {
+-        ConstantInt::get(GEPInt32Ty, 0),
+-        ConstantInt::get(GEPInt32Ty, ElemOffset)
+-      });
++  Value *ElemAddress = IRB.CreateInBoundsGEP(StructType, StructPointer, GEPOffsetChain);
+   Value *Elem = IRB.CreateLoad(ElemType, ElemAddress);
+   return Elem;
+ }
+@@ -1500,9 +1509,9 @@ void ModuleSanitizerCoverage::InjectFuncPointerCallbackAtShallowStruct(TraceInst
+ 
+   Value *StoredValue = Target.SI->getValueOperand()->stripPointerCastsAndAliases();
+   Value *StorePtr = Target.SI->getPointerOperand();
+-  unsigned Offset = Target.OffsetChain[1];
+   Type *FPointerType = Target.TypeChain[1];
+   Type *StructType = Target.TypeChain[2];
++  unsigned Offset = Target.OffsetChain[1];
+   // Here we assume:
+   //    TypeChain has the form {FType, Pointer to FType, StructType}
+   //    OffsetChain has the form {0, Index in the Struct, 0}
+@@ -1513,7 +1522,7 @@ void ModuleSanitizerCoverage::InjectFuncPointerCallbackAtShallowStruct(TraceInst
+   if (EntryLoc)
+     IRB.SetCurrentDebugLocation(EntryLoc);
+   Value * ShallowStructPointer = castMiscPointerIntoItsStructType(IRB, StoredValue, StructType);
+-  Value * FunctionPtr = InjectStructElemLoad(IRB, ShallowStructPointer, StructType, FPointerType, Offset);
++  Value * FunctionPtr = InjectStructElemLoad(IRB, ShallowStructPointer, StructType, FPointerType, {0,Offset});
+   InjectFuncPointerCallback(StorePtr, FunctionPtr, IRB);
+ }
+ 
+-- 
+2.43.0
+

@@ -1,0 +1,133 @@
+From 84389c6606eb3c2c46de56c55e154526734c5f32 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Fri, 21 Aug 2026 15:41:54 -0300
+Subject: [PATCH 08/13] refactor reusable logic out of
+ InjectFuncPointerCallbackAtShallowStruct
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 72 +++++++++++--------
+ 1 file changed, 43 insertions(+), 29 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 850f6ef937c1..91c37d5d75d8 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -15,6 +15,7 @@
+ #include "llvm/ADT/ArrayRef.h"
+ #include "llvm/ADT/SmallVector.h"
+ #include "llvm/ADT/StringRef.h"
++#include "llvm/ADT/Triple.h"
+ #include "llvm/Analysis/EHPersonalities.h"
+ #include "llvm/Analysis/PostDominators.h"
+ #include "llvm/IR/BasicBlock.h"
+@@ -302,6 +303,9 @@ private:
+   void InjectFuncPointerCallbackAtShallowStruct(TraceInstrumentTarget Target);
+   CallInst *InjectFuncPointerCallback(Value *StorePtr, Value *StoredValue,
+                                       IRBuilder<> &Builder);
++  Value *InjectStructElemLoad(IRBuilder<> &IRB, Value *StructPointer,
++                              Type *StructType, Type *ElemType,
++                              unsigned ElemOffset);
+   void InjectTraceForSwitch(Function &F,
+                             ArrayRef<Instruction *> SwitchTraceTargets);
+   bool InjectCoverage(Function &F, ArrayRef<BasicBlock *> AllBlocks,
+@@ -1392,6 +1396,17 @@ void fillJsonWithFunctionInfo(Function &F, json::Object &DebugDump) {
+   DebugDump["sourceLocation"] = std::move(SourceLocation);
+ }
+ 
++Value *castMiscPointerIntoItsStructType(IRBuilder<> &IRB, Value *StructHoldingPointer, Type *StructType){
++  unsigned AddrSpace = StructHoldingPointer->getType()->getPointerAddressSpace();
++  PointerType *StructPtrTy = PointerType::get(StructType, AddrSpace);
++
++  // This cast should only be necessary because this is the first
++  // ever Value in the nested struct chain. The recursive version
++  // should only do this cast before traversing the offset chain.
++  Value *StructPointer = IRB.CreatePointerCast(StructHoldingPointer, StructPtrTy);
++  return StructPointer;
++}
++
+ } // namespace
+ 
+ void ModuleSanitizerCoverage::InjectFuncPointerCallbackUsingOffsetChain(
+@@ -1442,35 +1457,16 @@ CallInst *ModuleSanitizerCoverage::InjectFuncPointerCallback(
+   return Res;
+ }
+ 
+-void ModuleSanitizerCoverage::InjectFuncPointerCallbackAtShallowStruct(
+-    TraceInstrumentTarget Target) {
++Value *ModuleSanitizerCoverage::InjectStructElemLoad(IRBuilder<> &IRB, Value *StructPointer, 
++                                                    Type *StructType, Type *ElemType,
++                                                    unsigned ElemOffset) {
+   unsigned long LINUX_MAX_ERRNO = 4095;
+ 
+-  Value *StoredValue = Target.SI->getValueOperand()->stripPointerCastsAndAliases();
+-  Value *StorePtr = Target.SI->getPointerOperand();
+-  unsigned Offset = Target.OffsetChain[0];
+-  Type *ContainedType = Target.TypeChain[0];
+-  Type *StructType = Target.TypeChain[1];
+-
+-  Instruction *Terminator = Target.BB->getTerminator();
+-  IRBuilder<> IRB(Terminator);
+-  DebugLoc EntryLoc = Target.SI->getDebugLoc();
+-  if (EntryLoc)
+-    IRB.SetCurrentDebugLocation(EntryLoc);
+-
+-  unsigned AddrSpace = StoredValue->getType()->getPointerAddressSpace();
+-  PointerType *StructPtrTy = PointerType::get(StructType, AddrSpace);
+-
+-  // This cast should only be necessary because this is the first
+-  // ever Value in the nested struct chain. The recursive version
+-  // should only do this cast before traversing the offset chain.
+-  StoredValue = IRB.CreatePointerCast(StoredValue, StructPtrTy);
+-
+   // The hacky hack here is that NULL=0 and ERR_PTR values live in the
+   // [max(unsigned long)-MAX_ERRNO, max(unsigned long)] space.
+   // So if BasePointer is NULL and we let it underflow, we get something in
+   // [max(unsigned long)-MAX_ERRNO-1, max(unsigned long)] for both NULL and ERR_PTR.
+-  Value *BasePointer = IRB.CreatePtrToInt(StoredValue, IntptrTy);
++  Value *BasePointer = IRB.CreatePtrToInt(StructPointer, IntptrTy);
+   Value *PossibleErrorPtr = IRB.CreateSub(BasePointer, ConstantInt::get(IntptrTy, 1));
+   Value *IsNotError = IRB.CreateICmpULT(
+     PossibleErrorPtr,
+@@ -1478,15 +1474,33 @@ void ModuleSanitizerCoverage::InjectFuncPointerCallbackAtShallowStruct(
+       APInt::getMaxValue(IntptrTy->getIntegerBitWidth()) - (LINUX_MAX_ERRNO + 1)
+     )
+   );
+-  Instruction *ThenInst = SplitBlockAndInsertIfThen(IsNotError, Target.BB->getTerminator(), false);
++  Instruction *ThenInst = SplitBlockAndInsertIfThen(IsNotError, IRB.GetInsertBlock()->getTerminator(), false);
+ 
+-  // Populate safeguarded block with the callback
++  // Populate safeguarded block with the LoadInst
+   IRB.SetInsertPoint(ThenInst);
+   Value *ContainedPtrAddress = IRB.CreateInBoundsGEP(
+-      StructType, StoredValue,
+-      {ConstantInt::get(Type::getInt32Ty(StoredValue->getContext()), 0),
+-       ConstantInt::get(Type::getInt32Ty(StoredValue->getContext()), Offset)});
+-  Value *FunctionPtr = IRB.CreateLoad(ContainedType, ContainedPtrAddress);
++      StructType, StructPointer,
++      {ConstantInt::get(Type::getInt32Ty(StructPointer->getContext()), 0),
++       ConstantInt::get(Type::getInt32Ty(StructPointer->getContext()), ElemOffset)});
++  Value *ElemPtr = IRB.CreateLoad(ElemType, ContainedPtrAddress);
++  return ElemPtr;
++}
++
++void ModuleSanitizerCoverage::InjectFuncPointerCallbackAtShallowStruct(
++    TraceInstrumentTarget Target) {
++
++  Value *StoredValue = Target.SI->getValueOperand()->stripPointerCastsAndAliases();
++  Value *StorePtr = Target.SI->getPointerOperand();
++  unsigned Offset = Target.OffsetChain[0];
++  Type *ContainedType = Target.TypeChain[0];
++  Type *StructType = Target.TypeChain[1];
++
++  IRBuilder<> IRB(Target.BB->getTerminator());
++  DebugLoc EntryLoc = Target.SI->getDebugLoc();
++  if (EntryLoc)
++    IRB.SetCurrentDebugLocation(EntryLoc);
++  Value * ShallowStructPointer = castMiscPointerIntoItsStructType(IRB, StoredValue, StructType);
++  Value * FunctionPtr = InjectStructElemLoad(IRB, ShallowStructPointer, StructType, ContainedType, Offset);
+   InjectFuncPointerCallback(StorePtr, FunctionPtr, IRB);
+ }
+ 
+-- 
+2.43.0
+

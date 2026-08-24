@@ -1,8 +1,8 @@
 From e8e0bec7ccc979f4a639e392b17d7889c344369e Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Fri, 14 Aug 2026 13:34:25 -0300
-Subject: [PATCH 2/6] instrument shallow stores of structs containing function
- pointers with coverage callback
+Subject: [PATCH 02/13] instrument shallow stores of structs containing
+ function pointers with coverage callback
 
 ---
  clang/include/clang/Basic/CodeGenOptions.def  |   3 +-

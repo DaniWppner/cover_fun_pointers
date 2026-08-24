@@ -1,9 +1,9 @@
 From 9b24045f4f6c958417371d01c649aaa52fab7542 Mon Sep 17 00:00:00 2001
 From: daniel wappner <dwappner@dc.uba.ar>
 Date: Fri, 14 Aug 2026 15:27:13 -0300
-Subject: [PATCH 3/6] add scaffolding of TraceNestedFunctionPointerStores, pass
- that instruments stores of function pointers in structs nested abritrarily
- many times
+Subject: [PATCH 03/13] add scaffolding of TraceNestedFunctionPointerStores,
+ pass that instruments stores of function pointers in structs nested
+ abritrarily many times
 
 ---
  clang/include/clang/Basic/CodeGenOptions.def  |  1 +

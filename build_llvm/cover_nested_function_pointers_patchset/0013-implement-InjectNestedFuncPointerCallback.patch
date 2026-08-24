@@ -1,0 +1,90 @@
+From 0ea079c6c6a38a8b2b6592e93bf72228c312711a Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Mon, 24 Aug 2026 17:46:35 -0300
+Subject: [PATCH 13/13] implement InjectNestedFuncPointerCallback
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 51 ++++++++++++++++---
+ 1 file changed, 44 insertions(+), 7 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 2cdf86ccff0e..873a610e6e21 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -16,6 +16,7 @@
+ #include "llvm/ADT/SmallVector.h"
+ #include "llvm/ADT/StringRef.h"
+ #include "llvm/ADT/Triple.h"
++#include "llvm/ADT/iterator_range.h"
+ #include "llvm/Analysis/EHPersonalities.h"
+ #include "llvm/Analysis/PostDominators.h"
+ #include "llvm/IR/BasicBlock.h"
+@@ -1545,14 +1546,50 @@ void ModuleSanitizerCoverage::InjectFuncPointerTracesAtBlocks(
+ 
+ 
+ void ModuleSanitizerCoverage::InjectNestedFuncPointerCallback(TraceInstrumentTarget Target) {
+-  unsigned i;
+-  // iterate through all entries in the chain except the last one
+-  for(i = Target.TypeChain.size() - 1; i--; i>0){
+-    Type *NextType = Target.TypeChain[i];
+-    unsigned NextOffset = Target.OffsetChain[i];
++  IRBuilder<> IRB(Target.BB->getTerminator());
++
++  Types::reverse_iterator itTy = Target.TypeChain.rbegin();
++  Offsets::reverse_iterator itOff = Target.OffsetChain.rbegin();
++  Offsets::reverse_iterator beginOff = itOff;
++
++  Type *CurrPointeeType = *itTy;
++  Value *CurrBasePointer = Target.SI->getValueOperand();
++
++  // The first type in the TypeChain won't be a pointer.
++  // Instead, we know that StoredValue is the initial Pointer.
++  // But we need to find the first pointer in the TypeChain that requires a Load.
++  while (itTy != Target.TypeChain.rend()){
++
++    if ((*itTy)->isPointerTy()){
++    // itTy is pointer to Function (end of chain) OR pointer to Struct.
++    // beginOff ... itOff is the sequence of offsets to reach the pointer.
++      Offsets OffsToELem(beginOff, next(itOff));
++      CurrBasePointer = InjectStructElemLoad(IRB, CurrBasePointer, CurrPointeeType, *itTy, OffsToELem);
++
++      CurrPointeeType = *(next(itTy));
++      beginOff = next(itOff);
++      if (CurrPointeeType->isFunctionTy())
++        // we should've reached the end of the type chain
++        assert(next(itTy) == Target.TypeChain.rend() && "Function pointers should appear only at end of Type Chain");
++      else
++        assert(CurrPointeeType->isStructTy() && "Every InjectStructElemLoad step should get to either a Struct or Function Type");
++    }
++
++    itTy = next(itTy);
++    itOff = next(itOff);
++  }
++
++  if(!CurrPointeeType->isFunctionTy() ||
++     !CurrBasePointer->getType()->getPointerElementType()->isFunctionTy()){
++    // We should get to a pointer to a function at the end of the loop.
++    // Let's panic if we get anything else.
++    std::string ErrMsg;
++    raw_string_ostream ROS(ErrMsg);
++    ROS << "Unexpected type at the end of TypeChain iteration:" << *CurrPointeeType << "\n" << *CurrBasePointer->getType() <<"\n";
++    report_fatal_error(StringRef(ErrMsg));
+   }
+-  assert(Target.TypeChain[i]->isFunctionTy() && "The end of the type chain should lead to a function pointer");
+ 
++  InjectFuncPointerCallback(Target.SI->getPointerOperand(), CurrBasePointer, IRB);
+ }
+ 
+ // On every store to a function pointer variable call we call a run-time
+@@ -1638,7 +1675,7 @@ void ModuleSanitizerCoverage::InjectTraceForNestedFunctionPointerStores(
+   fillJsonWithFunctionInfo(F, DebugDump); //TO DO: check that this is still relevant for this function?
+   bool HaveFuncPointerTypeArgs = putFunctionArgFuncTypesIntoJson(F, DebugDump); //TO DO: probably delete?
+ 
+-  unsigned InstrumentedCount = 0;
++  unsigned InstrumentedCount = 0; //TO DO: check where this variable should be used?
+   SmallVector<TraceInstrumentTarget, 8> TargetsToInstrument{};
+   for (StoreInst *SI : Stores) {
+     Value *StoredValue = SI->getValueOperand();
+-- 
+2.43.0
+

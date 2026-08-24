@@ -1,0 +1,228 @@
+From 7b94e97f3e9f87dd072a741e98eb0adbc977328d Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Mon, 24 Aug 2026 15:47:44 -0300
+Subject: [PATCH 10/13] fix getRecursiveOffsetsFromAllValues: every step of the
+ typechain now tells you how to get to the NEXT type
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 86 +++++++++++--------
+ 1 file changed, 52 insertions(+), 34 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 85d04a27c4eb..c69712a3dcde 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -52,6 +52,7 @@
+ #include "llvm/Transforms/Instrumentation.h"
+ #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+ #include "llvm/Transforms/Utils/ModuleUtils.h"
++#include <cassert>
+ #include <random>
+ #include <utility>
+ 
+@@ -192,7 +193,7 @@ typedef std::vector<Type *> Types;
+ typedef std::vector<unsigned> Offsets;
+ // TypesXOffsets represents the flattened path from Type `a` to a Type `b`
+ //  that can be reached through the nested Type structure `a`.
+-//  (Type `a` is the last element in the Types array. Type `b` is the first.)
++//  Type `a` is the last element in the Types array. Type `b` is the first.
+ //  For a given n: int, The last n elements in the Offsets array from back
+ //  to front are the indexes used to traverse the nested Type structure `a`
+ //  and reach the nth reachable Type in the Type array.
+@@ -299,6 +300,7 @@ private:
+       json::Object &DebugDump, json::Array &StoreInstInfoArray,
+       unsigned InstrumentedCount, bool HaveFuncPointerArgTypes);
+   void InjectShallowOrNakedFuncPointerCallback(TraceInstrumentTarget Target);
++  void InjectNestedFuncPointerCallback(TraceInstrumentTarget Target);
+   void InjectFuncPointerCallbackAtShallowStruct(TraceInstrumentTarget Target);
+   CallInst *InjectFuncPointerCallback(Value *StorePtr, Value *StoredValue,
+                                       IRBuilder<> &Builder);
+@@ -1171,7 +1173,7 @@ retType makePointerToStructResFromStructRes(const retType& StructRes, StructType
+   return std::make_pair(false, vectorTypesXOffsets{});
+ }
+ 
+-retType getOffsetsFromFunctionType(Type *FunctionType) {
++retType getOffsetsFromFunctionPointerType(Type *FunctionType) {
+   vectorTypesXOffsets Res = {std::make_pair(Types{FunctionType}, Offsets{0})};
+   return std::make_pair(true, Res);
+ }
+@@ -1179,9 +1181,7 @@ retType getOffsetsFromFunctionType(Type *FunctionType) {
+ // declared here for recursion purposes.
+ retType handleTypeRecursiveImpl(Type *Ty, Types &Visited);
+ 
+-retType recursivelyHandleStructType(StructType *STy, Types &Visited) {
+-  Visited.push_back(STy);
+-
++retType recursivelyHandleStructType(StructType *STy, Types &Visiting) {
+   bool Any = false;
+   vectorTypesXOffsets AllRes = {};
+   unsigned NumElements = STy->getNumElements();
+@@ -1189,12 +1189,12 @@ retType recursivelyHandleStructType(StructType *STy, Types &Visited) {
+   for (unsigned i = 0; i < NumElements; i++) {
+     Type *ElemType = STy->getElementType(i);
+ 
+-    if (std::find(Visited.begin(), Visited.end(), ElemType) != Visited.end()) {
++    if (std::find(Visiting.begin(), Visiting.end(), ElemType) != Visiting.end()) {
+       // We have a cyclical data structure
+       continue;
+     }
+ 
+-    retType ResPos = handleTypeRecursiveImpl(ElemType, Visited);
++    retType ResPos = handleTypeRecursiveImpl(ElemType, Visiting);
+     Any = Any || ResPos.first;
+     vectorTypesXOffsets ElemTypesXOffsets = ResPos.second;
+     if (ResPos.first) {
+@@ -1209,7 +1209,7 @@ retType recursivelyHandleStructType(StructType *STy, Types &Visited) {
+         // TypesToFuncPointer and OffsetsToFuncPointer hold the information on how
+         // to get from ElemType to a function pointer, as per the TypesXOffsets convention.
+         // We add one more step at the end: how to get from STy to ElemType.
+-        TypesToFuncPointer.push_back(STy);
++        TypesToFuncPointer.push_back(ElemType);
+         OffsetsToFuncPointer.push_back(i);
+         ElemTypesXOffsets[j] = std::make_pair(TypesToFuncPointer, OffsetsToFuncPointer);
+       }
+@@ -1222,18 +1222,17 @@ retType recursivelyHandleStructType(StructType *STy, Types &Visited) {
+   return std::make_pair(Any, AllRes);
+ }
+ 
+-retType recursivelyHandlePointerType(PointerType *Ty, Types &Visited) {
+-  Visited.push_back(Ty);
++retType recursivelyHandlePointerType(PointerType *Ty, Types &Visiting) {
+   Type *PointeeType = Ty->getPointerElementType();
+   //recursive case
+   if (StructType *STy = dyn_cast<StructType>(PointeeType)){
+-    retType StructRes = recursivelyHandleStructType(STy, Visited);
++    retType StructRes = handleTypeRecursiveImpl(STy, Visiting);
+     return makePointerToStructResFromStructRes(StructRes, STy);
+   }
+   // base cases
+   if (PointeeType->isFunctionTy())
+     // success!
+-    return getOffsetsFromFunctionType(PointeeType);
++    return getOffsetsFromFunctionPointerType(PointeeType);
+   if (PointeeType->isIntegerTy())
+     // we cannot get function pointers from a pointer to int. Dead end.
+     return std::make_pair(false, vectorTypesXOffsets{});
+@@ -1260,17 +1259,23 @@ retType recursivelyHandlePointerType(PointerType *Ty, Types &Visited) {
+ }
+ 
+ 
+-retType handleTypeRecursiveImpl(Type *Ty, Types &Visited) {
++retType handleTypeRecursiveImpl(Type *Ty, Types &Visiting) {
++  Visiting.push_back(Ty);
++  retType Result;
+   if (StructType *OriginalStruct = dyn_cast<StructType>(Ty))
+     // recursive: need to look into the struct's fields
+-    return recursivelyHandleStructType(OriginalStruct, Visited);
++    Result = recursivelyHandleStructType(OriginalStruct, Visiting);
+ 
+-  if (!Ty->isPointerTy())
++  else if (!Ty->isPointerTy())
+     // not a struct nor a pointer: this is a dead end.
+-    return std::make_pair(false, vectorTypesXOffsets{});
++    Result = std::make_pair(false, vectorTypesXOffsets{});
++
++  else
++    // assume pointer
++    Result = recursivelyHandlePointerType(dyn_cast<PointerType>(Ty), Visiting);
+ 
+-  //else: assume Pointer
+-  return recursivelyHandlePointerType(dyn_cast<PointerType>(Ty), Visited);
++  Visiting.pop_back();
++  return Result;
+ }
+ 
+ retType handleTypeRecursive(Type *Ty) {
+@@ -1286,10 +1291,10 @@ offsets
+   - vector: pairs of struct types and offset chains used to access each function
+ pointer.
+ */
+-retType
+-getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
++retType getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+   for (unsigned i = 0; i < PossibleStoredValues.size(); i++) {
+     Type *StoredType = PossibleStoredValues[i]->getType();
++    // THIS NEVER HAPPENS, CAN DELETE
+     if (StructType *STy = dyn_cast<StructType>(StoredType)) {
+       // Depth 1: struct possibly containing function pointers
+       return getOffsetsFromShallowStructType(STy);
+@@ -1300,7 +1305,7 @@ getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+     Type *PointeeType = StoredType->getPointerElementType();
+     if (PointeeType->isFunctionTy()) {
+       // Depth 0: naked function pointer
+-      return getOffsetsFromFunctionType(PointeeType);
++      return getOffsetsFromFunctionPointerType(PointeeType);
+     } // else: must be struct
+     if (StructType *STy = dyn_cast<StructType>(PointeeType)) {
+       // Depth 1+: pointer to struct possibly containing function pointers
+@@ -1330,8 +1335,7 @@ getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+   return std::make_pair(false, vectorTypesXOffsets{});
+ }
+ 
+-retType
+-getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
++retType getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
+   int Any = 0;
+   std::vector<retType> Res = {};
+   std::vector<int> PositiveResultIdxs = {};
+@@ -1481,8 +1485,8 @@ Value *ModuleSanitizerCoverage::InjectStructElemLoad(IRBuilder<> &IRB, Value *St
+       StructType, StructPointer,
+       {ConstantInt::get(Type::getInt32Ty(StructPointer->getContext()), 0),
+        ConstantInt::get(Type::getInt32Ty(StructPointer->getContext()), ElemOffset)});
+-  Value *ElemPtr = IRB.CreateLoad(ElemType, ContainedPtrAddress);
+-  return ElemPtr;
++  Value *Elem = IRB.CreateLoad(ElemType, ContainedPtrAddress);
++  return Elem;
+ }
+ 
+ void ModuleSanitizerCoverage::InjectFuncPointerCallbackAtShallowStruct(
+@@ -1520,6 +1524,18 @@ void ModuleSanitizerCoverage::InjectFuncPointerTracesAtBlocks(
+   }
+ }
+ 
++
++void ModuleSanitizerCoverage::InjectNestedFuncPointerCallback(TraceInstrumentTarget Target) {
++  unsigned i;
++  // iterate through all entries in the chain except the last one
++  for(i = Target.TypeChain.size() - 1; i--; i>0){
++    Type *NextType = Target.TypeChain[i];
++    unsigned NextOffset = Target.OffsetChain[i];
++  }
++  assert(Target.TypeChain[i]->isFunctionTy() && "The end of the type chain should lead to a function pointer");
++
++}
++
+ // On every store to a function pointer variable call we call a run-time
+ // function __sanitizer_cov_store_fun_pointer* with two parameters:
+ //   - address of the variable,
+@@ -1624,16 +1640,18 @@ void ModuleSanitizerCoverage::InjectTraceForNestedFunctionPointerStores(
+     }
+   }
+ 
+-  /* 
+-   * TO DO: implement this function, check its arguments. 
+-   * Revisit what portion can be reused between this
+-   * and injecTraceForShallowFunctionPointerStores 's implementation.
+-   */
++  // TODO: Implement this function
++  for (TraceInstrumentTarget Item : TargetsToInstrument) {
++    InjectNestedFuncPointerCallback(Item);
++  }
+ 
+-   // InjectFuncPointerTracesNavigatingRecursiveTypesXOffsets(
+-   // TargetsToInstrument, DebugDump,
+-   // StoreInstInfoArray, InstrumentedCount,
+-   // HaveFuncPointerTypeArgs);
++  DebugDump["InstrumentedStores"] = std::move(StoreInstInfoArray);
++  if (!TargetsToInstrument.empty()) {
++    json::Value FinalJson = std::move(DebugDump);
++    std::error_code EC;
++    raw_fd_ostream JSONOut("/tmp/nested_pointer_coverage.json", EC, sys::fs::OF_Append);
++    JSONOut << llvm::formatv("{0:2}", FinalJson) << ",\n";
++  }
+ 
+ }
+ 
+-- 
+2.43.0
+

@@ -1,0 +1,92 @@
+From dcf84dfaf4a573b240870b54a4ca98532d53b708 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Fri, 21 Aug 2026 13:58:35 -0300
+Subject: [PATCH 07/13] (WIP): implement recursive type handling for structs
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 46 +++++++++----------
+ 1 file changed, 23 insertions(+), 23 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index efd0596a07ec..850f6ef937c1 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -196,10 +196,8 @@ typedef std::vector<unsigned> Offsets;
+ //  to front are the indexes used to traverse the nested Type structure `a`
+ //  and reach the nth reachable Type in the Type array.
+ typedef std::pair<Types, Offsets> TypesXOffsets;
+-// vectorTypesXOffsets represents a vector of all the reachable interesting
+-// types,
+-//  where each reachable interesting type has its corresponding TypesXOffsets
+-//  entry
++// vectorTypesXOffsets represents a vector of all the reachable interesting types,
++// where each reachable interesting type has its corresponding TypesXOffsets entry
+ typedef std::vector<TypesXOffsets> vectorTypesXOffsets;
+ // retType represents whether a function pointer is reachable from a father
+ // type, and the vectorTypesXOffsets to all reachable function pointers.
+@@ -1179,14 +1177,12 @@ retType getOffsetsFromFunctionType(Type *FunctionType) {
+ retType handleTypeRecursiveImpl(Type *Ty, Types &Visited);
+ 
+ retType recursivelyHandleStructType(StructType *STy, Types &Visited) {
+-  unsigned NumElements = STy->getNumElements();
+-  bool Any = false;
+-  vectorTypesXOffsets AllRes = {};
+   Visited.push_back(STy);
+ 
+-  // Revisit this function
++  bool Any = false;
++  vectorTypesXOffsets AllRes = {};
++  unsigned NumElements = STy->getNumElements();
+ 
+-  /*
+   for (unsigned i = 0; i < NumElements; i++) {
+     Type *ElemType = STy->getElementType(i);
+ 
+@@ -1197,26 +1193,30 @@ retType recursivelyHandleStructType(StructType *STy, Types &Visited) {
+ 
+     retType ResPos = handleTypeRecursiveImpl(ElemType, Visited);
+     Any = Any || ResPos.first;
+-    vectorTypesXOffsets ThisTypesXOffsets = ResPos.second;
++    vectorTypesXOffsets ElemTypesXOffsets = ResPos.second;
+     if (ResPos.first) {
+-      if (ThisTypesXOffsets.size() == 0) {
+-        assert(false && "If the contained type can be stripped to a function "
+-                        "pointer the offset list should not be empty anymore");
+-        // this_types_offsets.push_back(std::make_pair(Types{}, Offsets{}));
++      if (ElemTypesXOffsets.size() == 0) {
++        report_fatal_error(
++          "Recursive struct element reports a function pointer being "
++          "reachable, yet the arry of types and offsets is empty.");
+       }
+-      for (unsigned j = 0; j < ThisTypesXOffsets.size(); j++) {
+-        Types ThisTypesJ = ThisTypesXOffsets[j].first;
+-        Offsets ThisOffsetsJ = ThisTypesXOffsets[j].second;
+-        ThisTypesJ.insert(ThisTypesJ.begin(), STy);
+-        ThisOffsetsJ.insert(ThisOffsetsJ.begin(), i);
+-        ThisTypesXOffsets[j] = std::make_pair(ThisTypesJ, ThisOffsetsJ);
++      for (unsigned j = 0; j < ElemTypesXOffsets.size(); j++) {
++        Types TypesToFuncPointer = ElemTypesXOffsets[j].first;
++        Offsets OffsetsToFuncPointer = ElemTypesXOffsets[j].second;
++        // TypesToFuncPointer and OffsetsToFuncPointer hold the information on how
++        // to get from ElemType to a function pointer, as per the TypesXOffsets convention.
++        // We add one more step at the end: how to get from STy to ElemType.
++        TypesToFuncPointer.push_back(STy);
++        OffsetsToFuncPointer.push_back(i);
++        ElemTypesXOffsets[j] = std::make_pair(TypesToFuncPointer, OffsetsToFuncPointer);
+       }
+-      AllRes.insert(AllRes.end(), ThisTypesXOffsets.begin(),
+-                            ThisTypesXOffsets.end());
++      // put the elements of the modified ElemType array
++      // into the array for the struct type.
++      AllRes.insert(AllRes.end(), ElemTypesXOffsets.begin(),
++                            ElemTypesXOffsets.end());
+     }
+   }
+   return std::make_pair(Any, AllRes);
+-  */
+ }
+ 
+ retType recursivelyHandlePointerType(PointerType *Ty, Types &Visited) {
+-- 
+2.43.0
+

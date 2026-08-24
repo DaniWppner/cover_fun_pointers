@@ -1,0 +1,58 @@
+From 6b111ef4d9e1d0217e3b6de26e8767771748f02c Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Fri, 21 Aug 2026 15:45:40 -0300
+Subject: [PATCH 09/13] remove unnecessary wrapper function
+
+---
+ .../Transforms/Instrumentation/SanitizerCoverage.cpp | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 91c37d5d75d8..85d04a27c4eb 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -294,12 +294,11 @@ private:
+       Function &F, ArrayRef<StoreInst *> InterestingStores);
+   void InjectTraceForNestedFunctionPointerStores(
+       Function &F, ArrayRef<StoreInst *> InterestingStores);
+-  void InjectFuncPointerTraceAtBlock(TraceInstrumentTarget Target);
+   void InjectFuncPointerTracesAtBlocks(
+       ArrayRef<TraceInstrumentTarget> BlocksToInstrument,
+       json::Object &DebugDump, json::Array &StoreInstInfoArray,
+       unsigned InstrumentedCount, bool HaveFuncPointerArgTypes);
+-  void InjectFuncPointerCallbackUsingOffsetChain(TraceInstrumentTarget Target);
++  void InjectShallowOrNakedFuncPointerCallback(TraceInstrumentTarget Target);
+   void InjectFuncPointerCallbackAtShallowStruct(TraceInstrumentTarget Target);
+   CallInst *InjectFuncPointerCallback(Value *StorePtr, Value *StoredValue,
+                                       IRBuilder<> &Builder);
+@@ -1409,7 +1408,7 @@ Value *castMiscPointerIntoItsStructType(IRBuilder<> &IRB, Value *StructHoldingPo
+ 
+ } // namespace
+ 
+-void ModuleSanitizerCoverage::InjectFuncPointerCallbackUsingOffsetChain(
++void ModuleSanitizerCoverage::InjectShallowOrNakedFuncPointerCallback(
+     TraceInstrumentTarget Target) {
+ 
+   if (Target.OffsetChain.size() == 1) {
+@@ -1504,17 +1503,12 @@ void ModuleSanitizerCoverage::InjectFuncPointerCallbackAtShallowStruct(
+   InjectFuncPointerCallback(StorePtr, FunctionPtr, IRB);
+ }
+ 
+-void ModuleSanitizerCoverage::InjectFuncPointerTraceAtBlock(
+-    TraceInstrumentTarget Target) {
+-  InjectFuncPointerCallbackUsingOffsetChain(Target);
+-}
+-
+ void ModuleSanitizerCoverage::InjectFuncPointerTracesAtBlocks(
+     ArrayRef<TraceInstrumentTarget> TargetsToInstrument,
+     json::Object &DebugDump, json::Array &StoreInstInfoArray,
+     unsigned InstrumentedCount, bool HaveFuncPointerArgTypes) {
+   for (TraceInstrumentTarget Item : TargetsToInstrument) {
+-    InjectFuncPointerTraceAtBlock(Item);
++    InjectShallowOrNakedFuncPointerCallback(Item);
+   }
+ 
+   DebugDump["InstrumentedStores"] = std::move(StoreInstInfoArray);
+-- 
+2.43.0
+
