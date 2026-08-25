@@ -1,7 +1,7 @@
 From 6b111ef4d9e1d0217e3b6de26e8767771748f02c Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Fri, 21 Aug 2026 15:45:40 -0300
-Subject: [PATCH 09/13] remove unnecessary wrapper function
+Subject: [PATCH 09/14] remove unnecessary wrapper function
 
 ---
  .../Transforms/Instrumentation/SanitizerCoverage.cpp | 12 +++---------

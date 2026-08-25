@@ -1,7 +1,7 @@
 From 7a47986fdba07f03b9be17a4119cbce36934bc51 Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Mon, 24 Aug 2026 16:40:21 -0300
-Subject: [PATCH 12/13] generalize InjectStructElemLoad to handle non-pointer
+Subject: [PATCH 12/14] generalize InjectStructElemLoad to handle non-pointer
  offset chains
 
 ---

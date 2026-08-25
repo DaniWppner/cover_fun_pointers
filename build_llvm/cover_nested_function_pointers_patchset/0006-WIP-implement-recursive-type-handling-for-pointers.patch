@@ -1,7 +1,7 @@
 From 709dccb6c9866c006283ca1a19249b076d406fe0 Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Fri, 14 Aug 2026 18:21:44 -0300
-Subject: [PATCH 06/13] (WIP): implement recursive type handling for pointers
+Subject: [PATCH 06/14] (WIP): implement recursive type handling for pointers
 
 ---
  .../Instrumentation/SanitizerCoverage.cpp     | 125 +++++++++++-------

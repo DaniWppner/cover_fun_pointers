@@ -1,0 +1,265 @@
+From 18ba400fd17d58cb038812c57cb658bde7175006 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Tue, 25 Aug 2026 15:13:16 -0300
+Subject: [PATCH 14/14] cache intermediate results in handleTypeRecursiveImpl
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 101 +++++++++++++-----
+ 1 file changed, 72 insertions(+), 29 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 873a610e6e21..bcca559d46ae 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -13,6 +13,8 @@
+ #include "llvm/Transforms/Instrumentation/SanitizerCoverage.h"
+ #include "llvm/ADT/APInt.h"
+ #include "llvm/ADT/ArrayRef.h"
++#include "llvm/ADT/DenseMap.h"
++#include "llvm/ADT/DenseMapInfo.h"
+ #include "llvm/ADT/SmallVector.h"
+ #include "llvm/ADT/StringRef.h"
+ #include "llvm/ADT/Triple.h"
+@@ -290,12 +292,13 @@ private:
+                          ArrayRef<GetElementPtrInst *> GepTraceTargets);
+   void InjectTraceForLoadsAndStores(Function &F, ArrayRef<LoadInst *> Loads,
+                                     ArrayRef<StoreInst *> Stores);
+-  void InjectTraceForNakedFunctionPointerStores(
+-      Function &F, ArrayRef<StoreInst *> InterestingStores);
+-  void InjectTraceForShallowFunctionPointerStores(
+-      Function &F, ArrayRef<StoreInst *> InterestingStores);
+-  void InjectTraceForNestedFunctionPointerStores(
+-      Function &F, ArrayRef<StoreInst *> InterestingStores);
++  void InjectTraceForNakedFunctionPointerStores(Function &F,
++                                                ArrayRef<StoreInst *> InterestingStores);
++  void InjectTraceForShallowFunctionPointerStores(Function &F,
++                                                  ArrayRef<StoreInst *> InterestingStores);
++  void InjectTraceForNestedFunctionPointerStores(Function &F,
++                                                 ArrayRef<StoreInst *> InterestingStores,
++                                                 DenseMap<Type*, retType> &RetTypeCache);
+   void InjectFuncPointerTracesAtBlocks(
+       ArrayRef<TraceInstrumentTarget> BlocksToInstrument,
+       json::Object &DebugDump, json::Array &StoreInstInfoArray,
+@@ -766,7 +769,8 @@ void ModuleSanitizerCoverage::instrumentFunction(
+   SmallVector<StoreInst *, 8> Stores;
+   SmallVector<StoreInst *, 8> NakedFunctionPointerStores;
+   SmallVector<StoreInst *, 8> ShallowFunctionPointerStores;
+-  SmallVector<StoreInst *, 8> NestedFunctionPointerStores;  
++  SmallVector<StoreInst *, 8> NestedFunctionPointerStores;
++  DenseMap<Type*, retType> RetTypeCache;
+ 
+   const DominatorTree *DT = DTCallback(F);
+   const PostDominatorTree *PDT = PDTCallback(F);
+@@ -827,7 +831,7 @@ void ModuleSanitizerCoverage::instrumentFunction(
+   InjectTraceForLoadsAndStores(F, Loads, Stores);
+   InjectTraceForNakedFunctionPointerStores(F, NakedFunctionPointerStores);
+   InjectTraceForShallowFunctionPointerStores(F, ShallowFunctionPointerStores);
+-  InjectTraceForNestedFunctionPointerStores(F, NestedFunctionPointerStores);  
++  InjectTraceForNestedFunctionPointerStores(F, NestedFunctionPointerStores, RetTypeCache);
+ }
+ 
+ GlobalVariable *ModuleSanitizerCoverage::CreateFunctionLocalArrayInSection(
+@@ -1086,6 +1090,19 @@ void showTypesXOffsets(vectorTypesXOffsets TypesXOffsetsArr) {
+   errs() << "}\n";
+ }
+ 
++void debugTypeChainTraversal(raw_string_ostream &ROS, TraceInstrumentTarget &Target, Offsets &OffsToElem){
++  ROS <<  " .\n\tFirst type: " << **Target.TypeChain.rbegin() <<
++    " .\n\tLen of offset chain:" << size(OffsToElem) << "/" << size(Target.OffsetChain) << "\n";
++    if (size(Target.OffsetChain) < 10){
++    ROS << "TypeChain: ";
++    for (auto it = Target.TypeChain.rbegin(); it != prev(prev(Target.TypeChain.rend())); it++){
++      ROS << "\t" << (*it)->getStructName() << ",\n";
++    }
++    ROS << "\t" << *Target.TypeChain[1] << ",\n";
++    ROS << "\t" << *Target.TypeChain[0];
++    }
++}
++
+ /*
+ Returns all intermediate values that appear while stripping pointer casts.
+ */
+@@ -1189,9 +1206,9 @@ retType getOffsetsFromFunctionPointerType(Type *FunctionType) {
+ }
+ 
+ // declared here for recursion purposes.
+-retType handleTypeRecursiveImpl(Type *Ty, Types &Visited);
++retType handleTypeRecursiveImpl(Type *Ty, Types &Visited, DenseMap<Type*, retType> &ResultCache);
+ 
+-retType recursivelyHandleStructType(StructType *STy, Types &Visiting) {
++retType recursivelyHandleStructType(StructType *STy, Types &Visiting, DenseMap<Type*, retType> &ResultCache) {
+   bool Any = false;
+   vectorTypesXOffsets AllRes = {};
+   unsigned NumElements = STy->getNumElements();
+@@ -1204,7 +1221,7 @@ retType recursivelyHandleStructType(StructType *STy, Types &Visiting) {
+       continue;
+     }
+ 
+-    retType ResPos = handleTypeRecursiveImpl(ElemType, Visiting);
++    retType ResPos = handleTypeRecursiveImpl(ElemType, Visiting, ResultCache);
+     Any = Any || ResPos.first;
+     vectorTypesXOffsets ElemTypesXOffsets = ResPos.second;
+     if (ResPos.first) {
+@@ -1232,11 +1249,11 @@ retType recursivelyHandleStructType(StructType *STy, Types &Visiting) {
+   return std::make_pair(Any, AllRes);
+ }
+ 
+-retType recursivelyHandlePointerType(PointerType *Ty, Types &Visiting) {
++retType recursivelyHandlePointerType(PointerType *Ty, Types &Visiting, DenseMap<Type*, retType> &ResultCache) {
+   Type *PointeeType = Ty->getPointerElementType();
+   //recursive case
+   if (StructType *STy = dyn_cast<StructType>(PointeeType)){
+-    retType StructRes = handleTypeRecursiveImpl(STy, Visiting);
++    retType StructRes = handleTypeRecursiveImpl(STy, Visiting, ResultCache);
+     return makePointerToStructResFromStructRes(StructRes, STy);
+   }
+   // base cases
+@@ -1269,12 +1286,15 @@ retType recursivelyHandlePointerType(PointerType *Ty, Types &Visiting) {
+ }
+ 
+ 
+-retType handleTypeRecursiveImpl(Type *Ty, Types &Visiting) {
++retType handleTypeRecursiveImpl(Type *Ty, Types &Visiting, DenseMap<Type*, retType> &ResultCache) {
++  if (auto itResult = ResultCache.find(Ty); itResult != ResultCache.end()){
++    return itResult->getSecond();
++  }
+   Visiting.push_back(Ty);
+   retType Result;
+   if (StructType *OriginalStruct = dyn_cast<StructType>(Ty))
+     // recursive: need to look into the struct's fields
+-    Result = recursivelyHandleStructType(OriginalStruct, Visiting);
++    Result = recursivelyHandleStructType(OriginalStruct, Visiting, ResultCache);
+ 
+   else if (!Ty->isPointerTy())
+     // not a struct nor a pointer: this is a dead end.
+@@ -1282,15 +1302,16 @@ retType handleTypeRecursiveImpl(Type *Ty, Types &Visiting) {
+ 
+   else
+     // assume pointer
+-    Result = recursivelyHandlePointerType(dyn_cast<PointerType>(Ty), Visiting);
++    Result = recursivelyHandlePointerType(dyn_cast<PointerType>(Ty), Visiting, ResultCache);
+ 
++  ResultCache.insert(std::pair<Type*, retType>(Ty, Result));
+   Visiting.pop_back();
+   return Result;
+ }
+ 
+-retType handleTypeRecursive(Type *Ty) {
++retType handleTypeRecursive(Type *Ty,DenseMap<Type*, retType> &RetTypeCache) {
+   Types Visited = {};
+-  return handleTypeRecursiveImpl(Ty, Visited);
++  return handleTypeRecursiveImpl(Ty, Visited, RetTypeCache);
+ }
+ 
+ 
+@@ -1340,14 +1361,15 @@ retType getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues)
+   return std::make_pair(false, vectorTypesXOffsets{});
+ }
+ 
+-retType getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues) {
++retType getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues,
++                                        DenseMap<Type*, retType> &RetTypeCache) {
+   int Any = 0;
+   std::vector<retType> Res = {};
+   std::vector<int> PositiveResultIdxs = {};
+ 
+   for (unsigned i = 0; i < PossibleStoredValues.size(); i++) {
+     Type *StoredType = PossibleStoredValues[i]->getType();
+-    retType PartialRes = handleTypeRecursive(StoredType);
++    retType PartialRes = handleTypeRecursive(StoredType, RetTypeCache);
+ 
+     if (PartialRes.first) {
+       Any += 1;
+@@ -1551,6 +1573,7 @@ void ModuleSanitizerCoverage::InjectNestedFuncPointerCallback(TraceInstrumentTar
+   Types::reverse_iterator itTy = Target.TypeChain.rbegin();
+   Offsets::reverse_iterator itOff = Target.OffsetChain.rbegin();
+   Offsets::reverse_iterator beginOff = itOff;
++  unsigned iterCount = 0;
+ 
+   Type *CurrPointeeType = *itTy;
+   Value *CurrBasePointer = Target.SI->getValueOperand();
+@@ -1559,6 +1582,7 @@ void ModuleSanitizerCoverage::InjectNestedFuncPointerCallback(TraceInstrumentTar
+   // Instead, we know that StoredValue is the initial Pointer.
+   // But we need to find the first pointer in the TypeChain that requires a Load.
+   while (itTy != Target.TypeChain.rend()){
++    iterCount ++;
+ 
+     if ((*itTy)->isPointerTy()){
+     // itTy is pointer to Function (end of chain) OR pointer to Struct.
+@@ -1568,11 +1592,25 @@ void ModuleSanitizerCoverage::InjectNestedFuncPointerCallback(TraceInstrumentTar
+ 
+       CurrPointeeType = *(next(itTy));
+       beginOff = next(itOff);
+-      if (CurrPointeeType->isFunctionTy())
++      if (CurrPointeeType->isFunctionTy()){
+         // we should've reached the end of the type chain
+-        assert(next(itTy) == Target.TypeChain.rend() && "Function pointers should appear only at end of Type Chain");
+-      else
+-        assert(CurrPointeeType->isStructTy() && "Every InjectStructElemLoad step should get to either a Struct or Function Type");
++        if (!(next(next(itTy)) == Target.TypeChain.rend())){
++          std::string ErrMsg;
++          raw_string_ostream ROS(ErrMsg);
++          ROS << "Function pointer [" << *CurrPointeeType << "] not at end of Type Chain on step " <<
++              iterCount << "/" << size(Target.TypeChain);
++          debugTypeChainTraversal(ROS, Target, OffsToELem);
++          report_fatal_error(StringRef(ErrMsg));
++        }
++      }
++      else if (! CurrPointeeType->isStructTy()){
++          std::string ErrMsg;
++          raw_string_ostream ROS(ErrMsg);
++          ROS << "Got to an intermediate non struct/function-pointer [" << *CurrPointeeType <<
++              "] at step " << iterCount << "/" << size(Target.TypeChain);
++          debugTypeChainTraversal(ROS, Target, OffsToELem);
++          report_fatal_error(StringRef(ErrMsg));
++      }
+     }
+ 
+     itTy = next(itTy);
+@@ -1596,8 +1634,7 @@ void ModuleSanitizerCoverage::InjectNestedFuncPointerCallback(TraceInstrumentTar
+ // function __sanitizer_cov_store_fun_pointer* with two parameters:
+ //   - address of the variable,
+ //   - stored function pointer
+-void ModuleSanitizerCoverage::InjectTraceForNakedFunctionPointerStores(
+-    Function &F, ArrayRef<StoreInst *> Stores) {
++void ModuleSanitizerCoverage::InjectTraceForNakedFunctionPointerStores(Function &F, ArrayRef<StoreInst *> Stores) {
+   json::Object DebugDump;
+   fillJsonWithFunctionInfo(F, DebugDump);
+   bool HaveFuncPointerTypeArgs = putFunctionArgFuncTypesIntoJson(F, DebugDump);
+@@ -1669,7 +1706,7 @@ void ModuleSanitizerCoverage::InjectTraceForShallowFunctionPointerStores(
+ //   - address of the variable,
+ //   - stored function pointer
+ void ModuleSanitizerCoverage::InjectTraceForNestedFunctionPointerStores(
+-    Function &F, ArrayRef<StoreInst *> Stores) {
++    Function &F, ArrayRef<StoreInst *> Stores, DenseMap<Type*, retType> &RetTypeCache) {
+   json::Array StoreInstInfoArray;
+   json::Object DebugDump;
+   fillJsonWithFunctionInfo(F, DebugDump); //TO DO: check that this is still relevant for this function?
+@@ -1682,7 +1719,7 @@ void ModuleSanitizerCoverage::InjectTraceForNestedFunctionPointerStores(
+     if (StoredValue->getType()->isPointerTy()) {
+       SmallVector<Value *, 8> AllIntermediateValues =
+           getAllValuesThatWouldBeStripped(StoredValue);
+-      retType NestedOffsets = getRecursiveOffsetsFromAllValues(AllIntermediateValues);
++      retType NestedOffsets = getRecursiveOffsetsFromAllValues(AllIntermediateValues, RetTypeCache);
+       if (NestedOffsets.first) {
+         BasicBlock *BlockOfSI = SI->getParent();
+         for (TypesXOffsets Item : NestedOffsets.second) {
+@@ -1696,8 +1733,14 @@ void ModuleSanitizerCoverage::InjectTraceForNestedFunctionPointerStores(
+     }
+   }
+ 
+-  // TODO: Implement this function
++  //unsigned instCount = 0;
++  //unsigned nPrint = 1;
+   for (TraceInstrumentTarget Item : TargetsToInstrument) {
++    /*if (instCount >= nPrint * (TargetsToInstrument.size() / 20)){
++      errs() << "Instrumenting target " << instCount << "/" << TargetsToInstrument.size() << " in function " << F.getName() << ".\n";
++      nPrint++;
++    }
++    instCount++;*/
+     InjectNestedFuncPointerCallback(Item);
+   }
+ 
+-- 
+2.43.0
+
