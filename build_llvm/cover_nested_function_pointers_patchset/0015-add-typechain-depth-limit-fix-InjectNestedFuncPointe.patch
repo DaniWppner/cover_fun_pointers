@@ -1,0 +1,174 @@
+From 1bf5e77e2f14210354fc5df7ad92084a038c3140 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Fri, 28 Aug 2026 15:55:14 -0300
+Subject: [PATCH 15/15] add typechain depth limit; fix
+ InjectNestedFuncPointerCallback by making sure we begin the process at the
+ same pointer used for the typechain
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 80 ++++++++++++-------
+ 1 file changed, 52 insertions(+), 28 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index bcca559d46ae..1bd053ada73f 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -14,11 +14,9 @@
+ #include "llvm/ADT/APInt.h"
+ #include "llvm/ADT/ArrayRef.h"
+ #include "llvm/ADT/DenseMap.h"
+-#include "llvm/ADT/DenseMapInfo.h"
+ #include "llvm/ADT/SmallVector.h"
+ #include "llvm/ADT/StringRef.h"
+ #include "llvm/ADT/Triple.h"
+-#include "llvm/ADT/iterator_range.h"
+ #include "llvm/Analysis/EHPersonalities.h"
+ #include "llvm/Analysis/PostDominators.h"
+ #include "llvm/IR/BasicBlock.h"
+@@ -56,7 +54,6 @@
+ #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+ #include "llvm/Transforms/Utils/ModuleUtils.h"
+ #include <cassert>
+-#include <random>
+ #include <utility>
+ 
+ using namespace llvm;
+@@ -1287,23 +1284,39 @@ retType recursivelyHandlePointerType(PointerType *Ty, Types &Visiting, DenseMap<
+ 
+ 
+ retType handleTypeRecursiveImpl(Type *Ty, Types &Visiting, DenseMap<Type*, retType> &ResultCache) {
++  unsigned MAX_DEPTH = 7;
+   if (auto itResult = ResultCache.find(Ty); itResult != ResultCache.end()){
+     return itResult->getSecond();
+   }
+   Visiting.push_back(Ty);
+   retType Result;
+-  if (StructType *OriginalStruct = dyn_cast<StructType>(Ty))
+-    // recursive: need to look into the struct's fields
+-    Result = recursivelyHandleStructType(OriginalStruct, Visiting, ResultCache);
+ 
+-  else if (!Ty->isPointerTy())
++  if (Visiting.size() > MAX_DEPTH){
++    //errs() << "Skip analysis of nested type " << *Ty << " due to recursion too deep while exploring " << *Visiting[0] << "\n";
++    Result = std::make_pair(false, vectorTypesXOffsets{});
++  }
++  else if (StructType *STy = dyn_cast<StructType>(Ty)){
++    // recursive: need to look into the struct's fields
++    bool ShouldSkip = false;
++    if (STy->hasName()){
++      // hacky hacK: hardcode certain structs we aren't interested in
++      StringRef SName = STy->getStructName();
++      if (SName == "struct.task_struct" || SName == "struct.module")
++        ShouldSkip = true;
++    }
++    if (ShouldSkip)
++      Result = std::make_pair(false, vectorTypesXOffsets{});
++    else
++      Result = recursivelyHandleStructType(STy, Visiting, ResultCache);
++  }
++  else if (!Ty->isPointerTy()){
+     // not a struct nor a pointer: this is a dead end.
+     Result = std::make_pair(false, vectorTypesXOffsets{});
+-
+-  else
++  }
++  else {
+     // assume pointer
+     Result = recursivelyHandlePointerType(dyn_cast<PointerType>(Ty), Visiting, ResultCache);
+-
++  }
+   ResultCache.insert(std::pair<Type*, retType>(Ty, Result));
+   Visiting.pop_back();
+   return Result;
+@@ -1389,23 +1402,21 @@ retType getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues,
+ }
+ 
+ bool putFunctionArgFuncTypesIntoJson(Function &F, json::Object &RootJson) {
+-  SmallVector<Type *> FuncPointerArgTypes = {};
++  bool res = false;
++  json::Array FunctionPointerParameters;
+   FunctionType *FType = F.getFunctionType();
+   for (Type *ParamType : FType->params()) {
+     if (ParamType->isPointerTy() &&
+         ParamType->getPointerElementType()->isFunctionTy()) {
+-      FuncPointerArgTypes.push_back(ParamType);
+-    }
+-  }
+-  json::Array FunctionPointerParameters;
+-  for (Type *T : FuncPointerArgTypes) {
+-    std::string TypeStr;
+-    raw_string_ostream RSO(TypeStr);
+-    T->print(RSO);
+-    FunctionPointerParameters.push_back(RSO.str());
++          res = true;
++          std::string TypeStr;
++          raw_string_ostream RSO(TypeStr);
++          ParamType->print(RSO);
++          FunctionPointerParameters.push_back(RSO.str());
++      }
+   }
+   RootJson["functionPointerParameters"] = std::move(FunctionPointerParameters);
+-  return !FuncPointerArgTypes.empty();
++  return res;
+ }
+ 
+ void putStoreInstIntoJson(StoreInst *SI, json::Array &storeInstInfoArray) {
+@@ -1569,14 +1580,29 @@ void ModuleSanitizerCoverage::InjectFuncPointerTracesAtBlocks(
+ 
+ void ModuleSanitizerCoverage::InjectNestedFuncPointerCallback(TraceInstrumentTarget Target) {
+   IRBuilder<> IRB(Target.BB->getTerminator());
++  if (Target.SI->getDebugLoc())
++        IRB.SetCurrentDebugLocation(Target.SI->getDebugLoc());
++
++  assert(Target.SI->getValueOperand()->getType()->isPointerTy());
++
++  if (! ((*Target.TypeChain.rbegin())->isStructTy())){
++    //else: this is a naked reachable function pointer
++    InjectFuncPointerCallback(Target.SI->getPointerOperand(),
++                              Target.SI->getValueOperand(), IRB);
++    return;
++  }
+ 
++  // The rest of this function assumes we're dealing with
++  // a typechain that begins with a struct pointer
+   Types::reverse_iterator itTy = Target.TypeChain.rbegin();
+   Offsets::reverse_iterator itOff = Target.OffsetChain.rbegin();
+-  Offsets::reverse_iterator beginOff = itOff;
++  Offsets::reverse_iterator beginOff = Target.OffsetChain.rbegin();
+   unsigned iterCount = 0;
+ 
++  Value *InitialPointer = Target.SI->getValueOperand()->stripPointerCastsAndAliases();
+   Type *CurrPointeeType = *itTy;
+-  Value *CurrBasePointer = Target.SI->getValueOperand();
++  Value *CurrBasePointer = castMiscPointerIntoItsStructType(IRB, InitialPointer,
++                                                            CurrPointeeType);
+ 
+   // The first type in the TypeChain won't be a pointer.
+   // Instead, we know that StoredValue is the initial Pointer.
+@@ -1709,10 +1735,9 @@ void ModuleSanitizerCoverage::InjectTraceForNestedFunctionPointerStores(
+     Function &F, ArrayRef<StoreInst *> Stores, DenseMap<Type*, retType> &RetTypeCache) {
+   json::Array StoreInstInfoArray;
+   json::Object DebugDump;
+-  fillJsonWithFunctionInfo(F, DebugDump); //TO DO: check that this is still relevant for this function?
+-  bool HaveFuncPointerTypeArgs = putFunctionArgFuncTypesIntoJson(F, DebugDump); //TO DO: probably delete?
++  fillJsonWithFunctionInfo(F, DebugDump);
++  putFunctionArgFuncTypesIntoJson(F, DebugDump);
+ 
+-  unsigned InstrumentedCount = 0; //TO DO: check where this variable should be used?
+   SmallVector<TraceInstrumentTarget, 8> TargetsToInstrument{};
+   for (StoreInst *SI : Stores) {
+     Value *StoredValue = SI->getValueOperand();
+@@ -1725,9 +1750,8 @@ void ModuleSanitizerCoverage::InjectTraceForNestedFunctionPointerStores(
+         for (TypesXOffsets Item : NestedOffsets.second) {
+           TargetsToInstrument.push_back(
+               {BlockOfSI, SI, Item.first, Item.second});
+-          InstrumentedCount++;
+         }
+-        if (SI->getDebugLoc()) // TO DO: check that this is still relevant?
++        if (SI->getDebugLoc())
+           putStoreInstIntoJson(SI, StoreInstInfoArray);
+       }
+     }
+-- 
+2.43.0
+
