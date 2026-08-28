@@ -1,7 +1,7 @@
 From 7b94e97f3e9f87dd072a741e98eb0adbc977328d Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Mon, 24 Aug 2026 15:47:44 -0300
-Subject: [PATCH 10/15] fix getRecursiveOffsetsFromAllValues: every step of the
+Subject: [PATCH 10/16] fix getRecursiveOffsetsFromAllValues: every step of the
  typechain now tells you how to get to the NEXT type
 
 ---

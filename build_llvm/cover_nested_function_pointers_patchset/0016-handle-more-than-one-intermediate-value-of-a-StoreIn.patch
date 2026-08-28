@@ -1,0 +1,70 @@
+From 05c82d046614f166378a599486151bec2feb0991 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Fri, 28 Aug 2026 17:05:57 -0300
+Subject: [PATCH 16/16] handle more than one intermediate value of a StoreInst
+ Operand reaching a function pointer
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 44 ++++++++++++++++---
+ 1 file changed, 39 insertions(+), 5 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 1bd053ada73f..a585b5db018b 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1391,13 +1391,47 @@ retType getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues,
+     Res.push_back(PartialRes);
+   }
+ 
+-  // TO DO: not have this weakness
+-  assert(Any <= 1 && "We cannot handle more than one intermediate value "
+-                     "reaching a function pointer");
+-  if (Any > 0) {
+-    // assume PositiveResultIdxs.size() == 1.
++  if (Any == 1) {
+     return std::make_pair(true, Res[PositiveResultIdxs[0]].second);
+   }
++  // TO DO: not have this weakness
++  if (Any == 2){
++    /* Try to assume the following:
++    * There is a nested type signature where both A and B can
++    * reach the same function pointer, and A is stored at the
++    * beginning of B.
++    *   struct A {int c; (void)() fn_ptr};
++    *   Struct B {struct A inner_a; int d};
++    *
++    * If we retrieve the inner_a we get a pointer that can
++    * have both the types A and B and can reach a function pointer
++    * through either:
++    *   struct A* ptr_a = &ptr_b.inner_a
++    *
++    * Nevertheless, it's only type A that we care about.
++    * Going through B is an extra step that we can delete.
++    * So, try to identify that both chains share a type near the beginning,
++    * and keep only the smaller of those chains.
++    */
++    Types firstTypeChain = Res[PositiveResultIdxs[0]].second[0].first;
++    Types secondTypeChain = Res[PositiveResultIdxs[1]].second[0].first;
++    Type *FirstOfFirstTC = *(firstTypeChain.rbegin());
++    Type *SecondOfSecondTC = *(next(secondTypeChain.rbegin()));
++    if (FirstOfFirstTC == SecondOfSecondTC){
++      // we assume the chain starting with B would appear second in Res,
++      // and looks like {Struct B, Struct A, ...}
++      return std::make_pair(true, Res[PositiveResultIdxs[0]].second);
++    }
++    std::string ErrMsg;
++    raw_string_ostream ROS(ErrMsg);
++    ROS << "Two intermediate values reach a function pointer. Example:\nStored Types=["
++        << *firstTypeChain.rbegin() << ", " << *secondTypeChain.rbegin() << "]\n Reachable Function Types=["
++        << *firstTypeChain.begin() << ", " <<  *secondTypeChain.begin() << "]\n";
++    report_fatal_error(StringRef(ErrMsg));
++  }
++  if (Any > 2){
++    report_fatal_error("Three or more intermediate values reach a function pointer");
++  }
+   return std::make_pair(false, vectorTypesXOffsets{});
+ }
+ 
+-- 
+2.43.0
+
