@@ -1,7 +1,7 @@
 From 18ba400fd17d58cb038812c57cb658bde7175006 Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Tue, 25 Aug 2026 15:13:16 -0300
-Subject: [PATCH 14/16] cache intermediate results in handleTypeRecursiveImpl
+Subject: [PATCH 14/19] cache intermediate results in handleTypeRecursiveImpl
 
 ---
  .../Instrumentation/SanitizerCoverage.cpp     | 101 +++++++++++++-----
