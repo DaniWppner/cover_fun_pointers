@@ -302,7 +302,19 @@ if __name__ == "__main__":
 
     out_dir = Path.cwd() / "coverage_over_time"
     out_dir.mkdir(parents=True, exist_ok=True)
-    labels = tuple(path.parent.absolute().name for path, _ in pairs)
+    if len(pairs) == 2:
+        default1 = pairs[0][0].parent.absolute().name
+        label1 = input(f"Enter name for first plot (default '{default1}'): ").strip()
+        label1 = label1 if label1 else default1
+        
+        default2 = pairs[1][0].parent.absolute().name
+        label2 = input(f"Enter name for second plot (default '{default2}'): ").strip()
+        label2 = label2 if label2 else default2
+        
+        labels = (label1, label2)
+    else:
+        labels = tuple(path.parent.absolute().name for path, _ in pairs)
+    
     save_coverage_time_series(
         coverage_series_a,
         coverage_series_b,
