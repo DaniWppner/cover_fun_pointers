@@ -18,6 +18,7 @@ import intervaltree
 import matplotlib.pyplot as plt
 import numpy
 from termcolor import colored
+from tqdm import tqdm
 
 from logentry_keys import RESULT_KEYS
 
@@ -46,7 +47,7 @@ def filter_time_profile_lines(json_lines_path: Path) -> tuple[list[dict], list[d
     with open(json_lines_path, "r") as f:
         lines = f.readlines()
     interesting_lines, not_interesting_lines = [], []
-    for l in lines:
+    for l in tqdm(lines, desc="Filtering time profile lines"):
         triage_entry = json.loads(l)
         if any(result_key in triage_entry for result_key in INTERESTING_KEYS):
             interesting_lines.append(triage_entry)
@@ -485,7 +486,7 @@ def unify_per_job(lines):
             present_keys.append(INTERESTING_KEYS[i])
 
     n_interesting_keys = len(present_keys)
-    for start_idx in range(0, len(lines), n_interesting_keys):
+    for start_idx in tqdm(range(0, len(lines), n_interesting_keys), desc="Unifying time profile jobs"):
         job_lines = lines[start_idx : start_idx + n_interesting_keys]
         # check that our assumption that all entries for a given job are consecutive holds
         job_ids = [(l[RESULT_KEYS.TRIAGEID], l[RESULT_KEYS.PROGID]) for l in job_lines]
@@ -504,7 +505,14 @@ def unify_per_job(lines):
             # each type of entry for each triage_id|prog_id pair. If we ever got a duplicate
             # entry for some reason (e.g, data being reported by triage_id|prog_id + call_id pairs)
             # something would break.
-            raise ValueError("Would overwrite entry in unified triage job dict.")
+            print(
+                colored(f"ERROR: would overwrite entry for key {unified_key}\n", "red")
+                + colored(json.dumps(unified_dict[unified_key], indent=2, default=str), "yellow")
+                + colored("\nwhen adding\n", "red")
+                + colored(json.dumps(unified_entry, indent=2, default=str), "yellow"),
+                file=sys.stderr
+            )
+            sys.exit(1)
         unified_dict[unified_key] = unified_entry
     return unified_dict
 

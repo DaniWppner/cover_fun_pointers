@@ -6,9 +6,12 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+import threading
+import time
 from typing import Any, Iterable
 
 from termcolor import colored
+from tqdm import tqdm
 
 from logentry_keys import (FPOINTERS_PAYLOAD_VALUES,
                            MINIMIZATION_RESULT_VALUES, PC_VALUES, RESULT_KEYS, locInfo)
@@ -40,8 +43,10 @@ def unify_per_prog(json_lines_file: Path) -> dict[str, dict[str, Any]]:
     # <prog, call> group instead of creating a lone <prog, newcall> group with just the "save" entry.
     awaiting_corpus_entry: dict[str, str] = {}
     awaiting_pc_cover: dict[str, str] = {}
-    with open(json_lines_file) as f:
+    file_size = json_lines_file.stat().st_size
+    with open(json_lines_file) as f, tqdm(total=file_size, desc="Unifying progs (bytes)", unit="B", unit_scale=True) as pbar:
         for line in f:
+            pbar.update(len(line))
             log_entry: dict[str, Any] = json.loads(line)
             prog_id = log_entry.pop(RESULT_KEYS.PROGID)
 
@@ -362,7 +367,7 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict[str, Any]
                                               fpointer_addr2loc: dict[str, list[locInfo]],
                                               storeinst_addr2loc: dict[str, list[locInfo]]) -> dict[str, dict[str, Any]]:
     error_locInfo: list[locInfo] = [("err", "err")]
-    for entry in prog2log.values():
+    for entry in tqdm(prog2log.values(), desc="Updating source code refs"):
         if RESULT_KEYS.PC_COVER in entry:
             pc_loc_entries = []
             for pc_value in entry[RESULT_KEYS.PC_COVER]:
@@ -479,17 +484,37 @@ def _get_source_code_refs_impl(offsets: Iterable[str]) -> dict[str, list[locInfo
     offsets = set(offsets)
     sourceInfo_data: dict[str, list[locInfo]] = {}
 
-    # Pass all addresses via stdin to avoid command-line argument limits
-    p = subprocess.Popen(
-        args=["addr2line", "-ipfCa", "-e", "vmlinux"],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        cwd=LINUX_DIR,
-        text=True,
-        encoding="utf8",
-    )
-    stdin_data = "\n".join(offsets)
-    stdout, _ = p.communicate(input=stdin_data)
+    def spinner(stop_event):
+        chars = "|/-\\"
+        idx = 0
+        while not stop_event.is_set():
+            sys.stderr.write(f"\r{colored('Running addr2line... ', 'cyan')} {chars[idx % len(chars)]}")
+            sys.stderr.flush()
+            idx += 1
+            time.sleep(0.1)
+        sys.stderr.write(f"\r{colored('Running addr2line... ', 'cyan')} Done! \n")
+        sys.stderr.flush()
+
+    stop_event = threading.Event()
+    spin_thread = threading.Thread(target=spinner, args=(stop_event,))
+    spin_thread.start()
+
+    try:
+        # Pass all addresses via stdin to avoid command-line argument limits
+        p = subprocess.Popen(
+            args=["addr2line", "-ipfCa", "-e", "vmlinux"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            cwd=LINUX_DIR,
+            text=True,
+            encoding="utf8",
+        )
+        stdin_data = "\n".join(offsets)
+        stdout, _ = p.communicate(input=stdin_data)
+    finally:
+        stop_event.set()
+        spin_thread.join()
+
     response = [l.strip() for l in stdout.splitlines()]
 
     for line in response:

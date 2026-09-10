@@ -254,7 +254,7 @@ def save_time_series(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot exec totals and exec/min from syzkaller status lines")
-    parser.add_argument("input", nargs="+", type=Path, help="One or two paths to files containing status lines")
+    parser.add_argument("log_file", nargs="+", type=Path, help="One or two paths to files containing status lines")
     parser.add_argument("--prefix", type=str, default="", help="Output filename prefix")
     parser.add_argument(
         "--skip-beginning",
@@ -276,7 +276,7 @@ def main() -> None:
     skip_seconds = args.skip_beginning if args.skip_beginning is not None else 0
     cut_after_seconds = args.cut_after_time
 
-    inputs: Sequence[Path] = args.input
+    inputs: Sequence[Path] = args.log_file
     if len(inputs) > 2:
         parser.error("Please provide at most two input files")
 
