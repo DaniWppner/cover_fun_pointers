@@ -1,0 +1,100 @@
+From 4d70eefc8fcb3435e703af0863a6758e088a2634 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Thu, 3 Sep 2026 15:50:11 -0300
+Subject: [PATCH 19/19] add debug information for intermediate value nested
+ type analysis
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 28 +++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index bfbc2bd0db65..f9767e12aa2e 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1048,6 +1048,9 @@ void ModuleSanitizerCoverage::InjectTraceForLoadsAndStores(
+ }
+ 
+ namespace {
++
++  struct debugParamCount {unsigned ivNecessary; unsigned multipleIvInteresting;};
++
+ // Unused, for debugging purposes
+ template <typename T>
+ static void showPointerVector(std::vector<T *> genericVector) {
+@@ -1445,7 +1448,8 @@ retType getOneLevelOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues)
+ }
+ 
+ retType getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues,
+-                                        DenseMap<Type*, retType> &RetTypeCache) {
++                                        DenseMap<Type*, retType> &RetTypeCache,
++                                        debugParamCount &debugCount) {
+   int Any = 0;
+   std::vector<retType> Res = {};
+   std::vector<int> PositiveResultIdxs = {};
+@@ -1456,6 +1460,9 @@ retType getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues,
+     retType PartialRes = handleTypeRecursive(StoredType, RetTypeCache);
+ 
+     if (PartialRes.first) {
++      if (i > 0 && Any == 0)
++        // If we limited ourselves to just the first value, we would've gotten nothing
++        debugCount.ivNecessary ++;
+       Any += 1;
+       PositiveResultIdxs.push_back(i);
+     }
+@@ -1468,6 +1475,13 @@ retType getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues,
+   }
+   // TO DO: not have this weakness
+   if (Any == 2){
++    // yolo: return the first type that was useful to reach fPointers.
++    // this is the type of the value that is the least amount of
++    // bitcasts/aliases/etc. from the 'actual' stored value.
++    // In most cases this means the 'actual' stored value itself.
++    debugCount.multipleIvInteresting ++;
++    return std::make_pair(true, Res[PositiveResultIdxs[0]].second);
++
+     // Grabbing from the vectorTypesXOffsets associated to the elements
+     // in Res that reach an fPointer, the first pair of TypesXOffsets.
+     // We're going to assume that pair is representative of all the TypeChains.
+@@ -1826,6 +1840,7 @@ void ModuleSanitizerCoverage::InjectTraceForShallowFunctionPointerStores(
+                                   HaveFuncPointerTypeArgs);
+ }
+ 
++
+ // On every store to a function pointer variable call we call a run-time
+ // function __sanitizer_cov_store_fun_pointer* with two parameters:
+ //   - address of the variable,
+@@ -1837,13 +1852,20 @@ void ModuleSanitizerCoverage::InjectTraceForNestedFunctionPointerStores(
+   fillJsonWithFunctionInfo(F, DebugDump);
+   putFunctionArgFuncTypesIntoJson(F, DebugDump);
+ 
++  struct debugParamCount dbgCount;
++  dbgCount.ivNecessary = 0;
++  dbgCount.multipleIvInteresting = 0;
++
+   SmallVector<TraceInstrumentTarget, 8> TargetsToInstrument{};
+   for (StoreInst *SI : Stores) {
+     Value *StoredValue = SI->getValueOperand();
+     if (StoredValue->getType()->isPointerTy()) {
+       SmallVector<Value *, 8> AllIntermediateValues =
+           getAllValuesThatWouldBeStripped(StoredValue);
+-      retType NestedOffsets = getRecursiveOffsetsFromAllValues(AllIntermediateValues, RetTypeCache);
++      retType NestedOffsets = getRecursiveOffsetsFromAllValues(
++                                                              AllIntermediateValues,
++                                                              RetTypeCache,
++                                                              dbgCount);
+       if (NestedOffsets.first) {
+         BasicBlock *BlockOfSI = SI->getParent();
+         for (TypesXOffsets Item : NestedOffsets.second) {
+@@ -1868,6 +1890,8 @@ void ModuleSanitizerCoverage::InjectTraceForNestedFunctionPointerStores(
+   }
+ 
+   DebugDump["InstrumentedStores"] = std::move(StoreInstInfoArray);
++  DebugDump["DestrippedReachFPointerCount"] = dbgCount.ivNecessary;
++  DebugDump["MultipleIntermediateValueReachFPointerCount"] = dbgCount.multipleIvInteresting;
+   if (!TargetsToInstrument.empty()) {
+     json::Value FinalJson = std::move(DebugDump);
+     std::error_code EC;
+-- 
+2.43.0
+

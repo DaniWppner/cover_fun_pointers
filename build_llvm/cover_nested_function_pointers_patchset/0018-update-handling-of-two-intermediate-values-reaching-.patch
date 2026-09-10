@@ -1,0 +1,109 @@
+From b8c907e0746f332b9c901f43fbd2c7e1457e28ac Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Wed, 2 Sep 2026 13:10:02 -0300
+Subject: [PATCH 18/19] update handling of two intermediate values reaching an
+ Fpointer to consider arbitrary nested vacuous struct chains
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 70 +++++++++++--------
+ 1 file changed, 41 insertions(+), 29 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index 2a29c26659cd..bfbc2bd0db65 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1239,6 +1239,39 @@ bool areStructTypesCompatible(llvm::Type *Left, llvm::Type *Right) {
+     return false;
+ }
+ 
++bool typeChainIsChild(Types &ChildTys, Types &ParentTys, Offsets &ParentOffs){
++  /* If the leading types are not variations of the same type,
++   * try to assume the following:
++   * There is a nested type signature where both A and B can
++   * reach the same function pointer, and A is stored at the
++   * beginning of B.
++   *   struct A {int c; (void)() fn_ptr};
++   *   Struct B {struct A inner_a; int d};
++   *
++   * The store instruction is of the shape:
++   *   struct A* ptr_a = &ptr_b.inner_a
++   *
++   * This means the stored value can have either the type B or A,
++   *  and reach the same function pointer through both.
++   *
++   * Nevertheless, it's only type A that we care about.
++   * Going through B is an extra step that we can delete.
++   * So, try to identify that both chains share the same types near the beginning,
++   * and that every similar type appears at the beginning of the next struct. */
++  Type *FirstChildTy = *(ChildTys.rbegin());
++  auto ChildTyIt = std::find(ParentTys.rbegin(), ParentTys.rend(), FirstChildTy);
++  if (ChildTyIt == ParentTys.rend()){
++    return false;
++  }
++  Types FirstTys = Types(ParentTys.rbegin(), next(ChildTyIt));
++  Offsets FirstOffs = Offsets(ParentOffs.rbegin(), ParentOffs.rbegin() + FirstTys.size());
++  for (unsigned i=0; i<FirstTys.size(); i++){
++    if (!FirstTys[i]->isStructTy() || FirstOffs[i] != 0)
++      return false;
++  }
++  return true;
++}
++
+ // declared here for recursion purposes.
+ retType handleTypeRecursiveImpl(Type *Ty, Types &Visited, DenseMap<Type*, retType> &ResultCache);
+ 
+@@ -1435,43 +1468,22 @@ retType getRecursiveOffsetsFromAllValues(ArrayRef<Value *> PossibleStoredValues,
+   }
+   // TO DO: not have this weakness
+   if (Any == 2){
++    // Grabbing from the vectorTypesXOffsets associated to the elements
++    // in Res that reach an fPointer, the first pair of TypesXOffsets.
++    // We're going to assume that pair is representative of all the TypeChains.
+     Types FirstTypeChain = Res[PositiveResultIdxs[0]].second[0].first;
+     Types SecondTypeChain = Res[PositiveResultIdxs[1]].second[0].first;
++    Offsets FirstOffsetChain = Res[PositiveResultIdxs[0]].second[0].second;
++    Offsets SecondOffsetChain = Res[PositiveResultIdxs[1]].second[0].second;
+     if (areStructTypesCompatible(*FirstTypeChain.rbegin(),
+                                 *SecondTypeChain.rbegin())){
+-      // areStructTypesCompatible returns `true` for any combination
+-      // of Left and Right being more specific than the other.
+-      // (i.e, Left and Right can be {}* in one field while the other isn't)
+-      // But we're going to assume of these types one is more specific.
+-      // Hence, return the one that produced the most reachable fPointers.
++      // They're compatible but one is (presumably) more specific than the other.
++      // Return the one that produced the most reachable fPointers.
+       if (FirstTypeChain.size() > SecondTypeChain.size())
+         return std::make_pair(true, Res[PositiveResultIdxs[0]].second);
+       return std::make_pair(true, Res[PositiveResultIdxs[1]].second);
+     }
+-    /* If the leading types are not variations of the same type,
+-    * try to assume the following:
+-    * There is a nested type signature where both A and B can
+-    * reach the same function pointer, and A is stored at the
+-    * beginning of B.
+-    *   struct A {int c; (void)() fn_ptr};
+-    *   Struct B {struct A inner_a; int d};
+-    *
+-    * The store instruction is of the shape:
+-    *   struct A* ptr_a = &ptr_b.inner_a
+-    *
+-    * This means the stored value can have either the type B or A,
+-    *  and reach the same function pointer through both.
+-    *
+-    * Nevertheless, it's only type A that we care about.
+-    * Going through B is an extra step that we can delete.
+-    * So, try to identify that both chains share a type near the beginning,
+-    * and keep only the smaller of those chains.
+-    */
+-    Type *FirstOfFirstTC = *(FirstTypeChain.rbegin());
+-    Type *SecondOfSecondTC = *(next(SecondTypeChain.rbegin()));
+-    if (FirstOfFirstTC == SecondOfSecondTC){
+-      // we assume the chain starting with B would appear second in Res,
+-      // and looks like {Struct B, Struct A, ...}
++    if (typeChainIsChild(FirstTypeChain, SecondTypeChain, SecondOffsetChain)){
+       return std::make_pair(true, Res[PositiveResultIdxs[0]].second);
+     }
+     // All edge case handling fails: panic accordingly.
+-- 
+2.43.0
+
