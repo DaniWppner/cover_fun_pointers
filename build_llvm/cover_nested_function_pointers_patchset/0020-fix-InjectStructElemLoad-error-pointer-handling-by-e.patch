@@ -1,0 +1,49 @@
+From 3fe1661ccdf0a50c8cb722fe26ed41bbc8b027a1 Mon Sep 17 00:00:00 2001
+From: Daniel Wappner <dwappner@dc.uba.ar>
+Date: Thu, 10 Sep 2026 11:33:42 -0300
+Subject: [PATCH 20/20] fix InjectStructElemLoad error pointer handling by
+ enforcing strictly that addresses are in kernel space
+
+---
+ .../Instrumentation/SanitizerCoverage.cpp     | 24 ++++++++-----------
+ 1 file changed, 10 insertions(+), 14 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index f9767e12aa2e..db5ca008a9ec 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1622,21 +1622,17 @@ CallInst *ModuleSanitizerCoverage::InjectFuncPointerCallback(
+ Value *ModuleSanitizerCoverage::InjectStructElemLoad(IRBuilder<> &IRB, Value *StructPointer, 
+                                                     Type *StructType, Type *ElemType,
+                                                     ArrayRef<unsigned> Offsets) {
+-  unsigned long LINUX_MAX_ERRNO = 4095;
+-
+-  // The hacky hack here is that NULL=0 and ERR_PTR values live in the
+-  // [max(unsigned long)-MAX_ERRNO, max(unsigned long)] space.
+-  // So if BasePointer is NULL and we let it underflow, we get something in
+-  // [max(unsigned long)-MAX_ERRNO-1, max(unsigned long)] for both NULL and ERR_PTR.
++  unsigned long LINUX_MIN_KERNEL_ADDRESS = 0xFFFF000000000000;
++  unsigned long LINUX_MAX_KERNEL_ADDRESS = 0xFFFF000000000000;
++  // Hacky hack: hardcode the valid range for kernel addresses on x86_64.
++  // This means don't dereference user-space addresses, NULL or ERR_PTRs.
+   Value *BasePointer = IRB.CreatePtrToInt(StructPointer, IntptrTy);
+-  Value *PossibleErrorPtr = IRB.CreateSub(BasePointer, ConstantInt::get(IntptrTy, 1));
+-  Value *IsNotError = IRB.CreateICmpULT(
+-    PossibleErrorPtr,
+-    ConstantInt::get(IntptrTy,
+-      APInt::getMaxValue(IntptrTy->getIntegerBitWidth()) - (LINUX_MAX_ERRNO + 1)
+-    )
+-  );
+-  Instruction *ThenInst = SplitBlockAndInsertIfThen(IsNotError, IRB.GetInsertBlock()->getTerminator(), false);
++  Value *MinValid = ConstantInt::get(IntptrTy, LINUX_MIN_KERNEL_ADDRESS);
++  Value *MaxValid = ConstantInt::get(IntptrTy, LINUX_MAX_KERNEL_ADDRESS);
++  Value *IsAboveMin = IRB.CreateICmpUGE(BasePointer, MinValid);
++  Value *IsBelowMax = IRB.CreateICmpULE(BasePointer, MaxValid);
++  Value *IsValid = IRB.CreateAnd(IsAboveMin, IsBelowMax);
++  Instruction *ThenInst = SplitBlockAndInsertIfThen(IsValid, IRB.GetInsertBlock()->getTerminator(), false);
+ 
+ 
+   // Convert the array of offsets into LLVM ConstantInt offsets.
+-- 
+2.43.0
+

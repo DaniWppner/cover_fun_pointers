@@ -1,7 +1,7 @@
 From f3dd657ba8108ed799a96be958c376bc6d18dcf4 Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Fri, 28 Aug 2026 17:05:57 -0300
-Subject: [PATCH 16/19] handle more than one intermediate value of a StoreInst
+Subject: [PATCH 16/20] handle more than one intermediate value of a StoreInst
  Operand reaching a function pointer
 
 ---

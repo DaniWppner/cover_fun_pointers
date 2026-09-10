@@ -1,7 +1,7 @@
 From b8c907e0746f332b9c901f43fbd2c7e1457e28ac Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Wed, 2 Sep 2026 13:10:02 -0300
-Subject: [PATCH 18/19] update handling of two intermediate values reaching an
+Subject: [PATCH 18/20] update handling of two intermediate values reaching an
  Fpointer to consider arbitrary nested vacuous struct chains
 
 ---
