@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-import subprocess
 import argparse
+import hashlib
+import json
+import subprocess
+import sys
 from pathlib import Path
+
+TOTAL_STEPS = 7
+SCRIPT_DIR = Path(__file__).resolve().parent
+# Every pipeline script imports it, so a change to it invalidates all steps.
+SHARED_MODULE = SCRIPT_DIR / "logentry_keys.py"
+
 
 def print_step(step, total, description):
     MAGENTA = "\033[95m"
@@ -20,17 +27,70 @@ def run_cmd(cmd, stdout_file=None, cwd=None):
             result = subprocess.run(cmd, stdout=f, cwd=cwd)
     else:
         result = subprocess.run(cmd, cwd=cwd)
-    
+
     if result.returncode != 0:
         print(f"Error: Command failed with return code {result.returncode}", file=sys.stderr)
         print(f"Command: {' '.join(str(c) for c in cmd)}", file=sys.stderr)
         sys.exit(result.returncode)
 
+
+def make_fingerprint(script: Path, inputs: list[Path]) -> dict[str, object]:
+    """
+    Args:
+        script: Path to the step's script.
+        inputs: Files the step reads.
+
+    Returns:
+        dict[str, object]: Identity of everything the step's results depend on.
+            sources_sha256: hash of the step's script plus the shared module
+            inputs: size and mtime (ns) of each input file, keyed by file name
+    """
+    sources = hashlib.sha256()
+    for source in (script, SHARED_MODULE):
+        sources.update(source.read_bytes())
+    # Inputs can be multi-GB logs, so they are identified by stat instead of by content.
+    return {
+        "sources_sha256": sources.hexdigest(),
+        "inputs": {
+            path.name: [path.stat().st_size, path.stat().st_mtime_ns] for path in inputs
+        },
+    }
+
+
+def rerun_reason(
+    stamp: Path, fingerprint: dict[str, object], outputs: list[Path], forced: bool
+) -> str | None:
+    """
+    Args:
+        stamp: Completion stamp written after the last successful run of the step.
+        fingerprint: Current identity of the step's sources and inputs.
+        outputs: Files the step is expected to produce.
+        forced: Whether the user asked to rerun this step regardless.
+
+    Returns:
+        str | None: Why the step must run again, or None if its stamped results are up to date.
+    """
+    if forced:
+        return "forced by --force / --from-step"
+    if not stamp.exists():
+        return "no completion stamp"
+    if json.loads(stamp.read_text()) != fingerprint:
+        return "sources or inputs changed since the last successful run"
+    missing = [output.name for output in outputs if not output.exists()]
+    if missing:
+        return f"missing outputs: {', '.join(missing)}"
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run the full triage and metrics pipeline.")
     parser.add_argument("log_file", type=str, help="Path to the syz-manager.log file")
     parser.add_argument("--out-dir", type=str, default=".", help="Output directory for intermediate files (default: current directory)")
+    forcing = parser.add_mutually_exclusive_group()
+    forcing.add_argument("--force", action="store_true", help="Rerun every step even if it is up to date")
+    forcing.add_argument("--from-step", type=int, default=TOTAL_STEPS + 1, metavar="N", help="Rerun step N and every later step even if they are up to date")
     args = parser.parse_args()
+    force_from = 1 if args.force else args.from_step
 
     log_path = Path(args.log_file).resolve()
     if not log_path.is_file():
@@ -41,93 +101,105 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     results_dir = out_dir / "results"
     results_dir.mkdir(parents=True, exist_ok=True)
-
-    # Get the directory of this script, to find the subscripts
-    script_dir = Path(__file__).resolve().parent
+    stamps_dir = out_dir / ".stamps"
+    stamps_dir.mkdir(parents=True, exist_ok=True)
 
     raw_jsonl = out_dir / "raw_triage_lines.jsonl"
     triage_jsonl = out_dir / "triage_lines.jsonl"
     time_profile_txt = out_dir / "time_profile.txt"
+    time_profile_data = out_dir / "time_profile_data.json"
     unified_json = out_dir / "unified_triage_logs.json"
     analysis_txt = results_dir / "analysis.txt"
+    cov_plot = out_dir / "coverage_over_time" / "coverage_evolution.png"
+    exec_plot = out_dir / "exec_over_time" / "exec_total_evolution.png"
 
-    total_steps = 7
+    def run_step(
+        step: int,
+        script_name: str,
+        inputs: list[Path],
+        outputs: list[Path],
+        cmd_args: list[Path],
+        cwd: Path,
+        stdout_file: Path | None = None,
+    ) -> None:
+        """
+        Args:
+            step: Step number, used for display and for --from-step.
+            script_name: Script of this step, relative to the scripts directory.
+            inputs: Files the step reads, used to detect stale results.
+            outputs: Files the step must produce. They are deleted before running and again on failure.
+            cmd_args: Positional arguments passed to the script.
+            cwd: Working directory of the script.
+            stdout_file: File receiving the script's stdout, if it is one of the step's outputs.
 
-    # Step 1
-    print_step(1, total_steps, "extract_logs_into_json.py")
-    if raw_jsonl.exists() and raw_jsonl.stat().st_size > 0:
-        print(f"Skipping: Output file {raw_jsonl.name} already exists.", flush=True)
-    else:
-        run_cmd([
-            sys.executable,
-            str(script_dir / "extract_logs_into_json.py"),
-            str(log_path),
-            str(raw_jsonl)
-        ])
+        Returns:
+            None
+        """
+        print_step(step, TOTAL_STEPS, script_name)
+        script = SCRIPT_DIR / script_name
+        fingerprint = make_fingerprint(script, inputs)
+        stamp = stamps_dir / f"{script.stem}.json"
+        reason = rerun_reason(stamp, fingerprint, outputs, forced=step >= force_from)
+        if reason is None:
+            print("Skipping: results are up to date.", flush=True)
+            return
 
-    # Step 2
-    print_step(2, total_steps, "separate_time_profile_entries.py")
-    if triage_jsonl.exists() and triage_jsonl.stat().st_size > 0:
-        print(f"Skipping: Output file {triage_jsonl.name} already exists.", flush=True)
-    else:
-        run_cmd([
-            sys.executable,
-            str(script_dir / "separate_time_profile_entries.py"),
-            str(raw_jsonl),
-            str(triage_jsonl)
-        ], stdout_file=time_profile_txt)
+        print(f"Running: {reason}.", flush=True)
+        stamp.unlink(missing_ok=True)
+        for output in outputs:
+            output.unlink(missing_ok=True)
+        try:
+            run_cmd(
+                [sys.executable, str(script), *map(str, cmd_args)],
+                stdout_file=stdout_file,
+                cwd=cwd,
+            )
+        except SystemExit:
+            for output in outputs:
+                output.unlink(missing_ok=True)
+            raise
+        stamp.write_text(json.dumps(fingerprint))
 
-    # Step 3
-    print_step(3, total_steps, "unify_triage_lines.py")
-    if unified_json.exists() and unified_json.stat().st_size > 0:
-        print(f"Skipping: Output file {unified_json.name} already exists.", flush=True)
-    else:
-        run_cmd([
-            sys.executable,
-            str(script_dir / "unify_triage_lines.py"),
-            str(triage_jsonl),
-            str(unified_json)
-        ])
+    run_step(1, "extract_logs_into_json.py",
+             inputs=[log_path],
+             outputs=[raw_jsonl],
+             cmd_args=[log_path, raw_jsonl],
+             cwd=out_dir)
 
-    # Step 4
-    print_step(4, total_steps, "Creating results directory")
+    run_step(2, "separate_time_profile_entries.py",
+             inputs=[raw_jsonl],
+             outputs=[triage_jsonl, time_profile_txt, time_profile_data],
+             cmd_args=[raw_jsonl, triage_jsonl],
+             cwd=out_dir,
+             stdout_file=time_profile_txt)
+
+    run_step(3, "unify_triage_lines.py",
+             inputs=[triage_jsonl],
+             outputs=[unified_json],
+             cmd_args=[triage_jsonl, unified_json],
+             cwd=out_dir)
+
+    print_step(4, TOTAL_STEPS, "Creating results directory")
     print(f"Directory already ensured at: {results_dir}", flush=True)
 
-    # Step 5
-    print_step(5, total_steps, "process_triage_metrics.py")
-    if analysis_txt.exists() and analysis_txt.stat().st_size > 0:
-        print(f"Skipping: Output file {analysis_txt.name} already exists.", flush=True)
-    else:
-        run_cmd([
-            sys.executable,
-            str(script_dir / "process_triage_metrics.py"),
-            str(unified_json)
-        ], stdout_file=analysis_txt, cwd=results_dir)
+    run_step(5, "process_triage_metrics.py",
+             inputs=[unified_json],
+             outputs=[analysis_txt],
+             cmd_args=[unified_json],
+             cwd=results_dir,
+             stdout_file=analysis_txt)
 
-    # Step 6
-    print_step(6, total_steps, "plot_metrics_evolution.py")
-    cov_plot = out_dir / "coverage_over_time" / "coverage_evolution.png"
-    if cov_plot.exists() and cov_plot.stat().st_size > 0:
-        print(f"Skipping: Output file {cov_plot.name} already exists.", flush=True)
-    else:
-        run_cmd([
-            sys.executable,
-            str(script_dir / "plot_metrics_evolution.py"),
-            str(unified_json),
-            str(log_path)
-        ], cwd=out_dir)
+    run_step(6, "plot_metrics_evolution.py",
+             inputs=[unified_json, log_path],
+             outputs=[cov_plot],
+             cmd_args=[unified_json, log_path],
+             cwd=out_dir)
 
-    # Step 7
-    print_step(7, total_steps, "plot_throughput_evolution.py")
-    exec_plot = out_dir / "exec_over_time" / "exec_total_evolution.png"
-    if exec_plot.exists() and exec_plot.stat().st_size > 0:
-        print(f"Skipping: Output file {exec_plot.name} already exists.", flush=True)
-    else:
-        run_cmd([
-            sys.executable,
-            str(script_dir / "plot_throughput_evolution.py"),
-            str(log_path)
-        ], cwd=out_dir)
+    run_step(7, "plot_throughput_evolution.py",
+             inputs=[log_path],
+             outputs=[exec_plot],
+             cmd_args=[log_path],
+             cwd=out_dir)
 
     print(f"\n" + "="*50)
     print("Pipeline completed successfully!")
