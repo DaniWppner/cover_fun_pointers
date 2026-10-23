@@ -397,7 +397,15 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict[str, Any]
     return prog2log
 
 
-def update_w_address_data(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+def update_w_address_data(prog2log: dict[str, dict[str, Any]], vmlinux_path: Path) -> dict[str, dict[str, Any]]:
+    """
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
+        vmlinux_path: vmlinux of the exact kernel build the campaign ran.
+
+    Returns:
+        dict[str, dict[str, Any]]: prog2log with source code locations filled in for every address.
+    """
     all_pcs = set()
     all_fpointers_stores = set()
     all_fpointers = set()
@@ -418,12 +426,12 @@ def update_w_address_data(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict
             for fp in entries[RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD]:
                 _update_fpointers_and_stores(fp)
 
-    pcs_addr2loc, fpointer_addr2loc, storeinst_addr2loc = get_PCs_to_locs(all_pcs, all_fpointers_stores, all_fpointers)
+    pcs_addr2loc, fpointer_addr2loc, storeinst_addr2loc = get_PCs_to_locs(all_pcs, all_fpointers_stores, all_fpointers, vmlinux_path)
     prog2log = update_master_dict_with_fpointer_loc_data(prog2log, pcs_addr2loc, fpointer_addr2loc, storeinst_addr2loc)
 
     return prog2log
 
-def get_PCs_to_locs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str]) -> tuple[
+def get_PCs_to_locs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpointers: set[str], vmlinux_path: Path) -> tuple[
     dict[str, list[locInfo]], dict[str, list[locInfo]], dict[str, list[locInfo]]
 ]:
     """
@@ -431,6 +439,7 @@ def get_PCs_to_locs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpoin
         all_pcs: Set of covered instruction addresses (hexadecimal strings).
         all_fpointers_stores: Set of instructions that store a function pointer (hexadecimal strings).
         all_fpointers: Set of function pointer values stored (hexadecimal strings).
+        vmlinux_path: vmlinux of the exact kernel build the campaign ran.
 
     Returns:
         tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], dict[str, list[locInfo]]]: A tuple with three elements:
@@ -438,15 +447,16 @@ def get_PCs_to_locs(all_pcs: set[str], all_fpointers_stores: set[str], all_fpoin
             fpointer_addr2location: dict mapping function pointer addresses to their source code locations, including inline resolutions.
             storeinst_addr2location: dict mapping store instruction addresses to their source code locations, including inline resolutions.
     """
-    allpcs_addr2location = get_source_code_refs(all_pcs)
-    storeinst_addr2location = get_source_code_refs(all_fpointers_stores)
-    fpointer_addr2location = get_source_code_refs(all_fpointers)
+    allpcs_addr2location = get_source_code_refs(all_pcs, vmlinux_path)
+    storeinst_addr2location = get_source_code_refs(all_fpointers_stores, vmlinux_path)
+    fpointer_addr2location = get_source_code_refs(all_fpointers, vmlinux_path)
     return allpcs_addr2location, fpointer_addr2location, storeinst_addr2location
 
 
 
 def get_source_code_refs(
     all_pcs: Iterable[str],
+    vmlinux_path: Path,
 ) -> dict[str, list[locInfo]]:
     """
     Receives an iterable of PCs (hexadecimal values)
@@ -465,16 +475,15 @@ def get_source_code_refs(
                         }
     Would return [('modulo_3', ??), ('complement_modulo_3', ??) , ('foo', a.c:747)] for 0x00c1.
     """
-    addr2fun_names = _get_source_code_refs_impl(all_pcs)
+    addr2fun_names = _get_source_code_refs_impl(all_pcs, vmlinux_path)
     return addr2fun_names
 
 
-def _get_source_code_refs_impl(offsets: Iterable[str]) -> dict[str, list[locInfo]]:
+def _get_source_code_refs_impl(offsets: Iterable[str], vmlinux_path: Path) -> dict[str, list[locInfo]]:
     """
     Returns a mapping containing the source code locations for each
     offset in the input, obtained using addr2line, including inlines
     """
-    LINUX_DIR = "/home/dwappner/Desktop/linux"
     # hacky hack:
     # strictly optionally capture the hex value or "(inlined by)"
     output_pattern = re.compile(
@@ -502,10 +511,9 @@ def _get_source_code_refs_impl(offsets: Iterable[str]) -> dict[str, list[locInfo
     try:
         # Pass all addresses via stdin to avoid command-line argument limits
         p = subprocess.Popen(
-            args=["addr2line", "-ipfCa", "-e", "vmlinux"],
+            args=["addr2line", "-ipfCa", "-e", str(vmlinux_path)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            cwd=LINUX_DIR,
             text=True,
             encoding="utf8",
         )
@@ -564,6 +572,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "out_path", type=str, nargs="?", help="Path to the output json."
     )
+    parser.add_argument(
+        "--vmlinux",
+        type=str,
+        required=True,
+        help="vmlinux of the exact kernel build the campaign ran, used by addr2line.",
+    )
     args = parser.parse_args()
 
     if not args.json_lines_path or not args.out_path:
@@ -572,6 +586,7 @@ if __name__ == "__main__":
 
     json_lines_path = Path(args.json_lines_path)
     out_path = Path(args.out_path)
+    vmlinux_path = Path(args.vmlinux).resolve()
     if not json_lines_path.exists():
         print(
             f"Error: The specified json lines file does not exist: {json_lines_path}",
@@ -581,7 +596,7 @@ if __name__ == "__main__":
 
     out_json = unify_per_prog(json_lines_path)
     cleanup_unified_json(out_json)
-    out_json = update_w_address_data(out_json)
+    out_json = update_w_address_data(out_json, vmlinux_path)
 
     with out_path.open("w") as f:
         f.write(json.dumps(out_json, indent=2) + "\n")

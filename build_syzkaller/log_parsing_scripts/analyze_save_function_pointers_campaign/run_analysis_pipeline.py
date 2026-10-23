@@ -85,6 +85,7 @@ def rerun_reason(
 def main():
     parser = argparse.ArgumentParser(description="Run the full triage and metrics pipeline.")
     parser.add_argument("log_file", type=str, help="Path to the syz-manager.log file")
+    parser.add_argument("--vmlinux", type=str, required=True, help="vmlinux of the exact kernel build the campaign ran, used by addr2line in step 3")
     parser.add_argument("--out-dir", type=str, default=".", help="Output directory for intermediate files (default: current directory)")
     forcing = parser.add_mutually_exclusive_group()
     forcing.add_argument("--force", action="store_true", help="Rerun every step even if it is up to date")
@@ -95,6 +96,11 @@ def main():
     log_path = Path(args.log_file).resolve()
     if not log_path.is_file():
         print(f"Error: Log file not found: {log_path}", file=sys.stderr)
+        sys.exit(1)
+
+    vmlinux_path = Path(args.vmlinux).resolve()
+    if not vmlinux_path.is_file():
+        print(f"Error: vmlinux not found: {vmlinux_path}", file=sys.stderr)
         sys.exit(1)
 
     out_dir = Path(args.out_dir).resolve()
@@ -174,9 +180,9 @@ def main():
              stdout_file=time_profile_txt)
 
     run_step(3, "unify_triage_lines.py",
-             inputs=[triage_jsonl],
+             inputs=[triage_jsonl, vmlinux_path],
              outputs=[unified_json],
-             cmd_args=[triage_jsonl, unified_json],
+             cmd_args=[triage_jsonl, unified_json, "--vmlinux", vmlinux_path],
              cwd=out_dir)
 
     print_step(4, TOTAL_STEPS, "Creating results directory")
