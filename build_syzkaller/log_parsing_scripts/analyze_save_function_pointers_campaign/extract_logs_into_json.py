@@ -258,6 +258,9 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
                 r"deflake complete",
                 call_pattern + r":? minimization step failure",
                 call_pattern + r":? minimization step (?:\(.*\) )?success \(\|calls\| = \d+\)",
+                # FIXME: syzkaller logs this entry without the call it refers to, so it can't be attributed to a
+                # <prog, call>. Once the call is logged, the pattern stops matching and this becomes a parse error.
+                r"new_covered_functions: \[.*\]$",
             ]
         ),
     }
