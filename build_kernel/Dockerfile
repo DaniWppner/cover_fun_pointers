@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install kernel dependencies
 RUN apt-get update && apt-get install -y \
     # These are needed for linux kernel build
-    make flex bison bc libelf-dev libssl-dev rsync file \
+    make flex bison bc libelf-dev libssl-dev rsync file subversion git \
     # These are nice to haves for developing inside the container
     # (running kernel scripts, etc.)
     python3 \
@@ -14,3 +14,4 @@ RUN apt-get update && apt-get install -y \
 
 # This folder needs to be mounted in the docker-compose
 ENV PATH="/home/src/llvm-project/build/bin:${PATH}"
+
