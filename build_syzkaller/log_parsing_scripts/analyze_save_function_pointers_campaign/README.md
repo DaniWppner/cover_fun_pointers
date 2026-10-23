@@ -22,6 +22,9 @@ Triage lines carrying the `[fpcov-orig]` prefix are tagged `fpointer_origin` in 
 ### `new_covered_functions` lines are dropped
 Logs of newer patched Syzkaller versions contain `new_covered_functions: [{"name", "path", "line"}, ...]`. Step 1 discards it through its explicit `SKIP` list. This important data should be included in analysis. This is because the line carries **no call id**, unlike every other per-call entry, and attributing it to the correct `<prog, call>` is cumbersome.
 
+### `candidate_triage` jobs are ignored
+Commit `28a0e909a75bc2255460a4bdba5151efe5a7a2d1` introduced the logging of the initial candidate progs, Syzkaller's seeds and the loaded corpus, as a different kind of job for reporting purposes. The scripts are hardcooded to see Jobs logged as `[triage-0x...]`, which ignores these initial `[candidate_triage-0x...]` logs. There are about 150-160 of such jobs on a defconfig linux campaign, all started in a short window at the beginning.
+
 ## What the pipeline does
 
 `run_analysis_pipeline.py` chains the scripts below. Each step is skipped only if it completed successfully before and nothing it depends on has changed (see [Caching](#caching)).
