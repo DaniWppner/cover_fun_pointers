@@ -8,9 +8,9 @@ import sys
 from pathlib import Path
 
 TOTAL_STEPS = 7
-SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPTS_ROOT = Path(__file__).resolve().parent.parent
 # Every pipeline script imports it, so a change to it invalidates all steps.
-SHARED_MODULE = SCRIPT_DIR / "logentry_keys.py"
+SHARED_MODULE = SCRIPTS_ROOT / "logentry_keys.py"
 
 
 def print_step(step, total, description):
@@ -131,7 +131,7 @@ def main():
         """
         Args:
             step: Step number, used for display and for --from-step.
-            script_name: Script of this step, relative to the scripts directory.
+            script_name: Script of this step, relative to the directory holding processing/ and plotting/.
             inputs: Files the step reads, used to detect stale results.
             outputs: Files the step must produce. They are deleted before running and again on failure.
             cmd_args: Positional arguments passed to the script.
@@ -142,7 +142,7 @@ def main():
             None
         """
         print_step(step, TOTAL_STEPS, script_name)
-        script = SCRIPT_DIR / script_name
+        script = SCRIPTS_ROOT / script_name
         fingerprint = make_fingerprint(script, inputs)
         stamp = stamps_dir / f"{script.stem}.json"
         reason = rerun_reason(stamp, fingerprint, outputs, forced=step >= force_from)
@@ -166,20 +166,20 @@ def main():
             raise
         stamp.write_text(json.dumps(fingerprint))
 
-    run_step(1, "extract_logs_into_json.py",
+    run_step(1, "processing/extract_logs_into_json.py",
              inputs=[log_path],
              outputs=[raw_jsonl],
              cmd_args=[log_path, raw_jsonl],
              cwd=out_dir)
 
-    run_step(2, "separate_time_profile_entries.py",
+    run_step(2, "processing/separate_time_profile_entries.py",
              inputs=[raw_jsonl],
              outputs=[triage_jsonl, time_profile_txt, time_profile_data],
              cmd_args=[raw_jsonl, triage_jsonl],
              cwd=out_dir,
              stdout_file=time_profile_txt)
 
-    run_step(3, "unify_triage_lines.py",
+    run_step(3, "processing/unify_triage_lines.py",
              inputs=[triage_jsonl, vmlinux_path],
              outputs=[unified_json],
              cmd_args=[triage_jsonl, unified_json, "--vmlinux", vmlinux_path],
@@ -188,20 +188,20 @@ def main():
     print_step(4, TOTAL_STEPS, "Creating results directory")
     print(f"Directory already ensured at: {results_dir}", flush=True)
 
-    run_step(5, "process_triage_metrics.py",
+    run_step(5, "processing/process_triage_metrics.py",
              inputs=[unified_json],
              outputs=[analysis_txt],
              cmd_args=[unified_json],
              cwd=results_dir,
              stdout_file=analysis_txt)
 
-    run_step(6, "plot_metrics_evolution.py",
+    run_step(6, "plotting/plot_metrics_evolution.py",
              inputs=[unified_json, log_path],
              outputs=[cov_plot],
              cmd_args=[unified_json, log_path],
              cwd=out_dir)
 
-    run_step(7, "plot_throughput_evolution.py",
+    run_step(7, "plotting/plot_throughput_evolution.py",
              inputs=[log_path],
              outputs=[exec_plot],
              cmd_args=[log_path],

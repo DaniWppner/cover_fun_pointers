@@ -5,8 +5,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-import plot_metrics_evolution
-import plot_throughput_evolution
+from plotting import plot_metrics_evolution, plot_throughput_evolution
 
 MAX_RUN_SPAN_DEVIATION = 0.05
 

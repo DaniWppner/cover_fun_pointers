@@ -1,6 +1,6 @@
 ## Repro results
 This is obtained by running [`check_stable_coverage.py`](./check_stable_coverage.py) on [`extracted_jsonlines.json`](extracted_jsonlines.json)
-Which was obtained by running [`extract_logs_into_json.py`](./extract_logs_into_json.py) on the syz-manager log of [log_raw_PCs](../../syzkaller_patchset/coverage_patchset/log_raw_PCs)
+Which was obtained by running [`extract_logs_into_json.py`](./extract_logs_into_json.py) on the syz-manager log of [log_raw_PCs](../../build_syzkaller/syzkaller_patchset/coverage_patchset/legacy/log_raw_PCs)
 
 
 ### uncovered functions

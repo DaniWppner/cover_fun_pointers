@@ -8,7 +8,8 @@ Everything is derived from a single `syz-manager.log`. There is no live connecti
 
 ```bash
 python3 -m venv venv && . venv/bin/activate && pip install -r requirements.txt
-./run_analysis_pipeline.py /path/to/syz-manager.log --vmlinux /path/to/linux/vmlinux --out-dir /path/to/analysis/run_0
+pip install -e . --config-settings editable_mode=compat
+./processing/run_analysis_pipeline.py /path/to/syz-manager.log --vmlinux /path/to/linux/vmlinux --out-dir /path/to/analysis/run_0
 ```
 
 `--out-dir` defaults to the **current directory**. Every step runs with `out_dir` as its working directory, so all outputs land there.
@@ -27,17 +28,17 @@ Commit `28a0e909a75bc2255460a4bdba5151efe5a7a2d1` introduced the logging of the 
 
 ## What the pipeline does
 
-`run_analysis_pipeline.py` chains the scripts below. Each step is skipped only if it completed successfully before and nothing it depends on has changed (see [Caching](#caching)).
+`processing/run_analysis_pipeline.py` chains the scripts below. Each step is skipped only if it completed successfully before and nothing it depends on has changed (see [Caching](#caching)).
 
 | # | Script | Input -> Output | What it does |
 |---|--------|-----------------|--------------|
-| 1 | `extract_logs_into_json.py` | `syz-manager.log` -> `raw_triage_lines.jsonl` | Regex-parses every `[triage-..] [prog-..]` log line into one JSON object per line. Also pulls the multi-line payloads that follow some entries (serialized progs, PC cover lists, per-exec duration JSON). |
-| 2 | `separate_time_profile_entries.py` | `raw_triage_lines.jsonl` -> `triage_lines.jsonl` (+ `time_profile.txt` from stdout, `time_profile_plots/`, `time_profile_data.json`) | Splits job-level timing entries (durations, exec counts, in-flight progs) from the per-call triage entries. Timing entries become plots and stats; the rest is passed on. |
-| 3 | `unify_triage_lines.py` | `triage_lines.jsonl` -> `unified_triage_logs.json` | Merges all lines of a triage into one entry per `<prog, call>` (the `prog2log` dictionary used everywhere downstream; see [KI-1](#ki-1-fpointer_origin-tag-is-not-used-by-any-analysis) for the `tags` field it carries but nobody reads), then resolves every PC / stored function pointer / store instruction address to source locations with `addr2line`. |
+| 1 | `processing/extract_logs_into_json.py` | `syz-manager.log` -> `raw_triage_lines.jsonl` | Regex-parses every `[triage-..] [prog-..]` log line into one JSON object per line. Also pulls the multi-line payloads that follow some entries (serialized progs, PC cover lists, per-exec duration JSON). |
+| 2 | `processing/separate_time_profile_entries.py` | `raw_triage_lines.jsonl` -> `triage_lines.jsonl` (+ `time_profile.txt` from stdout, `time_profile_plots/`, `time_profile_data.json`) | Splits job-level timing entries (durations, exec counts, in-flight progs) from the per-call triage entries. Timing entries become plots and stats; the rest is passed on. |
+| 3 | `processing/unify_triage_lines.py` | `triage_lines.jsonl` -> `unified_triage_logs.json` | Merges all lines of a triage into one entry per `<prog, call>` (the `prog2log` dictionary used everywhere downstream; see [KI-1](#ki-1-fpointer_origin-tag-is-not-used-by-any-analysis) for the `tags` field it carries but nobody reads), then resolves every PC / stored function pointer / store instruction address to source locations with `addr2line`. |
 | 4 | (creates `results/`) | | Only creates the directory. It is a no-op step kept for numbering. |
-| 5 | `process_triage_metrics.py` | `unified_triage_logs.json` -> `results/analysis.txt` (+ side files in `results/`) | The actual analysis (see below). |
-| 6 | `plot_metrics_evolution.py` | `unified_triage_logs.json` + log -> `coverage_over_time/coverage_evolution.png` | Coverage (from manager status lines) against number of finished triages. |
-| 7 | `plot_throughput_evolution.py` | log -> `exec_over_time/exec_total_evolution.png` (+ `exec_per_min_*`) | `exec total` and `exec/min` over time. |
+| 5 | `processing/process_triage_metrics.py` | `unified_triage_logs.json` -> `results/analysis.txt` (+ side files in `results/`) | The actual analysis (see below). |
+| 6 | `plotting/plot_metrics_evolution.py` | `unified_triage_logs.json` + log -> `coverage_over_time/coverage_evolution.png` | Coverage (from manager status lines) against number of finished triages. |
+| 7 | `plotting/plot_throughput_evolution.py` | log -> `exec_over_time/exec_total_evolution.png` (+ `exec_per_min_*`) | `exec total` and `exec/min` over time. |
 
 ### What `process_triage_metrics.py` reports
 
@@ -82,10 +83,10 @@ A step is skipped only if its stamp matches the current fingerprint and all its 
 
 ## Other scripts (not in the pipeline)
 
-* `compare_groups.py`: plots the average coverage / throughput of one or two *groups* of runs (`--group1 <run_dir> ...`, `--group2 <run_dir> ...`, e.g. `--group1 <experiment>/analysis/run_*`). Each run directory is a pipeline `--out-dir` that must also hold the run's `syz-manager.log`. All runs of a group must span roughly the same time.
-* `plot_metrics_evolution.py` and `plot_throughput_evolution.py` can also be called directly with two runs to overlay them (and `plot_throughput_evolution.py --cut-after hh:mm:ss`).
-* `extract_logs_into_json.py --cutoff-time "YYYY/MM/DD HH:MM:SS"` truncates the log before the first status line after that time. The pipeline does not expose it.
-* `logentry_keys.py`: the enums (`LOGENTRY_KEYS`, `RESULT_KEYS`, ...) shared by all scripts. Single source of truth for the intermediate JSON format.
+* `plotting/compare_groups.py`: plots the average coverage / throughput of one or two *groups* of runs (`--group1 <run_dir> ...`, `--group2 <run_dir> ...`, e.g. `--group1 <experiment>/analysis/run_*`). Each run directory is a pipeline `--out-dir` that must also hold the run's `syz-manager.log`. All runs of a group must span roughly the same time.
+* `plotting/plot_metrics_evolution.py` and `plotting/plot_throughput_evolution.py` can also be called directly with two runs to overlay them (and `plot_throughput_evolution.py --cut-after hh:mm:ss`).
+* `processing/extract_logs_into_json.py --cutoff-time "YYYY/MM/DD HH:MM:SS"` truncates the log before the first status line after that time. The pipeline does not expose it.
+* `logentry_keys.py`: the enums (`LOGENTRY_KEYS`, `RESULT_KEYS`, ...) shared by all scripts. Single source of truth for the intermediate JSON format. It sits above `processing/` and `plotting/`. The scripts are run as executables, so only their own directory is on `sys.path`; the editable install from [Quick start](#quick-start) is what makes `logentry_keys`, `processing` and `plotting` importable from any of them. `compat` mode installs a plain `.pth` path entry, which mypy can follow (the default editable mode uses an import hook mypy cannot see through).
 * `example_usage/`: a `sample.log` and `FINDINGS.md` (duplicate triage analysis on a real run). `uncovered_functions_analysis/`: manual write-ups of stored function pointers that never got executed. `extracted_sample.json` and `no_output_debug/` are leftover debugging artifacts.
 
 ## Caveats

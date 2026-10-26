@@ -46,4 +46,5 @@ build_syzkaller/syz-executor-test/QEMU-debug-image/
 # Python ignores
 __pycache__/
 venv/
+*.egg-info/
 .vscode/
