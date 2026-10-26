@@ -368,15 +368,16 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict[str, Any]
                                               storeinst_addr2loc: dict[str, list[locInfo]]) -> dict[str, dict[str, Any]]:
     error_locInfo: list[locInfo] = [("err", "err")]
     for entry in tqdm(prog2log.values(), desc="Updating source code refs"):
-        if RESULT_KEYS.PC_COVER in entry:
-            pc_loc_entries = []
-            for pc_value in entry[RESULT_KEYS.PC_COVER]:
-                # hacky hack: we will not have a location for this "empty" pointer
-                pc_loc = pcs_addr2loc[pc_value] if pc_value != '0xffffffffffffffff' else error_locInfo
-                pc_entry = {PC_VALUES.PC_ADDRESS : pc_value,
-                            PC_VALUES.PC_LOCATION : pc_loc}
-                pc_loc_entries.append(pc_entry)
-            entry[RESULT_KEYS.PC_COVER] = pc_loc_entries
+        for cover_key in (RESULT_KEYS.PC_COVER, RESULT_KEYS.SYZBASE_TOTAL_NEW_COVER):
+            if cover_key in entry:
+                pc_loc_entries = []
+                for pc_value in entry[cover_key]:
+                    # hacky hack: we will not have a location for this "empty" pointer
+                    pc_loc = pcs_addr2loc[pc_value] if pc_value != '0xffffffffffffffff' else error_locInfo
+                    pc_entry = {PC_VALUES.PC_ADDRESS : pc_value,
+                                PC_VALUES.PC_LOCATION : pc_loc}
+                    pc_loc_entries.append(pc_entry)
+                entry[cover_key] = pc_loc_entries
 
         for funcPointer_store_entry in entry.get(RESULT_KEYS.NEW_FPOINTERS_PAYLOAD, []):
             fPointer = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
@@ -419,6 +420,8 @@ def update_w_address_data(prog2log: dict[str, dict[str, Any]], vmlinux_path: Pat
     for entries in prog2log.values():
         if RESULT_KEYS.PC_COVER in entries:
             all_pcs.update(entries[RESULT_KEYS.PC_COVER])
+        if RESULT_KEYS.SYZBASE_TOTAL_NEW_COVER in entries:
+            all_pcs.update(entries[RESULT_KEYS.SYZBASE_TOTAL_NEW_COVER])
         if RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in entries:
             for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
                 _update_fpointers_and_stores(fp)

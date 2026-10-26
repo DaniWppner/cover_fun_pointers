@@ -21,6 +21,7 @@ class LOGENTRY_KEYS(StrEnum):
     MINIMIZATION_FPOINTER_SKIP = "minimization_skip_fpointer"
     MINIMIZATION_SIGNAL_SKIP = "minimization_skip_signal"
     PC_COVER = "total_cover"
+    SYZBASE_TOTAL_NEW_COVER = "syzbase_total_new_cover"
     TOTAL_JOB_DURATION = "total_job_duration"
     TOTAL_PROG_EXECUTIONS = "total_test_case_executions"
     FPOINTER_PROG_EXECUTIONS = "new_test_case_executions_because_of_fpcov"
@@ -49,6 +50,9 @@ class RESULT_KEYS(StrEnum):
     ORIGINAL_PROG = "original_prog"
     COUNT = "count"
     PC_COVER = "PC_COVER"
+    # PCs that were new to the whole corpus when the prog was saved,
+    # as opposed to PC_COVER, which is the whole cover of the call.
+    SYZBASE_TOTAL_NEW_COVER = "SYZBASE_TOTAL_NEW_COVER"
     TIMESTAMP = "timestamp"
     TIMESTAMP_BEGIN = "timestamp_begin"
     TIMESTAMP_END = "timestamp_end"

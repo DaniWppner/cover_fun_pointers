@@ -500,19 +500,14 @@ def unify_per_job(lines):
             timestamp_entry,
             "%Y-%m-%d %H:%M:%S",
         )
-        if unified_key in unified_dict:
-            # since we are only using time profile triage entries, we expect to get 1 of
-            # each type of entry for each triage_id|prog_id pair. If we ever got a duplicate
-            # entry for some reason (e.g, data being reported by triage_id|prog_id + call_id pairs)
-            # something would break.
-            print(
-                colored(f"ERROR: would overwrite entry for key {unified_key}\n", "red")
-                + colored(json.dumps(unified_dict[unified_key], indent=2, default=str), "yellow")
-                + colored("\nwhen adding\n", "red")
-                + colored(json.dumps(unified_entry, indent=2, default=str), "yellow"),
-                file=sys.stderr
-            )
-            sys.exit(1)
+        # triage_id and prog_id are pointers, so they can be reused by different jobs.
+        # jobs are told apart by their consecutive entries (checked above), so a repeated
+        # pair is a different job and just gets a disambiguating counter.
+        base_key = unified_key
+        n_repeats = 0
+        while unified_key in unified_dict:
+            n_repeats += 1
+            unified_key = f"{base_key}|{n_repeats}"
         unified_dict[unified_key] = unified_entry
     return unified_dict
 

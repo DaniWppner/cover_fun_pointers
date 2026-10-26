@@ -169,6 +169,21 @@ def read_serialized_cover(line_number: int, og_text: list[str]) -> list[str]:
     cover_line = cover_line[1:-1]
     return [x.strip() for x in cover_line.split(",")]
 
+def read_serialized_syzbase_cover(line_number: int, og_text: list[str]) -> list[str]:
+    """
+    Args:
+        line_number: Index of the line holding the cover, right after the "total new cover" triage line.
+        og_text: Lines of the log file.
+
+    Returns:
+        list[str]: PCs that were new to the whole corpus when the prog was saved, as hexadecimal strings.
+    """
+    cover_line = og_text[line_number].strip()
+    assert cover_line.startswith("[") and cover_line.endswith("]")
+    # Base syzkaller prints the PCs as a Go []uint64 (decimal). Every later step, addr2line included,
+    # identifies PCs by their hexadecimal string, so they are converted here.
+    return [hex(int(x)) for x in cover_line[1:-1].split()]
+
 def read_exec_durations(line: str) -> list[dict]:
     return json.loads(line)
 
@@ -238,6 +253,8 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
         LOGENTRY_KEYS.MINIMIZATION_SIGNAL_SKIP: call_pattern + r": skip minimize of empty new stable signal$",
         LOGENTRY_KEYS.MINIMIZATION_FPOINTER_SKIP: call_pattern + r": skip minimize of empty new stable stored function pointers$",
         LOGENTRY_KEYS.PC_COVER: r"total cover for " + call_pattern + r":",
+        # Need to retrieve the cover in the line after this entry
+        LOGENTRY_KEYS.SYZBASE_TOTAL_NEW_COVER: r"total new cover for " + call_pattern + r":",
         # This syzkaller log was actually formatted wrong in some versions, since it's trying to output a float as an integer.
         # But we can still match it. We have to account for the %!(float64=) wrapper.
         LOGENTRY_KEYS.TOTAL_JOB_DURATION: r"total job duration: (?:\%\!d\(float64=)?(\d+\.\d+)\)? seconds$",
@@ -414,6 +431,9 @@ def match_against_triage_log_line_types(
         case LOGENTRY_KEYS.PC_COVER:
             res[RESULT_KEYS.CALL_NAME] = match_groups[0]
             res[RESULT_KEYS.PC_COVER] = read_serialized_cover(line_number + 1, og_text)
+        case LOGENTRY_KEYS.SYZBASE_TOTAL_NEW_COVER:
+            res[RESULT_KEYS.CALL_NAME] = match_groups[0]
+            res[RESULT_KEYS.SYZBASE_TOTAL_NEW_COVER] = read_serialized_syzbase_cover(line_number + 1, og_text)
         case LOGENTRY_KEYS.TOTAL_JOB_DURATION:
             res[RESULT_KEYS.TOTAL_JOB_DURATION] = float(match_groups[0])
         case LOGENTRY_KEYS.PROG_EXECUTIONS_JOB_DURATION:
