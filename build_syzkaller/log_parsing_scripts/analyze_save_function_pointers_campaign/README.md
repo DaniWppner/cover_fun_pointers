@@ -82,7 +82,7 @@ A step is skipped only if its stamp matches the current fingerprint and all its 
 
 ## Other scripts (not in the pipeline)
 
-* `compare_groups.py`: plots the average coverage / throughput of one or two *groups* of runs (`--group1-pairs <unified.json> <log> ...`, `--group2-pairs ...`). Averaging across runs of different lengths uses a synthetic time axis (see caveats).
+* `compare_groups.py`: plots the average coverage / throughput of one or two *groups* of runs (`--group1 <run_dir> ...`, `--group2 <run_dir> ...`, e.g. `--group1 <experiment>/analysis/run_*`). Each run directory is a pipeline `--out-dir` that must also hold the run's `syz-manager.log`. All runs of a group must span roughly the same time.
 * `plot_metrics_evolution.py` and `plot_throughput_evolution.py` can also be called directly with two runs to overlay them (and `plot_throughput_evolution.py --cut-after hh:mm:ss`).
 * `extract_logs_into_json.py --cutoff-time "YYYY/MM/DD HH:MM:SS"` truncates the log before the first status line after that time. The pipeline does not expose it.
 * `logentry_keys.py`: the enums (`LOGENTRY_KEYS`, `RESULT_KEYS`, ...) shared by all scripts. Single source of truth for the intermediate JSON format.
