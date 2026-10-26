@@ -1,105 +1,91 @@
 # AGENTS.md
 
-## Agent Persona & Role
-You are an expert developer acting as a **code understanding and writing companion** for the `cover_fun_pointers` repository. Your primary role is to analyze fuzzing coverage logic, write log parsing scripts, and assist in debugging. 
+## Role
+You are a **code understanding and writing companion** for this repository: analyzing coverage logic, writing and maintaining the analysis scripts, and helping debug. You are **not** an autonomous executor of the toolchain.
 
-**You are NOT an autonomous executor of the `cover_fun_pointers` tools.**
+## Boundaries
+*   **DO NOT** build LLVM or the Linux kernel. These builds are manual, resource-intensive and run by the user.
+*   **DO NOT** launch fuzzing campaigns or QEMU instances.
+*   If a change needs testing in LLVM, the kernel or Syzkaller, write the code, present it, and ask the user to build and run it.
 
-## Strict Boundaries
-*   **DO NOT** attempt to build LLVM or the Linux Kernel. These builds are highly manual, resource-intensive, and complex. They will be executed by the human user.
-*   **DO NOT** attempt to launch fuzzing campaigns or QEMU instances autonomously.
-*   If a user request implies testing a change in the kernel or LLVM, write the code, present it to the user, and ask them to compile and run it.
+## Permitted executions
+*   The analysis scripts in `analysis_scripts/` (and the older ones in `build_syzkaller/log_parsing_scripts/` and `tools/`). They load whole logs and JSON files into memory: campaign logs are hundreds of MB to several GB, so check free RAM before running them on full campaigns.
+*   Simple unit tests (e.g. `build_kernel/simple_kcov_test.c`) when the user explicitly asks.
+*   The `syzkaller` container, to build Syzkaller or run its unit tests. Its working directory is mapped to `/syzkaller/gopath/src/github.com/google/syzkaller`.
 
-## Permitted Executions
-*   You may run lightweight Python parsing scripts in `build_syzkaller/log_parsing_scripts/` to analyze data. **However, be mindful that analyzing fuzzing campaigns requires huge amounts of RAM if the log files are in the gigabytes, as the Python parsing scripts tend to load entire logs into memory.**
-*   You may run simple unit tests (e.g., `simple_kcov_test.c`) if explicitly asked by the user.
-*   You may run the `syzkaller` container for building Syzkaller or running unit tests. Note: the container's working directory is mapped to `/syzkaller/gopath/src/github.com/google/syzkaller`.
 ---
 
-## Project Overview
-The goal of this repository is to add and evaluate support for **Function Pointer Coverage**. This enables tracing the execution of instructions that store function pointers into variables, which is highly useful for fuzzers like Syzkaller to discover new execution paths via callbacks. 
+## Project
+The goal is **function pointer coverage**: tracing kernel instructions that store (values that reach) function pointers, so Syzkaller can use them as a coverage signal for discovering callback-driven paths. It spans three components, each with its own README for build steps:
 
-The project spans three main pillars:
-1. **LLVM Compiler**: Instrumenting the code to trace function pointer stores.
-2. **Linux Kernel (KCOV)**: Receiving the instrumentation data and exposing it to userspace via shared memory.
-3. **Syzkaller (Fuzzer)**: Consuming this new coverage data to improve fuzzing.
+| Component | Where | Build / usage docs |
+|---|---|---|
+| Clang instrumentation (LLVM 14.0.6) | `build_llvm/` | `build_llvm/README.md` |
+| Kernel KCOV support (Linux v6.10) | `build_kernel/` | `build_kernel/README.md`, `build_kernel/QEMU_commands.md` |
+| Syzkaller consuming the new coverage | `build_syzkaller/` + the fork [DaniWppner/syzkaller, branch `handle_kcov_store_instructions`](https://github.com/DaniWppner/syzkaller/tree/handle_kcov_store_instructions) | `build_syzkaller/README.md`, `build_syzkaller/syzkaller_patchset/coverage_patchset/PLAN.md` |
+| Campaign analysis | `analysis_scripts/` | `analysis_scripts/README.md` |
 
-## Architecture
+Builds run in Docker through the root `docker-compose.yaml` (services `compile_llvm` and `compile_kernel`). The `linux` volume of `compile_kernel` points at a machine-specific kernel checkout, so local edits to that file are expected and are committed only on purpose (it is listed in `.gitignore` but tracked).
 
-### LLVM Modifications (`build_llvm/`)
-- Contains patches (`cover_function_pointers_patchset` and `cover_naked_function_pointers_patchset`) that modify Clang.
-- The new flags `-fsanitize-coverage=trace-function-pointer-stores` and `trace-naked-function-pointer-stores` instruct the compiler to insert calls to `__sanitizer_cov_store_fun_pointer` before a function pointer is stored into a variable or struct.
-- **Key Files (Implementations)**: 
-  - The patches in `cover_function_pointers_patchset/` and `cover_naked_function_pointers_patchset/`
-- **Interesting Material / Playground**: 
-  - `build_llvm/DynamicStructs.c` (Testing simple instrumentation)
-  - `build_llvm/Dockerfile` (Environment to build the custom LLVM)
+### LLVM patchsets (`build_llvm/`)
+Each patchset is a series of git patches on LLVM 14.0.6 adding a `-fsanitize-coverage=` flag that inserts calls to `__sanitizer_cov_store_fun_pointer(storeAddr, storedValue)`. From oldest to newest:
+- `cover_function_pointers_patchset/`: `trace-function-pointer-stores`, the original approach.
+- `cover_naked_function_pointers_patchset/`: `trace-naked-function-pointer-stores`, stores of plain function pointers.
+- `cover_shallow_function_pointers_patchset/`: adds `trace-shallow-function-pointer-stores`, stores of structs that directly contain function pointers. `VIABILITY.md` lists when injecting a dereference of the stored value would be unsafe.
+- `cover_nested_function_pointers_patchset/`: adds `trace-nested-function-pointer-stores`, following nested type structure to the function pointers reachable from a stored value. Most recent work.
+- `dummy_instrumentation_patchset/`: a placeholder callback per basic block, not a coverage metric.
 
-### Kernel KCOV Integration (`build_kernel/`)
-- The linux kernel uses KCOV to expose coverage. The patch `0001-kcov-add-support-for-fsanitize-coverage-trace-functi.patch` implements the kernel side of this instrumentation.
-- It implements the `__sanitizer_cov_store_fun_pointer` hook which writes the instruction pointer (PC), the destination address, and the stored function pointer value to the shared KCOV buffer.
-- To distinguish regular PC coverage from function pointer coverage, KCOV was updated to use typed entries: `KCOV_ENTRY_TYPE_PC (0xdeadbeeffffffffe)` and `KCOV_ENTRY_TYPE_FUN_POINTER (0xdeadbeefffffffff)`.
-- **Key Files (Implementations)**:
-  - `0001-kcov-add-support-for-fsanitize-coverage-trace-functi.patch`
-- **Interesting Material / Playground**:
-  - `build_kernel/simple_kcov_test.c` (Standalone userspace program to trigger and parse the new KCOV buffer)
-  - `build_kernel/QEMU_commands.md` (Commands for testing the instrumented kernel in QEMU)
-  - `build_kernel/Dockerfile` (Kernel build environment)
+`build_llvm/DynamicStructs.c` is the small playground for checking instrumentation by hand.
 
-### Syzkaller Integration (`build_syzkaller/`)
-- Syzkaller's `syz-executor` requires changes to understand the new layout of the KCOV shared buffer.
-- **Baseline Patches**: The `syzkaller_patchset/` directory adapts the RPC mechanisms (`flatrpc`) and executor to parse the function pointer store entries and pass them back to the fuzzer.
-- **Authoritative Patches (Source of Truth)**: Because active work is frequently done on top of the baseline, the root `syzkaller_patchset/` directory is often outdated. For any specific fuzzing campaign, the true authoritative patches are located within that campaign's `reproduction package`. Always prioritize the reproduction package's patches over the baseline, or prompt the user to confirm the active patchset before assuming Syzkaller logic.
-- Python scripts in `log_parsing_scripts/` exist to analyze data from fuzzing campaigns.
+### Kernel KCOV (`build_kernel/`)
+`0001-kcov-add-support-for-fsanitize-coverage-trace-functi.patch` implements the hook. Each call writes four words to the KCOV buffer: `KCOV_ENTRY_TYPE_FUN_POINTER (0xdeadbeefffffffff)`, the PC of the store, `storeAddr`, `storedValue`. Regular PC entries are tagged `KCOV_ENTRY_TYPE_PC (0xdeadbeeffffffffe)`. Kernel `.config`s live in `build_kernel/configs/` (defconfig-based and syzbot-based for v6.10).
 
-## Build Process
+### Syzkaller (`build_syzkaller/`)
+The executor and manager changes live in the fork above. `syzkaller_patchset/` holds older exported patches and older experiments (`coverage_patchset/{coverage_performance,time_profiling,crash_reproduce,legacy}`); it is frequently behind the fork.
 
-The repository relies heavily on Docker to isolate build environments. It uses the `docker-compose.yaml` at the root directory, and behaves this way:
+**Source of truth for a campaign:** its `repro_package/`, generated by `invoke-syz-manager.py` (from [DaniWppner/tutorials](https://github.com/DaniWppner/tutorials)). It records the Syzkaller fork commit and any uncommitted diff (`syzkaller_commit_difference.json`, `syzkaller_diff_from_ancestor.patch`), the kernel base plus its diff (`linux_commit_difference.json`, `linux_diff_from_ancestor.patch`), the kernel `.config` and the `syzkaller.cfg`. Read it before assuming which Syzkaller, kernel or LLVM logic a campaign ran, or ask the user. The instrumentation is identified by two pieces:
+- the `-fsanitize-coverage=` flag the kernel diff requests (`trace-shallow-…`, `trace-nested-…`, …);
+- the LLVM commit in the `.config`'s `CONFIG_CC_VERSION_TEXT`. The patchsets are committed on branches of `build_llvm/llvm-project` (`log-naked-fun-pointer`, `log-shallow-fun-pointer`, `log-nested-fun-pointer`), so `git log <hash>` there gives the exact patchset version. This only holds if clang was built from a clean, committed tree: a hash that is an upstream LLVM commit (e.g. `f28c006` "Bump version to 14.0.6"), or no hash at all, means the patches were uncommitted, and the version is unknown.
 
-1. **Building LLVM**:
-   - Clones LLVM 14.0.6 into `build_llvm/llvm-project` and applies patches.
-   - Runs the `compile_llvm` docker service to build it (using `cmake` and `ninja`).
+Unless something went wrong, the instrumentation can be generally inferred from the experiment's name.
 
-2. **Building the Kernel**:
-   - Clones the Linux kernel (e.g. v6.10.0) locally.
-   - Applies the KCOV patch.
-   - Updates `docker-compose.yaml` to point the `linux` volume to the local kernel source.
-   - Runs the `compile_kernel` docker service and compiles using the custom LLVM (`make LLVM=1`).
+## Campaign results (`campaign_results/`)
+Current campaigns, grouped by kernel config:
+- `defconfig_experiments/<experiment>/`: the Syzkaller workdir (`syz-manager.log`, `corpus.db`, `crashes/`, `repro_package/`, `previous_run_N/`) and `analysis/run_N/`, one `analysis_scripts` pipeline output per run (it also holds a copy of that run's `syz-manager.log`). The `*.vmlinux` files next to the experiments are the builds to pass as `--vmlinux`.
+- `syszbotconf_experiments/`: same layout, syzbot kernel config.
+- `Previous_PC/`: earlier campaigns.
+- `comparisons/`: plots comparing experiments.
 
-3. **Building Syzkaller**:
-   - Applies patches in `build_syzkaller/syzkaller_patchset/` (or a specific reproduction package) to a Syzkaller checkout.
-   - Compiles `syz-manager` and `syz-executor`.
-   - Sets up a `sample.cfg` to point to the instrumented QEMU image.
+Syzkaller workdir files (`corpus.db`, `crashes/`, `instance-*`, `syz-manager*.log`) are git-ignored.
 
-## Fuzzing Results and Analysis
-Fuzzing results and experiments are generally organized in `build_syzkaller/syzkaller_patchset/coverage_patchset/`. These include campaigns measuring `time_profiling`, `coverage_performance`, `crash_reproduce`, as well as legacy campaigns like `log_raw_PCs`. This directory is actively updated with new fuzzing runs. To identify which version of Syzkaller or the Linux kernel an experiment corresponds to, you can check the `reproduction package` directory inside any campaign.
+## Analysis scripts (`analysis_scripts/`)
+See its README for the pipeline steps, outputs, caching and caveats. Things to know before editing:
+- `processing/` (ETL, including `run_analysis_pipeline.py`), `plotting/`, and `logentry_keys.py` at the top: the enums defining the intermediate JSON format, shared by everything.
+- Scripts are run as **raw executables**. Imports across directories (`from logentry_keys import ...`, `from plotting import ...`) work through an editable install into `analysis_scripts/venv` (`pip install -e . --config-settings editable_mode=compat`); do not add `sys.path` hacks.
+- Type-check with the venv's mypy (`venv/bin/python -m mypy <file>` from `analysis_scripts/`). Several older scripts still have mypy errors; do not introduce new ones.
+- `build_syzkaller/log_parsing_scripts/analyze_log_function_pointers_campaign/` and `tools/` hold older, standalone scripts.
 
-### Log Parsing and Analysis
-A suite of Python scripts and analysis tools is located in `build_syzkaller/log_parsing_scripts/`. This directory is heavily utilized to evaluate the fuzzer's performance across various campaigns. It provides utilities for processing Syzkaller manager triage logs, extracting temporal execution metrics for time profiling, and plotting coverage evolution over time.
+## Python conventions
+Applies to all Python in this repository.
 
-## Python Scripting & Coding Conventions
-When editing Python scripts (e.g., inside `log_parsing_scripts/`), agents must strictly adhere to the following established conventions:
+### 1. Naming (domain preservation)
+*   Variables, functions and parameters use `snake_case`.
+*   **Exception:** domain concepts (`fPointer`), acronyms (`PC`) and custom types (`locInfo`) keep their native casing as atomic blocks, even inside `snake_case` names (`check_PC_exec_funcStore_literal_diffs`, `fPointer_entry`).
 
-### 1. Naming Conventions (The Domain Preservation Rule)
-*   Standard Python variables, functions, and parameters must use `snake_case`.
-*   **Crucial Exception:** Core domain concepts (e.g., `fPointer`), acronyms (`PC`), and custom types (`locInfo`) must retain their native casing (camelCase or PascalCase) as atomic blocks, even when embedded inside `snake_case` names (e.g., `check_PC_exec_funcStore_literal_diffs`, `fPointer_entry`).
-
-### 2. Standardized Arguments (`prog2log`)
-*   Any dictionary representing triage job entries must **always** be named `prog2log`.
-*   Even if the variable contains a filtered subset of the data, the parameter name must remain `prog2log`, and its docstring must exactly match: 
+### 2. `prog2log`
+*   Any dictionary of triage job entries is **always** named `prog2log`, even when it holds a filtered subset.
+*   Its docstring entry is exactly:
     `prog2log: dictionary with the standard format for triage entries of each prog|call pair.`
 
-### 3. Commenting (Dark Magics Only)
-*   Inline comments should be extremely sparse. 
-*   Do not use comments to explain *what* the code does. Comments are strictly reserved for explaining "dark magics" or rigid domain assumptions (e.g., explaining why `locs[0]` is used for inlining, or why timestamps are manipulated in a specific way).
+### 3. Comments (dark magics only)
+*   Inline comments are rare. Never explain *what* the code does; only explain "dark magics" or rigid domain assumptions (why `locs[0]` is used for inlining, why timestamps are shifted a certain way).
 
-### 4. Documentation & Type Hints
-*   All new function signatures must be fully and rigorously type-hinted.
-*   Docstrings must follow the established format with `Args:` and `Returns:` sections. For complex tuple returns, break down each element of the tuple on a new indented line.
-*   Do not include a leading summary sentence in the docstring if the `Args` and `Returns` sections are sufficient to describe the function.
-*   The `Returns` section must explain *what* the returned values mean conceptually in the domain, not *how* they are computed.
+### 4. Docstrings and type hints
+*   Every new function signature is fully type-hinted.
+*   Docstrings use `Args:` and `Returns:` sections. Break complex tuple returns into one indented line per element.
+*   No leading summary sentence when `Args` and `Returns` already describe the function.
+*   `Returns` explains what the values mean in the domain, not how they are computed.
 
-### 5. Anti-Defensive Programming (Fail Fast)
-*   **Do not program defensively.** If a function assumes certain data is present or formatted in a specific way based on the domain context, it must strictly rely on that assumption.
-*   Do not use `if key in dict:`, `dict.get()`, etc. to guard against or massage data that is contractually guaranteed to exist.
-*   Instead, access the data directly (e.g., `dict[key]`, `list[0]`) so that the function naturally blows up (via `KeyError`, `IndexError`, etc.) if bad data is passed in. The very lack of defensive checks serves to document the rigid assumptions of the function.
+### 5. Fail fast (no defensive programming)
+*   Rely on the data contracts of the domain. Do not guard contractually guaranteed data with `if key in dict:`, `dict.get()`, emptiness checks and the like.
+*   Access it directly (`dict[key]`, `list[0]`) so bad input fails loudly with `KeyError`, `IndexError`, etc. The absence of checks documents the assumptions.
