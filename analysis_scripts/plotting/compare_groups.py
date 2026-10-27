@@ -113,7 +113,7 @@ def aggregate_coverage_by_triage(group_coverage: list[list[tuple[float, int]]]) 
 def resample_into_time_buckets(series: list[tuple[float, int]], step_seconds: float) -> list[float]:
     """
     Args:
-        series: (elapsed seconds, coverage) pairs of a single run, starting at 0 seconds.
+        series: (elapsed seconds, coverage) pairs of a single run, in chronological order, starting at 0 seconds.
         step_seconds: width of each time bucket.
 
     Returns:
@@ -121,19 +121,20 @@ def resample_into_time_buckets(series: list[tuple[float, int]], step_seconds: fl
         or the last known coverage if none did.
     """
     max_time = series[-1][0]
-    time_steps = []
+    aggregated_cov: list[float] = []
+    next_point = 0
     t = 0.0
     while t <= max_time + step_seconds:
-        time_steps.append(t)
-        t += step_seconds
-
-    aggregated_cov: list[float] = []
-    for t_val in time_steps:
-        window_points = [p for p in series if t_val - step_seconds < p[0] <= t_val]
-        if window_points:
-            aggregated_cov.append(sum(p[1] for p in window_points) / len(window_points))
+        window_start = next_point
+        while next_point < len(series) and series[next_point][0] <= t:
+            next_point += 1
+        if next_point > window_start:
+            window_sum = sum(p[1] for p in series[window_start:next_point])
+            aggregated_cov.append(window_sum / (next_point - window_start))
         else:
-            aggregated_cov.append([p for p in series if p[0] <= t_val][-1][1])
+            assert next_point > 0, f"no triage at or before {t} s: the series must start at 0 seconds"
+            aggregated_cov.append(series[next_point - 1][1])
+        t += step_seconds
 
     return aggregated_cov
 
