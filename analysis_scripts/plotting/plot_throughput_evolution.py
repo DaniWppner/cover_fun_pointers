@@ -81,7 +81,7 @@ def format_elapsed_time(seconds: float) -> str:
 STATUS_LINE_RE = re.compile(
     r"^(?P<ts>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})\s+"
     r"candidates=\d+\s+corpus=\d+\s+coverage=\d+\s+"
-    r"exec total=(?P<exec_total>\d+)\s+\((?P<exec_rate>\d+)/min\)\s+pending=\d+\s+reproducing=\d+"
+    r"exec total=(?P<exec_total>\d+)\s+\((?P<exec_rate>\d+)/(?P<rate_unit>sec|min)\)\s+pending=\d+\s+reproducing=\d+"
 )
 
 
@@ -99,7 +99,9 @@ def parse_status_lines(path: Path) -> SeriesData:
             if not m:
                 continue
             exec_totals.append(int(m.group("exec_total")))
-            exec_rates.append(int(m.group("exec_rate")))
+            # syz-manager switches the rate to /sec while it is at least 10/sec, typically early in the campaign
+            rate_per_min = int(m.group("exec_rate")) * (60 if m.group("rate_unit") == "sec" else 1)
+            exec_rates.append(rate_per_min)
             timestamps.append(datetime.strptime(m.group("ts"), "%Y/%m/%d %H:%M:%S"))
 
     return SeriesData(exec_totals=exec_totals, exec_rates=exec_rates, timestamps=timestamps)

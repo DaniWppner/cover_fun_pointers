@@ -26,7 +26,7 @@ from logentry_keys import RESULT_KEYS
 STATUS_LINE_RE = re.compile(
     r"^(?P<ts>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})\s+"
     r"candidates=\d+\s+corpus=\d+\s+coverage=(?P<coverage>\d+)\s+"
-    r"exec total=\d+\s+\(\d+/min\)\s+pending=\d+\s+reproducing=\d+"
+    r"exec total=\d+\s+\(\d+/(?:sec|min)\)\s+pending=\d+\s+reproducing=\d+"
 )
 
 
