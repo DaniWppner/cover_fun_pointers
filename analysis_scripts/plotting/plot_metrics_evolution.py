@@ -19,6 +19,7 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy
+from numpy.typing import ArrayLike
 
 from logentry_keys import RESULT_KEYS
 
@@ -30,6 +31,13 @@ STATUS_LINE_RE = re.compile(
 
 
 def parse_status_lines(syz_manager_log: Path) -> list[tuple[datetime, int]]:
+    """
+    Args:
+        syz_manager_log: syz-manager log of a single run.
+
+    Returns:
+        (timestamp, coverage) of every manager status line, in log order.
+    """
     coverages: list[int] = []
     timestamps: list[datetime] = []
 
@@ -50,7 +58,14 @@ def parse_status_lines(syz_manager_log: Path) -> list[tuple[datetime, int]]:
 def convert_timestamps_nicely(
     prog2log: dict[str, dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
+    """
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
 
+    Returns:
+        The same prog2log, modified in place, with TIMESTAMP_END parsed into a datetime.
+        No other field is converted.
+    """
     for prog_key, entries in prog2log.items():
         entries[RESULT_KEYS.TIMESTAMP_END] = datetime.strptime(
             entries[RESULT_KEYS.TIMESTAMP_END], "%Y-%m-%d %H:%M:%S"
@@ -59,6 +74,15 @@ def convert_timestamps_nicely(
 
 
 def all_triage_timestamps(prog2log: dict[str, dict[str, Any]]) -> list[datetime]:
+    """
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
+            TIMESTAMP_END must already be a datetime (see convert_timestamps_nicely).
+
+    Returns:
+        End time of every prog|call entry, in chronological order. An entry triaged several
+        times (COUNT > 1) contributes a single timestamp.
+    """
     timestamps = [entry[RESULT_KEYS.TIMESTAMP_END] for entry in prog2log.values()]
     return sorted(timestamps)
 
@@ -66,28 +90,39 @@ def all_triage_timestamps(prog2log: dict[str, dict[str, Any]]) -> list[datetime]
 def closest_coverage_entries(
     triage_timestamps: list[datetime], ts_x_cov: list[tuple[datetime, int]]
 ) -> list[tuple[datetime, int]]:
+    """
+    Args:
+        triage_timestamps: end time of every triage, in chronological order.
+        ts_x_cov: (timestamp, coverage) of every status line, in chronological order.
+
+    Returns:
+        For each triage, the (timestamp, coverage) of the status line closest in time to its end.
+        Both inputs are walked forward together, so an unsorted input silently gives wrong matches.
+        On a tie between two status lines, the later one wins.
+    """
     result_entries: list[tuple[datetime, int]] = []
     i = 0
     for triage_ts in triage_timestamps:
-        last_ts: datetime = ts_x_cov[i][0]
-        last_cov: int = ts_x_cov[i][1]
-        for j, pair in enumerate(ts_x_cov[i:]):
-            ts, cov = pair
-            if abs((triage_ts - ts).total_seconds()) > abs(
-                (triage_ts - last_ts).total_seconds()
-            ):
-                i += j
-                break
-            last_ts = ts
-            last_cov = cov
-        result_entries.append((last_ts, last_cov))
-    assert len(result_entries) == len(triage_timestamps)
+        while i + 1 < len(ts_x_cov) and abs((triage_ts - ts_x_cov[i + 1][0]).total_seconds()) <= abs(
+            (triage_ts - ts_x_cov[i][0]).total_seconds()
+        ):
+            i += 1
+        result_entries.append(ts_x_cov[i])
     return result_entries
 
 
 def normalize_timestamps(
     ts_x_cov: list[tuple[datetime, int]],
 ) -> list[tuple[float, int]]:
+    """
+    Args:
+        ts_x_cov: (timestamp, coverage) pairs, in chronological order.
+
+    Returns:
+        The same pairs with timestamps as seconds elapsed since the first pair. For the output of
+        closest_coverage_entries, t=0 is the status line closest to the first triage, not the
+        start of the campaign.
+    """
     ts_0: datetime = ts_x_cov[0][0]
     normalized = [((ts - ts_0).total_seconds(), cov) for ts, cov in ts_x_cov]
     return normalized
@@ -97,6 +132,18 @@ def choose_plot_time_unit(
     timestamps_a: list[float],
     timestamps_b: list[float] | None,
 ) -> tuple[str, list[float], list[float] | None, list[float]]:
+    """
+    Args:
+        timestamps_a: elapsed seconds of the first series.
+        timestamps_b: elapsed seconds of the second series, if any.
+
+    Returns:
+        A tuple containing:
+            - "Hours" if the longer series spans more than 2 hours, otherwise "Minutes".
+            - timestamps_a converted to that unit.
+            - timestamps_b converted to that unit, or None.
+            - The timestamps of the longer series converted to that unit.
+    """
     s_in_h = 3600
     s_in_m = 60
 
@@ -107,18 +154,13 @@ def choose_plot_time_unit(
         largest_series = timestamps_b
 
     time_unit = "Hours" if duration_s > s_in_h * 2 else "Minutes"
-
-    def apply_to_list(ts: list[float] | None):
-        if ts is None:
-            return None
-        ratio = s_in_h if time_unit == "Hours" else s_in_m
-        return [t / ratio for t in ts]
+    ratio = s_in_h if time_unit == "Hours" else s_in_m
 
     return (
         time_unit,
-        apply_to_list(timestamps_a),
-        apply_to_list(timestamps_b),
-        apply_to_list(largest_series),
+        [t / ratio for t in timestamps_a],
+        None if timestamps_b is None else [t / ratio for t in timestamps_b],
+        [t / ratio for t in largest_series],
     )
 
 
@@ -134,21 +176,41 @@ def plot_single_coverage_series(
     largest_possible_timestamp: float,
     largest_possible_entry_n: int,
 ) -> None:
+    """
+    Draws the series against triage number on ax, and adds a secondary top axis, in the series'
+    color, that maps triage number to elapsed time for this series only.
+
+    Args:
+        ax: axes to draw on.
+        coverage_values: coverage at each triage of the series.
+        timestamps: elapsed time at each triage of the series, in time_unit.
+        cutoff_point: number of leading triages left out of the plotted line. They still count
+            for the triage numbering and the time mapping.
+        time_unit: unit of timestamps, used in the axis label.
+        color: color of the line and of its time axis.
+        label: legend name of the series.
+        first_secondary_xaxis: True for the first series drawn on ax. Its time axis is labelled and
+            sits right above the plot, while the second series' axis is pushed further out.
+        largest_possible_timestamp: last timestamp of the longest series on ax.
+        largest_possible_entry_n: last triage number of the longest series on ax. Together with
+            largest_possible_timestamp, it extends the time mapping of a shorter series to the
+            whole x range.
+    """
     entry_ns = list(range(len(timestamps)))
     plot_entry_ns = entry_ns[cutoff_point:]
     coverage_values = coverage_values[cutoff_point:]
 
-    interploation_entries = entry_ns + [largest_possible_entry_n]
-    interploation_timestamps = timestamps + [largest_possible_timestamp]
+    interpolation_entries = entry_ns + [largest_possible_entry_n]
+    interpolation_timestamps = timestamps + [largest_possible_timestamp]
 
-    def entry_to_time(entry_n_array: numpy.ndarray) -> numpy.ndarray:
+    def entry_to_time(entry_n_array: ArrayLike) -> numpy.ndarray:
         return numpy.interp(
-            entry_n_array, interploation_entries, interploation_timestamps, left=0
+            numpy.asarray(entry_n_array, dtype=float), interpolation_entries, interpolation_timestamps, left=0
         )
 
-    def time_to_entry(timestamp_array: numpy.ndarray) -> numpy.ndarray:
+    def time_to_entry(timestamp_array: ArrayLike) -> numpy.ndarray:
         return numpy.interp(
-            timestamp_array, interploation_timestamps, interploation_entries, left=0
+            numpy.asarray(timestamp_array, dtype=float), interpolation_timestamps, interpolation_entries, left=0
         )
 
     ax.plot(
@@ -176,7 +238,6 @@ def plot_single_coverage_series(
         ax2.spines["top"].set_position(("outward", 5))
     else:
         ax2.spines["top"].set_position(("outward", 40))
-    return ax2
 
 
 def save_coverage_time_series(
@@ -184,42 +245,39 @@ def save_coverage_time_series(
     coverage_pairs_b: list[tuple[float, int]] | None,
     out_file: Path,
     title: str,
-    labels: tuple[str, str],
+    labels: tuple[str, ...],
 ) -> None:
     """
-    Plot coverage values over time.
+    Plots coverage against triage number, with one elapsed-time axis per series on top.
+    The first 15 triages of each series are left out of the plotted lines.
 
     Args:
-        coverage_pairs: List of (timestamp, coverage) tuples
-        out_file: Output file path for the PNG
-        title: Title for the plot
+        coverage_pairs_a: (elapsed seconds, coverage) at each triage of the first series.
+        coverage_pairs_b: (elapsed seconds, coverage) at each triage of the second series, if any.
+        out_file: path of the PNG to write.
+        title: title of the plot.
+        labels: legend names of the first and, if any, second series.
     """
     CUT_FIRST_N_TRIAGES = 15
-    ts_series = []
-    cov_series = []
-    for pairs in coverage_pairs_a, coverage_pairs_b:
-        if pairs is None:
-            ts, cvs = None, None
-        else:
-            _ts, _cvs = zip(*pairs)
-            ts, cvs = list(_ts), list(_cvs)
-        ts_series.append(ts)
-        cov_series.append(cvs)
-    time_unit, ts_series[0], ts_series[1], largest_series = choose_plot_time_unit(
-        ts_series[0], ts_series[1]
-    )
+    ts_a = [p[0] for p in coverage_pairs_a]
+    ts_b = None if coverage_pairs_b is None else [p[0] for p in coverage_pairs_b]
+    time_unit, ts_a, ts_b, largest_series = choose_plot_time_unit(ts_a, ts_b)
+
+    plotted_series = [([p[1] for p in coverage_pairs_a], ts_a)]
+    if coverage_pairs_b is not None:
+        assert ts_b is not None
+        plotted_series.append(([p[1] for p in coverage_pairs_b], ts_b))
+
     fig = plt.figure(figsize=(10, 4))
     ax = fig.add_subplot(111)
 
-    for series_idx in (0, 1):
-        if ts_series[series_idx] is None:
-            break
+    for series_idx, (coverages, timestamps) in enumerate(plotted_series):
         color = ("Blue", "Red")[series_idx]
         first_plot = series_idx == 0
         plot_single_coverage_series(
             ax,
-            cov_series[series_idx],
-            ts_series[series_idx],
+            coverages,
+            timestamps,
             CUT_FIRST_N_TRIAGES,
             time_unit,
             color,
@@ -240,6 +298,10 @@ def save_coverage_time_series(
 
 
 def check_file_exists(file_path: Path) -> None:
+    """
+    Args:
+        file_path: input file that must exist. Exits with status 1 if it does not.
+    """
     if not file_path.exists():
         print(
             f"Error: The specified json file does not exist: {file_path}",
@@ -251,16 +313,24 @@ def check_file_exists(file_path: Path) -> None:
 def process_log_json_pair(
     syz_manager_log: Path, triage_json_path: Path
 ) -> list[tuple[float, int]]:
+    """
+    Args:
+        syz_manager_log: syz-manager log of the run.
+        triage_json_path: unified_triage_logs.json of the same run. Note the order: log first,
+            unlike the command line, which takes the json first.
+
+    Returns:
+        For each prog|call entry, in order of end time: (elapsed seconds, coverage) of the status
+        line closest to its end. Elapsed seconds count from the status line matched to the first
+        entry (see normalize_timestamps).
+    """
     with open(triage_json_path, "r") as f:
-        __contents = f.read()
-    triage_json = json.loads(__contents)
+        triage_json = json.load(f)
     triage_json = convert_timestamps_nicely(triage_json)
 
     timestamp_x_coverage = parse_status_lines(syz_manager_log)
     triage_timestamps = all_triage_timestamps(triage_json)
-    coverage_pairs = closest_coverage_entries(triage_timestamps, timestamp_x_coverage)
-    coverage_pairs = normalize_timestamps(coverage_pairs)
-    return coverage_pairs
+    return normalize_timestamps(closest_coverage_entries(triage_timestamps, timestamp_x_coverage))
 
 
 if __name__ == "__main__":
@@ -311,7 +381,7 @@ if __name__ == "__main__":
         label2 = input(f"Enter name for second plot (default '{default2}'): ").strip()
         label2 = label2 if label2 else default2
         
-        labels = (label1, label2)
+        labels: tuple[str, ...] = (label1, label2)
     else:
         labels = tuple(path.parent.absolute().name for path, _ in pairs)
     
