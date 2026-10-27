@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import argparse
-from datetime import datetime
+import bisect
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -8,6 +10,83 @@ import matplotlib.pyplot as plt
 from plotting import plot_metrics_evolution, plot_throughput_evolution
 
 MAX_RUN_SPAN_DEVIATION = 0.05
+BUCKET_SECONDS = 60.0
+
+# (elapsed seconds, value) samples of a single run, in chronological order, starting at 0 seconds
+type RunSeries = Sequence[tuple[float, float]]
+
+
+@dataclass(frozen=True)
+class GroupStatistic:
+    """
+    How the runs of a group are summarized at each sample.
+
+    Attributes:
+        description: what the line and the band show, used in plot titles.
+        summarize: maps the values of the runs at one sample to (line, band low, band high).
+    """
+    description: str
+    summarize: Callable[[list[float]], tuple[float, float, float]]
+
+
+@dataclass
+class GroupBand:
+    """
+    Summary of one group for one metric, ready to plot.
+
+    Attributes:
+        x: sample index or elapsed seconds of each point.
+        line: center value at each point.
+        low: lower edge of the band at each point.
+        high: upper edge of the band at each point.
+    """
+    x: list[float]
+    line: list[float]
+    low: list[float]
+    high: list[float]
+
+
+@dataclass(frozen=True)
+class MetricSpec:
+    """
+    Attributes:
+        key: key of the metric in the output of load_group_metrics.
+        name: plot title prefix and y axis label.
+        index_label: x axis label of the plot by sample index.
+        out_subdir: directory, under the current one, of the metric's plots.
+        file_stem: prefix of the metric's PNG names.
+    """
+    key: str
+    name: str
+    index_label: str
+    out_subdir: str
+    file_stem: str
+
+
+METRICS = [
+    MetricSpec("exec_total", "Exec total", "Status line number", "exec_over_time", "grouped_exec_total"),
+    MetricSpec("exec_rate", "Exec/min", "Status line number", "exec_over_time", "grouped_exec_per_min"),
+    MetricSpec(
+        "coverage", "Coverage", "Triaged prog|call entries finished", "coverage_over_time", "grouped_coverage"
+    ),
+]
+
+
+def mean_min_max(values: list[float]) -> tuple[float, float, float]:
+    """
+    Args:
+        values: values of the runs at one sample.
+
+    Returns:
+        A tuple containing:
+            - Mean of the runs.
+            - Lowest run.
+            - Highest run.
+    """
+    return sum(values) / len(values), min(values), max(values)
+
+
+MEAN_MIN_MAX = GroupStatistic("mean, band from min to max", mean_min_max)
 
 
 def assert_similar_run_spans(group_series: list[plot_throughput_evolution.SeriesData], group_paths: list[Path]) -> None:
@@ -24,104 +103,37 @@ def assert_similar_run_spans(group_series: list[plot_throughput_evolution.Series
         )
 
 
-def compute_group_time_mapping(group_series: list[list[float]]) -> list[float]:
+def load_group_metrics(run_files: list[tuple[Path, Path]]) -> dict[str, list[RunSeries]]:
     """
     Args:
-        group_series: normalized timestamps of each run in the group, indexed by sample number.
+        run_files: (triage json, syz-manager log) of each run in the group. All runs must span roughly the same time.
 
     Returns:
-        Synthetic timestamp of each sample number for the whole group: starts at the average first
-        timestamp and advances by the average gap between consecutive samples of the runs still alive.
+        For each metric key of METRICS, the series of every run in the group.
     """
-    max_len = max(len(s) for s in group_series)
-    t0_vals = [s[0] for s in group_series]
-    mapping = [sum(t0_vals) / len(t0_vals)]
+    logs = [log for _, log in run_files]
+    status_lines = [plot_throughput_evolution.parse_status_lines(log) for log in logs]
+    assert_similar_run_spans(status_lines, logs)
 
-    for i in range(1, max_len):
-        deltas = [s[i] - s[i - 1] for s in group_series if len(s) > i]
-        mapping.append(mapping[-1] + sum(deltas) / len(deltas))
-
-    return mapping
-
-
-def average_values_at_step(series_list: list[list[int]], step: int) -> int:
-    """
-    Args:
-        series_list: values of each run in the group, indexed by sample number.
-        step: sample number to average at. At least one run must reach it.
-
-    Returns:
-        Integer average of the runs that reached the given sample number.
-    """
-    vals = [s[step] for s in series_list if len(s) > step]
-    return sum(vals) // len(vals)
+    return {
+        "exec_total": [list(zip(s.timestamps, s.exec_totals)) for s in status_lines],
+        "exec_rate": [list(zip(s.timestamps, s.exec_rates)) for s in status_lines],
+        "coverage": [plot_metrics_evolution.process_log_json_pair(log, json_path) for json_path, log in run_files],
+    }
 
 
-def aggregate_throughput(group_paths: list[Path]) -> plot_throughput_evolution.SeriesData:
+def resample_into_time_buckets(series: RunSeries, step_seconds: float) -> list[float]:
     """
     Args:
-        group_paths: syz-manager logs of each run in the group. All runs must span roughly the same time.
-
-    Returns:
-        Average exec totals and exec rates of the group per status line number, on the synthetic group time axis.
-    """
-    parsed_series = [plot_throughput_evolution.parse_status_lines(p) for p in group_paths]
-    assert_similar_run_spans(parsed_series, group_paths)
-    synthetic_timestamps: list[datetime | float] = list(
-        compute_group_time_mapping([s.timestamps for s in parsed_series])
-    )
-
-    synthetic_exec_totals = [
-        average_values_at_step([s.exec_totals for s in parsed_series], i) for i in range(len(synthetic_timestamps))
-    ]
-    synthetic_exec_rates = [
-        average_values_at_step([s.exec_rates for s in parsed_series], i) for i in range(len(synthetic_timestamps))
-    ]
-
-    return plot_throughput_evolution.SeriesData(
-        exec_totals=synthetic_exec_totals,
-        exec_rates=synthetic_exec_rates,
-        timestamps=synthetic_timestamps,
-    )
-
-
-def parse_group_coverage(group_pairs: list[tuple[Path, Path]]) -> list[list[tuple[float, int]]]:
-    """
-    Args:
-        group_pairs: (triage json, syz-manager log) of each run in the group.
-
-    Returns:
-        For each run, the (elapsed seconds, coverage) pair at the end of every triage job.
-    """
-    return [plot_metrics_evolution.process_log_json_pair(log_path, json_path) for json_path, log_path in group_pairs]
-
-
-def aggregate_coverage_by_triage(group_coverage: list[list[tuple[float, int]]]) -> list[tuple[float, int]]:
-    """
-    Args:
-        group_coverage: for each run, the (elapsed seconds, coverage) pair at the end of every triage job.
-
-    Returns:
-        Average coverage of the group per triage job number, paired with the synthetic group time axis.
-    """
-    synthetic_timestamps = compute_group_time_mapping([[p[0] for p in series] for series in group_coverage])
-    coverages = [[p[1] for p in series] for series in group_coverage]
-
-    return [(ts, average_values_at_step(coverages, i)) for i, ts in enumerate(synthetic_timestamps)]
-
-
-def resample_into_time_buckets(series: list[tuple[float, int]], step_seconds: float) -> list[float]:
-    """
-    Args:
-        series: (elapsed seconds, coverage) pairs of a single run, in chronological order, starting at 0 seconds.
+        series: samples of a single run.
         step_seconds: width of each time bucket.
 
     Returns:
-        Coverage of the run at the end of each bucket: the mean of the triages that finished inside it,
-        or the last known coverage if none did.
+        Value of the run at the end of each bucket: the mean of the samples inside it,
+        or the last known value if there are none.
     """
     max_time = series[-1][0]
-    aggregated_cov: list[float] = []
+    bucket_values: list[float] = []
     next_point = 0
     t = 0.0
     while t <= max_time + step_seconds:
@@ -130,79 +142,190 @@ def resample_into_time_buckets(series: list[tuple[float, int]], step_seconds: fl
             next_point += 1
         if next_point > window_start:
             window_sum = sum(p[1] for p in series[window_start:next_point])
-            aggregated_cov.append(window_sum / (next_point - window_start))
+            bucket_values.append(window_sum / (next_point - window_start))
         else:
-            assert next_point > 0, f"no triage at or before {t} s: the series must start at 0 seconds"
-            aggregated_cov.append(series[next_point - 1][1])
+            assert next_point > 0, f"no sample at or before {t} s: the series must start at 0 seconds"
+            bucket_values.append(series[next_point - 1][1])
         t += step_seconds
 
-    return aggregated_cov
+    return bucket_values
 
 
-def average_bucketed_series(group_bucketed: list[list[float]]) -> list[float]:
+def values_at_step(group_values: Sequence[Sequence[float]], step: int) -> list[float]:
     """
     Args:
-        group_bucketed: coverage of each run in the group per time bucket.
+        group_values: values of each run in the group, indexed by step.
+        step: step to read. At least one run must reach it.
 
     Returns:
-        Average coverage of the runs still alive at each time bucket.
+        Values of the runs that reached the given step.
     """
-    max_len = max(len(s) for s in group_bucketed)
-    avg_coverages = []
-    for i in range(max_len):
-        vals = [s[i] for s in group_bucketed if len(s) > i]
-        avg_coverages.append(sum(vals) / len(vals))
-
-    return avg_coverages
+    return [values[step] for values in group_values if len(values) > step]
 
 
-def aggregate_coverage_by_time(
-    group_coverage: list[list[tuple[float, int]]], step_seconds: float = 60.0
-) -> tuple[list[float], list[float]]:
+def band_over_steps(
+    group_values: Sequence[Sequence[float]], x_of_step: Callable[[int], float], statistic: GroupStatistic
+) -> GroupBand:
     """
     Args:
-        group_coverage: for each run, the (elapsed seconds, coverage) pair at the end of every triage job.
+        group_values: values of each run in the group, indexed by step.
+        x_of_step: x coordinate of each step.
+        statistic: how the runs are summarized at each step.
+
+    Returns:
+        The group summarized at every step reached by at least one run.
+    """
+    longest = max(len(values) for values in group_values)
+    summaries = [statistic.summarize(values_at_step(group_values, step)) for step in range(longest)]
+
+    return GroupBand(
+        x=[x_of_step(step) for step in range(longest)],
+        line=[s[0] for s in summaries],
+        low=[s[1] for s in summaries],
+        high=[s[2] for s in summaries],
+    )
+
+
+def band_by_index(group_runs: list[RunSeries], statistic: GroupStatistic) -> GroupBand:
+    """
+    Args:
+        group_runs: series of each run in the group.
+        statistic: how the runs are summarized at each sample index.
+
+    Returns:
+        The group summarized at the i-th sample of each run, with x being the sample index.
+    """
+    return band_over_steps([[value for _, value in run] for run in group_runs], float, statistic)
+
+
+def band_by_time(group_runs: list[RunSeries], statistic: GroupStatistic, step_seconds: float) -> GroupBand:
+    """
+    Args:
+        group_runs: series of each run in the group.
+        statistic: how the runs are summarized at each time bucket.
         step_seconds: width of each time bucket.
 
     Returns:
-        A tuple containing:
-            - Elapsed seconds at the end of each time bucket.
-            - Average coverage of the group at that time.
+        The group summarized at the end of each time bucket, with x being elapsed seconds.
     """
-    avg_coverages = average_bucketed_series([resample_into_time_buckets(s, step_seconds) for s in group_coverage])
-    time_steps = [i * step_seconds for i in range(len(avg_coverages))]
-
-    return time_steps, avg_coverages
+    bucketed = [resample_into_time_buckets(run, step_seconds) for run in group_runs]
+    return band_over_steps(bucketed, lambda step: step * step_seconds, statistic)
 
 
-def save_time_aligned_coverage(
-    group_a: tuple[list[float], list[float]],
-    group_b: tuple[list[float], list[float]] | None,
+def skip_time_seconds(group_runs: list[list[RunSeries]], skip_first: int) -> float:
+    """
+    Args:
+        group_runs: for each group, the series of every run for one metric.
+        skip_first: number of leading samples hidden from the plots by index. Every run must have more.
+
+    Returns:
+        Elapsed seconds at which the slowest run of any group reached its sample number skip_first.
+        Hiding everything before it on the time plots hides at least those samples of every run.
+    """
+    return max(run[skip_first][0] for runs in group_runs for run in runs)
+
+
+def drop_before(band: GroupBand, x_min: float) -> GroupBand:
+    """
+    Args:
+        band: summary of one group, with x in increasing order.
+        x_min: first x to keep.
+
+    Returns:
+        The points of the band from x_min on.
+    """
+    first = bisect.bisect_left(band.x, x_min)
+    return GroupBand(band.x[first:], band.line[first:], band.low[first:], band.high[first:])
+
+
+def time_axis_unit(bands: list[GroupBand]) -> tuple[str, float]:
+    """
+    Args:
+        bands: bands plotted against elapsed seconds.
+
+    Returns:
+        A tuple containing:
+            - "Hours" if the longest band spans more than 2 hours, otherwise "Minutes".
+            - Seconds in that unit.
+    """
+    longest = max(band.x[-1] for band in bands)
+    return ("Hours", 3600.0) if longest > 2 * 3600 else ("Minutes", 60.0)
+
+
+def save_band_plot(
+    bands: list[GroupBand],
+    labels: Sequence[str],
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    x_divisor: float,
     out_file: Path,
-    labels: tuple[str, str],
 ) -> None:
     """
     Args:
-        group_a: (elapsed seconds, average coverage) per time bucket of the first group.
-        group_b: (elapsed seconds, average coverage) per time bucket of the second group, if any.
+        bands: one band per group.
+        labels: legend name of each group, in the same order.
+        title: title of the plot.
+        xlabel: label of the x axis.
+        ylabel: label of the y axis.
+        x_divisor: every x is divided by it before plotting, to change its unit.
         out_file: path of the PNG to write.
-        labels: legend names of the first and second group.
     """
     fig = plt.figure(figsize=(10, 4))
     ax = fig.add_subplot(111)
 
-    groups = [group_a] if group_b is None else [group_a, group_b]
-    for (time_steps, coverages), label, color in zip(groups, labels, ("Blue", "Red")):
-        ax.plot([t / 60 for t in time_steps], coverages, label=label, color=color, marker=".", linewidth=1)
+    for band, label, color in zip(bands, labels, ("tab:blue", "tab:orange")):
+        x = [v / x_divisor for v in band.x]
+        ax.plot(x, band.line, color=color, linewidth=1, label=label)
+        ax.fill_between(x, band.low, band.high, color=color, alpha=0.2, linewidth=0)
 
-    ax.set_title("Coverage Evolution (Time-Aligned)", loc="left", fontsize="15")
-    ax.set_xlabel("Elapsed Time (Minutes)")
-    ax.set_ylabel("Coverage Score")
+    ax.set_title(title, loc="left", fontsize="15")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     ax.legend(loc="best")
     fig.tight_layout()
     fig.savefig(out_file)
     plt.close(fig)
     print(f"Saved {out_file}")
+
+
+def save_metric_plots(
+    metric: MetricSpec,
+    group_runs: list[list[RunSeries]],
+    labels: Sequence[str],
+    statistic: GroupStatistic,
+    skip_first: int,
+) -> None:
+    """
+    Args:
+        metric: metric to plot.
+        group_runs: for each group, the series of every run for this metric.
+        labels: legend name of each group, in the same order.
+        statistic: how the runs of a group are summarized.
+        skip_first: number of leading samples hidden from the plot by index. The plot by time hides
+            everything before the time given by skip_time_seconds.
+    """
+    out_dir = Path.cwd() / metric.out_subdir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    title = f"{metric.name} ({statistic.description})"
+
+    by_index = [drop_before(band_by_index(runs, statistic), skip_first) for runs in group_runs]
+    save_band_plot(
+        by_index, labels, title, metric.index_label, metric.name, 1.0, out_dir / f"{metric.file_stem}_by_index.png"
+    )
+
+    skip_seconds = skip_time_seconds(group_runs, skip_first)
+    by_time = [drop_before(band_by_time(runs, statistic, BUCKET_SECONDS), skip_seconds) for runs in group_runs]
+    unit, seconds_per_unit = time_axis_unit(by_time)
+    save_band_plot(
+        by_time,
+        labels,
+        title,
+        f"Elapsed time ({unit})",
+        metric.name,
+        seconds_per_unit,
+        out_dir / f"{metric.file_stem}_by_time.png",
+    )
 
 
 def run_dir_files(run_dirs: list[Path]) -> list[tuple[Path, Path]]:
@@ -217,7 +340,7 @@ def run_dir_files(run_dirs: list[Path]) -> list[tuple[Path, Path]]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Wrapper to plot average metrics/throughput of groups of campaigns")
+    parser = argparse.ArgumentParser(description="Plot the metrics/throughput of one or two groups of campaigns")
     parser.add_argument(
         "--group1",
         nargs="+",
@@ -229,58 +352,24 @@ def main() -> None:
     parser.add_argument("--group2", nargs="+", type=Path, metavar="RUN_DIR", help="same as --group1")
     parser.add_argument("--group1-label", type=str, default="Group 1")
     parser.add_argument("--group2-label", type=str, default="Group 2")
+    parser.add_argument(
+        "--skip-first",
+        type=int,
+        default=0,
+        metavar="N",
+        help="hide the first N samples (status lines, or triaged prog|call entries for coverage) of the plots by "
+        "index, and everything before the slowest run reached its N-th sample on the plots by time",
+    )
     args = parser.parse_args()
 
-    g1_pairs = run_dir_files(args.group1)
-    g2_pairs = run_dir_files(args.group2) if args.group2 is not None else None
+    groups = [args.group1] if args.group2 is None else [args.group1, args.group2]
     labels = (args.group1_label, args.group2_label)
+    group_metrics = [load_group_metrics(run_dir_files(run_dirs)) for run_dirs in groups]
 
-    throughput_series_list = [aggregate_throughput([log for _, log in g1_pairs])]
-    if g2_pairs is not None:
-        throughput_series_list.append(aggregate_throughput([log for _, log in g2_pairs]))
-
-    out_dir_t = Path.cwd() / "exec_over_time"
-    out_dir_t.mkdir(parents=True, exist_ok=True)
-    throughput_labels = labels[: len(throughput_series_list)]
-    plot_throughput_evolution.save_time_series(
-        throughput_series_list,
-        out_dir_t / "grouped_exec_total_evolution.png",
-        "Exec total over time (Group Average)",
-        "Exec total",
-        "exec_totals",
-        throughput_labels,
-    )
-    plot_throughput_evolution.save_time_series(
-        throughput_series_list,
-        out_dir_t / "grouped_exec_per_min_evolution.png",
-        "Exec/min over time (Group Average)",
-        "Exec/min",
-        "exec_rates",
-        throughput_labels,
-    )
-
-    g1_coverage = parse_group_coverage(g1_pairs)
-    g2_coverage = parse_group_coverage(g2_pairs) if g2_pairs is not None else None
-
-    by_triage_a = aggregate_coverage_by_triage(g1_coverage)
-    by_triage_b = aggregate_coverage_by_triage(g2_coverage) if g2_coverage is not None else None
-
-    out_dir_m = Path.cwd() / "coverage_over_time"
-    out_dir_m.mkdir(parents=True, exist_ok=True)
-    plot_metrics_evolution.save_coverage_time_series(
-        by_triage_a,
-        by_triage_b,
-        out_dir_m / "grouped_coverage_evolution.png",
-        "Coverage Evolution over Triages (Index-Aligned Average)",
-        labels=labels,
-    )
-
-    save_time_aligned_coverage(
-        aggregate_coverage_by_time(g1_coverage),
-        aggregate_coverage_by_time(g2_coverage) if g2_coverage is not None else None,
-        out_dir_m / "grouped_coverage_evolution_time_aligned.png",
-        labels,
-    )
+    for metric in METRICS:
+        save_metric_plots(
+            metric, [metrics[metric.key] for metrics in group_metrics], labels, MEAN_MIN_MAX, args.skip_first
+        )
 
 
 if __name__ == "__main__":
