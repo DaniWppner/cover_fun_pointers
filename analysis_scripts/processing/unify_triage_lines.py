@@ -493,7 +493,23 @@ def _get_source_code_refs_impl(offsets: Iterable[str], vmlinux_path: Path) -> di
         r"^(?:(0x[0-9a-fA-F]+):\s+)?(?:\(inlined by\)\s+)?(.+?)\s+at\s+(.+)$"
     )
 
+    # hacky hack:
+    # Some Linux APIs (like ebpf) dynamically generate blobs that live in kernel address space 
+    # and are interpreted as executable code. Pointers to that code can show up in this analysis. 
+    # Assuming x86_64 architecure, and that Kernel Address-Range Randomization is OFF
+    # (which it should be for any of this to make sense).
+    #
+    # The `execmem` module stores this code in the address range associated to modules, which is
+    # (MODULES_VADDR = __START_KERNEL_map + 512 MiB, up to the largest MODULES_END).
+    # Addresses in this range should never belong to the 'static' kernel, which is what we're 
+    # allowed to look at in this function.
+    DYNAMIC_CODE_START = 0xffffffffa0000000
+    DYNAMIC_CODE_END = 0xffffffffff000000
+    DYNAMIC_CODE_LOCINFO: locInfo = ("<execmem>:0", "<dynamic code>")
+
     offsets = set(offsets)
+    dynamic_offsets = {o for o in offsets if DYNAMIC_CODE_START <= int(o, 16) < DYNAMIC_CODE_END}
+    offsets -= dynamic_offsets
     sourceInfo_data: dict[str, list[locInfo]] = {}
 
     def spinner(stop_event):
@@ -558,6 +574,8 @@ def _get_source_code_refs_impl(offsets: Iterable[str], vmlinux_path: Path) -> di
     # we need to set the NULL pointer value back to no-trailing-zeroes formatting after addr2line modified it
     if "0x0" in offsets:
         sourceInfo_data["0x0"] = sourceInfo_data.pop("0x0000000000000000")
+    for o in dynamic_offsets:
+        sourceInfo_data[o] = [DYNAMIC_CODE_LOCINFO]
     return sourceInfo_data
 
 
