@@ -34,19 +34,20 @@ def run_cmd(cmd, stdout_file=None, cwd=None):
         sys.exit(result.returncode)
 
 
-def make_fingerprint(script: Path, inputs: list[Path]) -> dict[str, object]:
+def make_fingerprint(script: Path, inputs: list[Path], extra_sources: list[Path]) -> dict[str, object]:
     """
     Args:
         script: Path to the step's script.
         inputs: Files the step reads.
+        extra_sources: Other scripts whose functions the step imports.
 
     Returns:
         dict[str, object]: Identity of everything the step's results depend on.
-            sources_sha256: hash of the step's script plus the shared module
+            sources_sha256: hash of the step's script, its extra sources and the shared module
             inputs: size and mtime (ns) of each input file, keyed by file name
     """
     sources = hashlib.sha256()
-    for source in (script, SHARED_MODULE):
+    for source in (script, *extra_sources, SHARED_MODULE):
         sources.update(source.read_bytes())
     # Inputs can be multi-GB logs, so they are identified by stat instead of by content.
     return {
@@ -115,6 +116,9 @@ def main():
     time_profile_txt = out_dir / "time_profile.txt"
     time_profile_data = out_dir / "time_profile_data.json"
     unified_json = out_dir / "unified_triage_logs.json"
+    # extract_logs_into_json.py writes it next to raw_jsonl, under this name
+    raw_fpointer_events = out_dir / "raw_fpointer_events.jsonl"
+    fpointer_events = out_dir / "fpointer_events.json"
     analysis_txt = results_dir / "analysis.txt"
     cov_plot = out_dir / "coverage_over_time" / "coverage_evolution.png"
     exec_plot = out_dir / "exec_over_time" / "exec_total_evolution.png"
@@ -124,9 +128,11 @@ def main():
         script_name: str,
         inputs: list[Path],
         outputs: list[Path],
-        cmd_args: list[Path],
+        cmd_args: list[Path | str],
         cwd: Path,
         stdout_file: Path | None = None,
+        optional_outputs: tuple[Path, ...] = (),
+        extra_sources: tuple[Path, ...] = (),
     ) -> None:
         """
         Args:
@@ -137,13 +143,16 @@ def main():
             cmd_args: Positional arguments passed to the script.
             cwd: Working directory of the script.
             stdout_file: File receiving the script's stdout, if it is one of the step's outputs.
+            optional_outputs: Files the step produces only for some inputs. They are deleted like outputs,
+                but their absence does not make the step rerun.
+            extra_sources: Other scripts whose functions the step imports, so that changing them reruns the step.
 
         Returns:
             None
         """
         print_step(step, TOTAL_STEPS, script_name)
         script = SCRIPTS_ROOT / script_name
-        fingerprint = make_fingerprint(script, inputs)
+        fingerprint = make_fingerprint(script, inputs, [SCRIPTS_ROOT / source for source in extra_sources])
         stamp = stamps_dir / f"{script.stem}.json"
         reason = rerun_reason(stamp, fingerprint, outputs, forced=step >= force_from)
         if reason is None:
@@ -152,7 +161,7 @@ def main():
 
         print(f"Running: {reason}.", flush=True)
         stamp.unlink(missing_ok=True)
-        for output in outputs:
+        for output in [*outputs, *optional_outputs]:
             output.unlink(missing_ok=True)
         try:
             run_cmd(
@@ -161,7 +170,7 @@ def main():
                 cwd=cwd,
             )
         except SystemExit:
-            for output in outputs:
+            for output in [*outputs, *optional_outputs]:
                 output.unlink(missing_ok=True)
             raise
         stamp.write_text(json.dumps(fingerprint))
@@ -169,6 +178,7 @@ def main():
     run_step(1, "processing/extract_logs_into_json.py",
              inputs=[log_path],
              outputs=[raw_jsonl],
+             optional_outputs=(raw_fpointer_events,),
              cmd_args=[log_path, raw_jsonl],
              cwd=out_dir)
 
@@ -185,8 +195,19 @@ def main():
              cmd_args=[triage_jsonl, unified_json, "--vmlinux", vmlinux_path],
              cwd=out_dir)
 
-    print_step(4, TOTAL_STEPS, "Creating results directory")
-    print(f"Directory already ensured at: {results_dir}", flush=True)
+    if raw_fpointer_events.exists():
+        run_step(4, "processing/resolve_fpointer_events.py",
+                 inputs=[raw_fpointer_events, vmlinux_path],
+                 outputs=[fpointer_events],
+                 cmd_args=[raw_fpointer_events, fpointer_events, "--vmlinux", vmlinux_path],
+                 cwd=out_dir,
+                 extra_sources=(Path("processing/unify_triage_lines.py"),))
+    else:
+        print_step(4, TOTAL_STEPS, "processing/resolve_fpointer_events.py")
+        print("Skipping: the log has no stored function pointers events outside of triage jobs.", flush=True)
+        # A previous run of step 1 may have found events that the current log no longer has.
+        fpointer_events.unlink(missing_ok=True)
+        (stamps_dir / "resolve_fpointer_events.json").unlink(missing_ok=True)
 
     run_step(5, "processing/process_triage_metrics.py",
              inputs=[unified_json],

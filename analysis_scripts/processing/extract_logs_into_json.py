@@ -49,6 +49,8 @@ class TriageSkipLine(Exception):
 
 TIMESTAMP_RE = r"^(?P<ts>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})"
 TIMESTAMP_TRIAGE_RE = r"^(?P<tstriage>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"
+# Written next to the output json, only if the log has any of these events.
+FPOINTER_EVENTS_FILE_NAME = "raw_fpointer_events.jsonl"
 
 def read_serializaed_prog(line_number: int, og_text: list[int]) -> list[str]:
     """
@@ -284,22 +286,47 @@ def create_triage_master_regex() -> tuple[re.Pattern, dict[str, list[int]]]:
     return __create_master_regex(patterns)
 
 
-def parse_raw_triage_logs(log_lines: list[str]) -> Iterable[dict]:
-    # Regex breakdown:
+def parse_raw_triage_logs(log_lines: list[str]) -> Iterable[tuple[bool, dict]]:
+    """
+    Args:
+        log_lines: Lines of the log file.
+
+    Returns:
+        Iterable[tuple[bool, dict]]: One pair per parsed line, in log order:
+            is_fpointer_event: whether the entry is a stored function pointers event logged outside of any
+                triage job (base syzkaller only) instead of a triage line.
+            entry: for a triage line, its parsed data plus TIMESTAMP (fuzzer clock), PROGID and TRIAGEID.
+                For an event, PROGID, CALL_NAME, NEW_FPOINTERS_PAYLOAD (the raw json list) and TIMESTAMP
+                (manager clock).
+    """
+    # Regex breakdown, triage lines:
     # \[(triage-[^\]]+)\] -> Captures the triage-id (e.g., triage-0x2c66bd608c80)
     # \[(prog-[^\]]+)\]   -> Captures the prog-id (e.g., prog-0x351ec85d0480)
     # (.*)                -> Captures the rest of the log entry
-
-    indentify_triage_re = re.compile(r"\[(triage-[^\]]+)\] \[(prog-[^\]]+)\]: (.*)")
+    # Stored function pointers events of base syzkaller carry no triage-id. Patched versions log the same
+    # line without the payload (it goes in the triage job instead), which does not match.
+    indentify_line_re = re.compile(
+        r"\[(?P<triage>triage-[^\]]+)\] \[(?P<prog>prog-[^\]]+)\]: (?P<triage_line>.*)"
+        + "|" + TIMESTAMP_RE
+        + r" \[(?P<event_prog>prog-[^\]]+)\] found new stored function pointers in call"
+        + r" (?P<event_call>#-?\d+ \[[^\]]+\]): (?P<event_payload>\[.*\])$"
+    )
     triage_line_re, triage_re_map = create_triage_master_regex()
 
     for line_number, line in tcontrib.tenumerate(log_lines):
-        match = indentify_triage_re.search(line)
-        if match:
+        match = indentify_line_re.search(line)
+        if match and match.group("event_prog"):
+            yield True, {
+                RESULT_KEYS.PROGID: match.group("event_prog"),
+                RESULT_KEYS.CALL_NAME: match.group("event_call"),
+                RESULT_KEYS.NEW_FPOINTERS_PAYLOAD: match.group("event_payload"),
+                RESULT_KEYS.TIMESTAMP: str(parse_timestamp_from_line(line)),
+            }
+        elif match:
             fpcov_orig = False
-            triage_id = match.group(1)
-            prog_id = match.group(2)
-            triage_log_line = match.group(3)
+            triage_id = match.group("triage")
+            prog_id = match.group("prog")
+            triage_log_line = match.group("triage_line")
             # hackily remove the [fpcov-orig] tag from the begginning of the triage line if it's there
             if triage_log_line.startswith("[fpcov-orig] "):
                 fpcov_orig = True
@@ -337,7 +364,7 @@ def parse_raw_triage_logs(log_lines: list[str]) -> Iterable[dict]:
             entry[RESULT_KEYS.TRIAGEID] = triage_id
             if fpcov_orig:
                 entry[RESULT_KEYS.TAGS] = [TAG_RESULT_VALUES.FPOINTER_ORIGIN]
-            yield entry
+            yield False, entry
 
 
 def match_against_triage_log_line_types(
@@ -470,7 +497,9 @@ if __name__ == "__main__":
         "log_path", type=str, nargs="?", help="Path to the syzkaller log file to parse."
     )
     parser.add_argument(
-        "out_path", type=str, nargs="?", help="Path to the output json."
+        "out_path", type=str, nargs="?",
+        help=f"Path to the output json. The stored function pointers events logged outside of triage jobs "
+        f"(base syzkaller only) go to {FPOINTER_EVENTS_FILE_NAME} next to it, if the log has any.",
     )
     parser.add_argument(
         "--cutoff-time",
@@ -516,10 +545,16 @@ if __name__ == "__main__":
         cutoff_index = find_cutoff_before_status_block(lines, cutoff)
         lines = lines[:cutoff_index]
 
-    out_str = '\n'.join(
-        json.dumps(json_obj, indent=None)
-        for json_obj in parse_raw_triage_logs(lines)
-    )
+    triage_lines: list[str] = []
+    fpointer_events: list[str] = []
+    for is_fpointer_event, json_obj in parse_raw_triage_logs(lines):
+        (fpointer_events if is_fpointer_event else triage_lines).append(json.dumps(json_obj, indent=None))
 
     with out_path.open("w") as f:
-        f.write(out_str)
+        f.write('\n'.join(triage_lines))
+
+    if fpointer_events:
+        fpointer_events_path = out_path.with_name(FPOINTER_EVENTS_FILE_NAME)
+        with fpointer_events_path.open("w") as f:
+            f.write('\n'.join(fpointer_events))
+        print(f"Wrote {len(fpointer_events)} stored function pointers events to {fpointer_events_path}")

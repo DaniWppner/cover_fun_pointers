@@ -32,13 +32,23 @@ Commit `28a0e909a75bc2255460a4bdba5151efe5a7a2d1` introduced the logging of the 
 
 | # | Script | Input -> Output | What it does |
 |---|--------|-----------------|--------------|
-| 1 | `processing/extract_logs_into_json.py` | `syz-manager.log` -> `raw_triage_lines.jsonl` | Regex-parses every `[triage-..] [prog-..]` log line into one JSON object per line. Also pulls the multi-line payloads that follow some entries (serialized progs, PC cover lists, per-exec duration JSON). |
+| 1 | `processing/extract_logs_into_json.py` | `syz-manager.log` -> `raw_triage_lines.jsonl` (+ `raw_fpointer_events.jsonl`) | Regex-parses every `[triage-..] [prog-..]` log line into one JSON object per line. Also pulls the multi-line payloads that follow some entries (serialized progs, PC cover lists, per-exec duration JSON). In the same pass it also matches the stored function pointers events logged outside of triage jobs (see [Stored function pointers events](#stored-function-pointers-events)).|
 | 2 | `processing/separate_time_profile_entries.py` | `raw_triage_lines.jsonl` -> `triage_lines.jsonl` (+ `time_profile.txt` from stdout, `time_profile_plots/`, `time_profile_data.json`) | Splits job-level timing entries (durations, exec counts, in-flight progs) from the per-call triage entries. Timing entries become plots and stats; the rest is passed on. |
-| 3 | `processing/unify_triage_lines.py` | `triage_lines.jsonl` -> `unified_triage_logs.json` | Merges all lines of a triage into one entry per `<prog, call>` (the `prog2log` dictionary used everywhere downstream; see [KI-1](#ki-1-fpointer_origin-tag-is-not-used-by-any-analysis) for the `tags` field it carries but nobody reads), then resolves every PC / stored function pointer / store instruction address to source locations with `addr2line`. |
-| 4 | (creates `results/`) | | Only creates the directory. It is a no-op step kept for numbering. |
+| 3 | `processing/unify_triage_lines.py` | `triage_lines.jsonl` -> `unified_triage_logs.json` | Merges all lines of a triage into one entry per `<prog, call>`, then resolves every PC / stored function pointer / store instruction address to source locations with `addr2line`. |
+| 4 | `processing/resolve_fpointer_events.py` | `raw_fpointer_events.jsonl` -> `fpointer_events.json` | Only runs if step 1 found events. Keys the events by `<prog, call>` and resolves their addresses with `addr2line`. |
 | 5 | `processing/process_triage_metrics.py` | `unified_triage_logs.json` -> `results/analysis.txt` (+ side files in `results/`) | The actual analysis (see below). |
 | 6 | `plotting/plot_metrics_evolution.py` | `unified_triage_logs.json` + log -> `coverage_over_time/coverage_evolution.png` | Coverage (from manager status lines) against number of finished triages. |
 | 7 | `plotting/plot_throughput_evolution.py` | log -> `exec_over_time/exec_total_evolution.png` (+ `exec_per_min_*`) | `exec total` and `exec/min` over time. |
+
+### Stored function pointers events
+
+Base Syzkaller does not triage progs for their stored function pointers, so it reports them as soon as they are found, outside of any triage job:
+
+```
+2026/09/30 16:57:25 [prog-0x6526e16c340] found new stored function pointers in call #4 [umount2]: [{"PC": "0x...", "StoredValue": "0x..."}]
+```
+
+The patched versions report the payload inside the triage job instead (its `|new stored function pointers|=` line). Their version of this line carries no payload, does not match, and produces no events file.
 
 ### What `process_triage_metrics.py` reports
 
@@ -60,6 +70,8 @@ Outputs for a finished run:
   time_profile.txt              step 2 stdout (campaign/job timing summary)
   time_profile_plots/           step 2
   unified_triage_logs.json      step 3
+  raw_fpointer_events.jsonl     step 1, base Syzkaller only
+  fpointer_events.json          step 4, base Syzkaller only
   results/analysis.txt          step 5 (+ json/py side files)
   coverage_over_time/           step 6
   exec_over_time/               step 7
@@ -70,7 +82,8 @@ Outputs for a finished run:
 
 Each step records a completion stamp in `<out-dir>/.stamps/<script>.json` **only after it exits with code 0**. The stamp holds a fingerprint of:
 
-* the step's script and `logentry_keys.py` (content hash);
+* the step's script, `logentry_keys.py` and any other script whose functions it imports (content hash; step 4 imports step 3's);
+* optional outputs (`raw_fpointer_events.jsonl`) are deleted like the others before a step runs, but their absence does not make it rerun;
 * the size and mtime of each input file (not content, since logs can be multi-GB).
 
 A step is skipped only if its stamp matches the current fingerprint and all its declared outputs exist. Before a step runs, its declared outputs and stamp are deleted, and its outputs are deleted again if it fails, so a crash never leaves something that looks finished. Invalidation cascades: rerunning a step changes its outputs' mtimes, which invalidates the steps that read them.
