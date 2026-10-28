@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 import argparse
 import bisect
+import math
+import statistics
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from scipy import stats  # type: ignore[import-untyped]
 
 from plotting import plot_metrics_evolution, plot_throughput_evolution
 
@@ -87,6 +90,30 @@ def mean_min_max(values: list[float]) -> tuple[float, float, float]:
 
 
 MEAN_MIN_MAX = GroupStatistic("mean, band from min to max", mean_min_max)
+
+def mean_t_ci95(values: list[float]) -> tuple[float, float, float]:
+    """
+    Args:
+        values: values of the runs at one sample.
+
+    Returns:
+        A tuple containing:
+            - Mean of the runs.
+            - Lower edge of the 95% confidence interval of the mean, NaN if only one run reached the sample.
+            - Upper edge of the 95% confidence interval of the mean, NaN if only one run reached the sample.
+    """
+    mean = statistics.fmean(values)
+    if len(values) == 1:
+        return mean, math.nan, math.nan
+
+    critical = float(stats.t.ppf(0.975, df=len(values) - 1))
+    half_width = critical * statistics.stdev(values) / math.sqrt(len(values))
+    return mean, mean - half_width, mean + half_width
+
+
+MEAN_T_CI95 = GroupStatistic("mean, band is its 95% t confidence interval", mean_t_ci95)
+
+STATISTICS = {"ci95": MEAN_T_CI95, "minmax": MEAN_MIN_MAX}
 
 
 def assert_similar_run_spans(group_series: list[plot_throughput_evolution.SeriesData], group_paths: list[Path]) -> None:
@@ -360,6 +387,13 @@ def main() -> None:
         help="hide the first N samples (status lines, or triaged prog|call entries for coverage) of the plots by "
         "index, and everything before the slowest run reached its N-th sample on the plots by time",
     )
+    parser.add_argument(
+        "--statistic",
+        choices=STATISTICS,
+        default="ci95",
+        help="line and band drawn for each group: mean with its 95%% t confidence interval, or mean with the "
+        "min/max of the runs",
+    )
     args = parser.parse_args()
 
     groups = [args.group1] if args.group2 is None else [args.group1, args.group2]
@@ -368,7 +402,11 @@ def main() -> None:
 
     for metric in METRICS:
         save_metric_plots(
-            metric, [metrics[metric.key] for metrics in group_metrics], labels, MEAN_MIN_MAX, args.skip_first
+            metric,
+            [metrics[metric.key] for metrics in group_metrics],
+            labels,
+            STATISTICS[args.statistic],
+            args.skip_first,
         )
 
 
