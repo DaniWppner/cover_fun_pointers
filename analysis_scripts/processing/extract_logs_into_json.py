@@ -300,13 +300,14 @@ def parse_raw_triage_logs(log_lines: list[str]) -> Iterable[tuple[bool, dict]]:
                 (manager clock).
     """
     # Regex breakdown, triage lines:
-    # \[(triage-[^\]]+)\] -> Captures the triage-id (e.g., triage-0x2c66bd608c80)
+    # \[(triage-[^\]]+)\] -> Captures the triage-id (e.g., triage-0x2c66bd608c80), or the id of a
+    #                        candidate triage job (candidate_triage-0x...: seeds and loaded corpus)
     # \[(prog-[^\]]+)\]   -> Captures the prog-id (e.g., prog-0x351ec85d0480)
     # (.*)                -> Captures the rest of the log entry
     # Stored function pointers events of base syzkaller carry no triage-id. Patched versions log the same
     # line without the payload (it goes in the triage job instead), which does not match.
     indentify_line_re = re.compile(
-        r"\[(?P<triage>triage-[^\]]+)\] \[(?P<prog>prog-[^\]]+)\]: (?P<triage_line>.*)"
+        r"\[(?P<triage>(?P<candidate>candidate_)?triage-[^\]]+)\] \[(?P<prog>prog-[^\]]+)\]: (?P<triage_line>.*)"
         + "|" + TIMESTAMP_RE
         + r" \[(?P<event_prog>prog-[^\]]+)\] found new stored function pointers in call"
         + r" (?P<event_call>#-?\d+ \[[^\]]+\]): (?P<event_payload>\[.*\])$"
@@ -362,8 +363,13 @@ def parse_raw_triage_logs(log_lines: list[str]) -> Iterable[tuple[bool, dict]]:
             entry[RESULT_KEYS.TIMESTAMP] = str(parse_timestamp_from_triage_line(line))
             entry[RESULT_KEYS.PROGID] = prog_id
             entry[RESULT_KEYS.TRIAGEID] = triage_id
+            tags: list[str] = []
+            if match.group("candidate"):
+                tags.append(TAG_RESULT_VALUES.CANDIDATE_TRIAGE)
             if fpcov_orig:
-                entry[RESULT_KEYS.TAGS] = [TAG_RESULT_VALUES.FPOINTER_ORIGIN]
+                tags.append(TAG_RESULT_VALUES.FPOINTER_ORIGIN)
+            if tags:
+                entry[RESULT_KEYS.TAGS] = tags
             yield False, entry
 
 
