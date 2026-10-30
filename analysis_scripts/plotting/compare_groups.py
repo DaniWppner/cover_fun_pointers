@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 import argparse
 import bisect
+import itertools
+import json
 import math
 import statistics
-from collections.abc import Callable, Sequence
+from collections import Counter
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 from scipy import stats  # type: ignore[import-untyped]
 
+from logentry_keys import RESULT_KEYS, locInfo
 from plotting import plot_metrics_evolution, plot_throughput_evolution
+from processing import process_triage_metrics
 
 MAX_RUN_SPAN_DEVIATION = 0.05
 BUCKET_SECONDS = 60.0
@@ -55,22 +62,48 @@ class MetricSpec:
     Attributes:
         key: key of the metric in the output of load_group_metrics.
         name: plot title prefix and y axis label.
-        index_label: x axis label of the plot by sample index.
+        index_label: x axis label of the plot by sample index, None if the samples are time buckets and only the
+            plot by time is drawn.
         out_subdir: directory, under the current one, of the metric's plots.
         file_stem: prefix of the metric's PNG names.
+        skip_by: key of the metric whose samples --skip-first counts to cut the plot by time.
     """
     key: str
     name: str
-    index_label: str
+    index_label: str | None
     out_subdir: str
     file_stem: str
+    skip_by: str
 
 
 METRICS = [
-    MetricSpec("exec_total", "Exec total", "Status line number", "exec_over_time", "grouped_exec_total"),
-    MetricSpec("exec_rate", "Exec/min", "Status line number", "exec_over_time", "grouped_exec_per_min"),
     MetricSpec(
-        "coverage", "Coverage", "Triaged prog|call entries finished", "coverage_over_time", "grouped_coverage"
+        "exec_total", "Exec total", "Status line number", "exec_over_time", "grouped_exec_total", "exec_total"
+    ),
+    MetricSpec("exec_rate", "Exec/min", "Status line number", "exec_over_time", "grouped_exec_per_min", "exec_rate"),
+    MetricSpec(
+        "coverage",
+        "Coverage",
+        "Triaged prog|call entries finished",
+        "coverage_over_time",
+        "grouped_coverage",
+        "coverage",
+    ),
+    MetricSpec(
+        "stored_fpointers",
+        "Unique stored function pointers",
+        None,
+        "fpointers_over_time",
+        "grouped_stored_fpointers",
+        "coverage",
+    ),
+    MetricSpec(
+        "executed_fpointers",
+        "Unique executed stored function pointers",
+        None,
+        "fpointers_over_time",
+        "grouped_executed_fpointers",
+        "coverage",
     ),
 ]
 
@@ -130,22 +163,146 @@ def assert_similar_run_spans(group_series: list[plot_throughput_evolution.Series
         )
 
 
-def load_group_metrics(run_files: list[tuple[Path, Path]]) -> dict[str, list[RunSeries]]:
+def time_bucket(timestamp: datetime, t0: datetime) -> int:
     """
     Args:
-        run_files: (triage json, syz-manager log) of each run in the group. All runs must span roughly the same time.
+        timestamp: time of something that happened in the run.
+        t0: time of the first status line of the run.
+
+    Returns:
+        Index of the first sample, taken every BUCKET_SECONDS from t0, whose state includes it.
+    """
+    # Triages that finished before the first status line are already part of the state at t=0.
+    return max(0, math.ceil((timestamp - t0).total_seconds() / BUCKET_SECONDS))
+
+
+def cumulative_series(first_buckets: Iterable[int], n_buckets: int) -> RunSeries:
+    """
+    Args:
+        first_buckets: for each counted item, the time bucket where it first appears.
+        n_buckets: number of samples of the series.
+
+    Returns:
+        Number of items that appeared at or before each sample, every BUCKET_SECONDS from 0 seconds.
+    """
+    new_per_bucket = Counter(first_buckets)
+    running_counts = itertools.accumulate(new_per_bucket[bucket] for bucket in range(n_buckets))
+    return [(bucket * BUCKET_SECONDS, count) for bucket, count in zip(range(n_buckets), running_counts)]
+
+
+def first_stored_buckets(
+    sources: list[dict[str, dict[str, Any]]], t0: datetime
+) -> tuple[dict[str, int], dict[str, list[locInfo]]]:
+    """
+    Args:
+        sources: prog2log and stored function pointers events of the same run, both converted with
+            process_triage_metrics.convert_types_nicely. Their keys may repeat across sources.
+        t0: time of the first status line of the run.
+
+    Returns:
+        A tuple containing:
+            - For each stored function pointer value, the time bucket where it was first stored.
+            - For each stored function pointer value, its source locations.
+    """
+    # Every entry is a slice of its own: the stored function pointers of a set of entries are the union of theirs.
+    slices = sorted(
+        ((entry[RESULT_KEYS.TIMESTAMP_END], {key: entry}) for source in sources for key, entry in source.items()),
+        key=lambda end_and_slice: end_and_slice[0],
+    )
+    stored_bucket: dict[str, int] = {}
+    fpointer_addr2loc: dict[str, list[locInfo]] = {}
+    for end, entry_slice in slices:
+        _, slice_addr2loc, _, _ = process_triage_metrics.get_fPointerStore_dicts_and_locs(entry_slice)
+        for fpointer in slice_addr2loc:
+            stored_bucket.setdefault(fpointer, time_bucket(end, t0))
+        fpointer_addr2loc.update(slice_addr2loc)
+    return stored_bucket, fpointer_addr2loc
+
+
+def fpointer_series(
+    prog2log: dict[str, dict[str, Any]],
+    prog2event: dict[str, dict[str, Any]],
+    t0: datetime,
+    t_last: datetime,
+) -> tuple[RunSeries, RunSeries]:
+    """
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair,
+            converted with process_triage_metrics.convert_types_nicely.
+        prog2event: stored function pointers events of the same run (fpointer_events.json), converted the same way.
+            Empty for patched syzkaller, which reports them inside the triage entries instead.
+        t0: time of the first status line of the run.
+        t_last: time of the last status line of the run.
+
+    Returns:
+        A tuple containing:
+            - Unique stored function pointer values, cumulative.
+            - Unique stored function pointer values whose function (the non-inlined frame) had been executed,
+              inlined copies included, cumulative. A pointer counts from the time it was both stored and executed.
+    """
+    stored_bucket, fpointer_addr2loc = first_stored_buckets([prog2log, prog2event], t0)
+    function_cover_map = process_triage_metrics.get_function_pointer_coverage_timeline(prog2log)
+    first_executed = {
+        func_name: min(min_end for _, min_end, _, _ in loc_dict.values())
+        for func_name, loc_dict in function_cover_map.items()
+    }
+    executed_bucket = {
+        fpointer: max(stored_bucket[fpointer], time_bucket(first_executed[locs[-1][1]], t0))
+        for fpointer, locs in fpointer_addr2loc.items()
+        if locs[-1][1] in first_executed
+    }
+    n_buckets = 1 + max([time_bucket(t_last, t0), *stored_bucket.values(), *executed_bucket.values()])
+    return cumulative_series(stored_bucket.values(), n_buckets), cumulative_series(executed_bucket.values(), n_buckets)
+
+
+def load_run_triage_metrics(run_dir: Path) -> tuple[RunSeries, RunSeries, RunSeries]:
+    """
+    Args:
+        run_dir: `--out-dir` of run_analysis_pipeline.py for the run, holding the run's syz-manager.log too.
+
+    Returns:
+        A tuple containing the run's series of:
+            - Coverage, by triaged prog|call entry (see plot_metrics_evolution.process_log_json_pair).
+            - Unique stored function pointers, by time bucket (see fpointer_series).
+            - Unique executed stored function pointers, by time bucket (see fpointer_series).
+    """
+    with (run_dir / "unified_triage_logs.json").open() as f:
+        prog2log = process_triage_metrics.convert_types_nicely(json.load(f))
+    prog2event: dict[str, dict[str, Any]] = {}
+    # The pipeline only creates it for logs that have events (base syzkaller)
+    if (run_dir / "fpointer_events.json").exists():
+        with (run_dir / "fpointer_events.json").open() as f:
+            prog2event = process_triage_metrics.convert_types_nicely(json.load(f))
+
+    timestamp_x_coverage = plot_metrics_evolution.parse_status_lines(run_dir / "syz-manager.log")
+    coverage = plot_metrics_evolution.coverage_by_triage(prog2log, timestamp_x_coverage)
+    stored, executed = fpointer_series(
+        prog2log, prog2event, timestamp_x_coverage[0][0], timestamp_x_coverage[-1][0]
+    )
+    return coverage, stored, executed
+
+
+def load_group_metrics(run_dirs: list[Path]) -> dict[str, list[RunSeries]]:
+    """
+    Args:
+        run_dirs: `--out-dir` of run_analysis_pipeline.py for each run in the group, holding the run's
+            syz-manager.log too. All runs must span roughly the same time.
 
     Returns:
         For each metric key of METRICS, the series of every run in the group.
     """
-    logs = [log for _, log in run_files]
+    run_dirs = [d.resolve() for d in run_dirs]
+    logs = [d / "syz-manager.log" for d in run_dirs]
     status_lines = [plot_throughput_evolution.parse_status_lines(log) for log in logs]
     assert_similar_run_spans(status_lines, logs)
+    triage_metrics = [load_run_triage_metrics(d) for d in run_dirs]
 
     return {
         "exec_total": [list(zip(s.timestamps, s.exec_totals)) for s in status_lines],
         "exec_rate": [list(zip(s.timestamps, s.exec_rates)) for s in status_lines],
-        "coverage": [plot_metrics_evolution.process_log_json_pair(log, json_path) for json_path, log in run_files],
+        "coverage": [coverage for coverage, _, _ in triage_metrics],
+        "stored_fpointers": [stored for _, stored, _ in triage_metrics],
+        "executed_fpointers": [executed for _, _, executed in triage_metrics],
     }
 
 
@@ -322,6 +479,7 @@ def save_metric_plots(
     labels: Sequence[str],
     statistic: GroupStatistic,
     skip_first: int,
+    skip_seconds: float,
 ) -> None:
     """
     Args:
@@ -329,19 +487,25 @@ def save_metric_plots(
         group_runs: for each group, the series of every run for this metric.
         labels: legend name of each group, in the same order.
         statistic: how the runs of a group are summarized.
-        skip_first: number of leading samples hidden from the plot by index. The plot by time hides
-            everything before the time given by skip_time_seconds.
+        skip_first: number of leading samples hidden from the plot by index.
+        skip_seconds: elapsed seconds hidden from the plot by time (see skip_time_seconds).
     """
     out_dir = Path.cwd() / metric.out_subdir
     out_dir.mkdir(parents=True, exist_ok=True)
     title = f"{metric.name} ({statistic.description})"
 
-    by_index = [drop_before(band_by_index(runs, statistic), skip_first) for runs in group_runs]
-    save_band_plot(
-        by_index, labels, title, metric.index_label, metric.name, 1.0, out_dir / f"{metric.file_stem}_by_index.png"
-    )
+    if metric.index_label is not None:
+        by_index = [drop_before(band_by_index(runs, statistic), skip_first) for runs in group_runs]
+        save_band_plot(
+            by_index,
+            labels,
+            title,
+            metric.index_label,
+            metric.name,
+            1.0,
+            out_dir / f"{metric.file_stem}_by_index.png",
+        )
 
-    skip_seconds = skip_time_seconds(group_runs, skip_first)
     by_time = [drop_before(band_by_time(runs, statistic, BUCKET_SECONDS), skip_seconds) for runs in group_runs]
     unit, seconds_per_unit = time_axis_unit(by_time)
     save_band_plot(
@@ -353,17 +517,6 @@ def save_metric_plots(
         seconds_per_unit,
         out_dir / f"{metric.file_stem}_by_time.png",
     )
-
-
-def run_dir_files(run_dirs: list[Path]) -> list[tuple[Path, Path]]:
-    """
-    Args:
-        run_dirs: `--out-dir` of run_analysis_pipeline.py for each run, holding the run's syz-manager.log too.
-
-    Returns:
-        (triage json, syz-manager log) of each run.
-    """
-    return [(d.resolve() / "unified_triage_logs.json", d.resolve() / "syz-manager.log") for d in run_dirs]
 
 
 def main() -> None:
@@ -385,7 +538,8 @@ def main() -> None:
         default=0,
         metavar="N",
         help="hide the first N samples (status lines, or triaged prog|call entries for coverage) of the plots by "
-        "index, and everything before the slowest run reached its N-th sample on the plots by time",
+        "index, and everything before the slowest run reached its N-th sample on the plots by time. The function "
+        "pointer plots, only by time, are cut like coverage",
     )
     parser.add_argument(
         "--statistic",
@@ -398,7 +552,7 @@ def main() -> None:
 
     groups = [args.group1] if args.group2 is None else [args.group1, args.group2]
     labels = (args.group1_label, args.group2_label)
-    group_metrics = [load_group_metrics(run_dir_files(run_dirs)) for run_dirs in groups]
+    group_metrics = [load_group_metrics(run_dirs) for run_dirs in groups]
 
     for metric in METRICS:
         save_metric_plots(
@@ -407,6 +561,7 @@ def main() -> None:
             labels,
             STATISTICS[args.statistic],
             args.skip_first,
+            skip_time_seconds([metrics[metric.skip_by] for metrics in group_metrics], args.skip_first),
         )
 
 

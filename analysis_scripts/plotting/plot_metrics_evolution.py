@@ -328,8 +328,22 @@ def process_log_json_pair(
         triage_json = json.load(f)
     triage_json = convert_timestamps_nicely(triage_json)
 
-    timestamp_x_coverage = parse_status_lines(syz_manager_log)
-    triage_timestamps = all_triage_timestamps(triage_json)
+    return coverage_by_triage(triage_json, parse_status_lines(syz_manager_log))
+
+
+def coverage_by_triage(
+    prog2log: dict[str, dict[str, Any]], timestamp_x_coverage: list[tuple[datetime, int]]
+) -> list[tuple[float, int]]:
+    """
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
+            TIMESTAMP_END must already be a datetime (see convert_timestamps_nicely).
+        timestamp_x_coverage: output of parse_status_lines for the same run.
+
+    Returns:
+        Same as process_log_json_pair.
+    """
+    triage_timestamps = all_triage_timestamps(prog2log)
     return normalize_timestamps(closest_coverage_entries(triage_timestamps, timestamp_x_coverage))
 
 

@@ -87,5 +87,6 @@ Applies to all Python in this repository.
 *   `Returns` explains what the values mean in the domain, not how they are computed.
 
 ### 5. Fail fast (no defensive programming)
-*   Rely on the data contracts of the domain. Do not guard contractually guaranteed data with `if key in dict:`, `dict.get()`, emptiness checks and the like.
-*   Access it directly (`dict[key]`, `list[0]`) so bad input fails loudly with `KeyError`, `IndexError`, etc. The absence of checks documents the assumptions.
+*   Rely on the data contracts of the domain. Do not guard contractually guaranteed data with checks that avoid failure (`if key in dict:`, `dict.get()`, skipping empty inputs, defaults and the like).
+*   Access it directly (`dict[key]`, `list[0]`) so bad input fails loudly with `KeyError`, `IndexError`, etc. The absence of guards documents the assumptions.
+*   When a broken contract would be let through silently by direct access (e.g. mismatched lengths before a `zip`), explicit checking and `assert`/`raise` is fine and even expected.

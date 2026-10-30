@@ -77,6 +77,8 @@ class FPOINTERS_PAYLOAD_VALUES(StrEnum):
 
 class TAG_RESULT_VALUES(StrEnum):
     FPOINTER_ORIGIN = "fpointer_origin"
+    # The job triaged a seed or a prog of the loaded corpus (candidate_triage-0x...), not a newly found prog.
+    CANDIDATE_TRIAGE = "candidate_triage"
 
 class MINIMIZATION_RESULT_VALUES(StrEnum):
     MINIMIZATION_RES_NODIFF = "signal_fpointer_equal"
