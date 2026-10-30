@@ -37,9 +37,10 @@ def convert_types_nicely(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict[
             neat2 = convert_locations_list(fpointer_payload, storeinst_loc_key)
             fpointer_payload[fpointer_loc_key] = neat1
             fpointer_payload[storeinst_loc_key] = neat2
-        for pc_entry in entries.get(RESULT_KEYS.PC_COVER, []):
-            neat = convert_locations_list(pc_entry, PC_VALUES.PC_LOCATION)
-            pc_entry[PC_VALUES.PC_LOCATION] = neat
+        for cover_key in (RESULT_KEYS.PC_COVER, RESULT_KEYS.SYZBASE_TOTAL_NEW_COVER):
+            for pc_entry in entries.get(cover_key, []):
+                neat = convert_locations_list(pc_entry, PC_VALUES.PC_LOCATION)
+                pc_entry[PC_VALUES.PC_LOCATION] = neat
 
     return prog2log
 
@@ -387,13 +388,13 @@ def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict[str, A
                                                      # The first one is the top-most function, where every other one is an "(inlined-by)" statement.
                                                      # We are asking if a function pointer that was actually stored, was covered,
                                                      # so the list of locations for the function pointer shouldn't have any entries besides the first one.
-                                                     fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC][0] in covered_fpointer_locs
+                                                     fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC][-1] in covered_fpointer_locs
                                                      for fPointer_entry in e.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, [])
                                                  ))
     uncovered_fpointers_subdict = filter_many_cond(saved_because_skip_signal,
                                                  lambda e: any(
                                                      # see above
-                                                     fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC][0] in uncovered_fpointer_locs
+                                                     fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC][-1] in uncovered_fpointer_locs
                                                      for fPointer_entry in e.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, [])
                                                  ))
     covered_fpointers_subdict_fout = OUTDIR / "registered_covered_fpointers_saved_because_fpointer.json"
@@ -513,7 +514,7 @@ def get_fPointerStore_dicts_and_locs(prog2log: dict[str, dict[str, Any]]) -> tup
             storeinst_addr2location: Dict from store instruction addresses to source code locations (including inline resolutions).
             fpointer_addr2location: Dict from function pointer addresses to source code locations (including inline resolutions).
             storeinst_locs: Set of all source code locations of store instructions.
-            fpointer_locs: Set of all source code locations of function pointers.
+            fpointer_locs: Set of the source code locations of the non-inlined functions the function pointers point to.
     """
     storeinst_addr2location : dict[str, list[locInfo]] = dict()
     fpointer_addr2location : dict[str, list[locInfo]] = dict()
@@ -529,7 +530,7 @@ def get_fPointerStore_dicts_and_locs(prog2log: dict[str, dict[str, Any]]) -> tup
         storeinst_addr2location[storeinst_addr] = storeinst_loc
         storeinst_locs.update(storeinst_loc)
         fpointer_addr2location[fp_addr] = fp_loc
-        fpointer_locs.update(fp_loc)
+        fpointer_locs.add(fp_loc[-1])
 
     for e in prog2log.values():
         if RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in e:
@@ -562,7 +563,7 @@ def get_function_pointer_coverage_timeline(prog2log: dict[str, dict[str, Any]]) 
 
     Returns:
         dict[str, dict[locInfo, tuple[datetime, datetime, int, list[str]]]]: A dictionary from function names
-            to dictionaries of locInfos executed within that function.
+            to dictionaries of locInfos executed within that function, including its inlined copies.
 
             Each value in the nested dictionaries is a tuple with four elements:
                 min_timestamp_begin: the earliest start timestamp among triage jobs that covered this locInfo
@@ -572,30 +573,33 @@ def get_function_pointer_coverage_timeline(prog2log: dict[str, dict[str, Any]]) 
     """
     function_cover_map: dict[str, dict[locInfo, tuple[datetime, datetime, int, list[str]]]] = dict()
     for job_key, entry in prog2log.items():
-        if RESULT_KEYS.PC_COVER not in entry:
-            continue
         t_start = entry[RESULT_KEYS.TIMESTAMP_BEGIN]
         t_end = entry[RESULT_KEYS.TIMESTAMP_END]
-        for pc_entry in entry[RESULT_KEYS.PC_COVER]:
-            locs = pc_entry[PC_VALUES.PC_LOCATION]
-            # locs is a list of locInfo representing the inline stack.
-            # locs[-1] corresponds to the current, non-inlined executing function.
-            top_level_loc = locs[-1]
-            func_name = top_level_loc[1]
+        # covered locations can be in PC_COVER, which is the covered PCs in a triage job.
+        # SYZBASE_TOTAL_NEW_COVER is a hack-around present only in "base syzkaller" logs,
+        # which have much less info but do report at the end of each job which PCs were new in corpus.
+        for cover_key in (RESULT_KEYS.PC_COVER, RESULT_KEYS.SYZBASE_TOTAL_NEW_COVER):
+            if cover_key not in entry:
+                continue
+            for pc_entry in entry[cover_key]:
+                # PC_LOCATION is the inline stack of the PC. Every frame counts as an execution of its function:
+                # an inlined copy runs the same code that a function pointer to that function can reach.
+                for loc in pc_entry[PC_VALUES.PC_LOCATION]:
+                    func_name = loc[1]
 
-            if func_name not in function_cover_map:
-                function_cover_map[func_name] = dict()
-            loc_dict = function_cover_map[func_name]
+                    if func_name not in function_cover_map:
+                        function_cover_map[func_name] = dict()
+                    loc_dict = function_cover_map[func_name]
 
-            if top_level_loc not in loc_dict:
-                loc_dict[top_level_loc] = (t_start, t_end, 1, [job_key])
-            else:
-                old_start, old_end, current_count, job_keys = loc_dict[top_level_loc]
-                new_start = min(old_start, t_start)
-                new_end = min(old_end, t_end)
-                if job_key not in job_keys:
-                    job_keys.append(job_key)
-                loc_dict[top_level_loc] = (new_start, new_end, current_count + 1, job_keys)
+                    if loc not in loc_dict:
+                        loc_dict[loc] = (t_start, t_end, 1, [job_key])
+                    else:
+                        old_start, old_end, current_count, job_keys = loc_dict[loc]
+                        new_start = min(old_start, t_start)
+                        new_end = min(old_end, t_end)
+                        if job_key not in job_keys:
+                            job_keys.append(job_key)
+                        loc_dict[loc] = (new_start, new_end, current_count + 1, job_keys)
     return function_cover_map
 
 
@@ -623,10 +627,10 @@ def get_fPointers_covered_accross_timeline(
         job_covered_funcs: set[str] = set()
         if RESULT_KEYS.PC_COVER in entries:
             for pc_entry in entries[RESULT_KEYS.PC_COVER]:
-                job_covered_funcs.add(pc_entry[PC_VALUES.PC_LOCATION][0][1])
+                job_covered_funcs.update(fname for _, fname in pc_entry[PC_VALUES.PC_LOCATION])
 
         for fPointer_entry in entries.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, []):
-            fp_loc = fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC][0]
+            fp_loc = fPointer_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC][-1]
             func_name = fp_loc[1]
 
             if func_name not in job_covered_funcs:
