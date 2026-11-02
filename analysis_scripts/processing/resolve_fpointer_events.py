@@ -8,7 +8,7 @@ from logentry_keys import RESULT_KEYS
 from processing import unify_triage_lines
 
 
-def events_per_prog(events_jsonl: Path) -> dict[str, dict[str, Any]]:
+def     events_per_prog(events_jsonl: Path) -> dict[str, dict[str, Any]]:
     """
     Args:
         events_jsonl: stored function pointers events written by extract_logs_into_json.py (raw_fpointer_events.jsonl).
@@ -24,13 +24,26 @@ def events_per_prog(events_jsonl: Path) -> dict[str, dict[str, Any]]:
         for line in f:
             event = json.loads(line)
             key = f"{event[RESULT_KEYS.PROGID]}|{event[RESULT_KEYS.CALL_NAME]}"
-            # prog ids are Go pointers (%p), which can be reused once the prog is freed
-            assert key not in prog2event, f"two stored function pointers events for {key}"
-            prog2event[key] = {
+            entry = {
                 RESULT_KEYS.NEW_FPOINTERS_PAYLOAD: event[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD],
                 RESULT_KEYS.TIMESTAMP_BEGIN: event[RESULT_KEYS.TIMESTAMP],
                 RESULT_KEYS.TIMESTAMP_END: event[RESULT_KEYS.TIMESTAMP],
             }
+            unify_triage_lines.cleanup_particular_fpointer(entry, RESULT_KEYS.NEW_FPOINTERS_PAYLOAD)
+            if key not in prog2event:
+                entry[RESULT_KEYS.COUNT] = 1
+            else:
+                entry[RESULT_KEYS.COUNT] = prog2event[key][RESULT_KEYS.COUNT] + 1
+                # Get the union for NEW_FPOINTERS_PAYLOAD.
+                # Since Syzkaller base identifies jobs by Go pointers (%p), this is gonna trigger often.
+                # FIXME: This is a bug; but since we're not mapping these entries to triages, it seems fine for now.
+                stored_fpointers_payload = entry.pop(RESULT_KEYS.NEW_FPOINTERS_PAYLOAD)
+                old_payload = prog2event[key][RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]
+                # NEW_FPOINTER_PAYLOADS are supposed to be lists of dictionaries where 
+                # each dictionary is a PC-FPOINTER pair.
+                # Merging payloads means concatenating the lists.
+                entry[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD] = old_payload + stored_fpointers_payload 
+            prog2event[key] = entry
     return prog2event
 
 
@@ -53,7 +66,6 @@ def main() -> None:
     args = parser.parse_args()
 
     prog2event = events_per_prog(args.events_jsonl)
-    unify_triage_lines.cleanup_unified_json(prog2event)
     prog2event = unify_triage_lines.update_w_address_data(prog2event, args.vmlinux.resolve())
 
     with args.out_path.open("w") as f:
