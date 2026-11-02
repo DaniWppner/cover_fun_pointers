@@ -90,3 +90,10 @@ Applies to all Python in this repository.
 *   Rely on the data contracts of the domain. Do not guard contractually guaranteed data with checks that avoid failure (`if key in dict:`, `dict.get()`, skipping empty inputs, defaults and the like).
 *   Access it directly (`dict[key]`, `list[0]`) so bad input fails loudly with `KeyError`, `IndexError`, etc. The absence of guards documents the assumptions.
 *   When a broken contract would be let through silently by direct access (e.g. mismatched lengths before a `zip`), explicit checking and `assert`/`raise` is fine and even expected.
+
+## Documentation conventions
+Applies to READMEs, docstrings and comments.
+*   Document what a tool does, its inputs and outputs, and how to read its results. Leave out how it is implemented (internal function names, data flow, how to extend it).
+*   Keep the domain knowledge needed to interpret results: data assumptions and representation quirks (e.g. "Identity is `<prog_id, call>`").
+*   Describe the current state only. Do not record fixes, refactors or consistency guarantees from a working session ("now counts X as in Y", "so that Z cannot happen"); that belongs in commit messages.
+*   Be brief: one line per tool where possible, short bullets for options and caveats. Point to `--help` rather than restating every flag.

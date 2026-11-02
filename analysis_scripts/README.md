@@ -33,7 +33,7 @@ Logs of newer patched Syzkaller versions contain `new_covered_functions: [{"name
 | 2 | `processing/separate_time_profile_entries.py` | `raw_triage_lines.jsonl` -> `triage_lines.jsonl` (+ `time_profile.txt` from stdout, `time_profile_plots/`, `time_profile_data.json`) | Splits job-level timing entries (durations, exec counts, in-flight progs) from the per-call triage entries. Timing entries become plots and stats; the rest is passed on. |
 | 3 | `processing/unify_triage_lines.py` | `triage_lines.jsonl` -> `unified_triage_logs.json` | Merges all lines of a triage into one entry per `<prog, call>`, then resolves every PC / stored function pointer / store instruction address to source locations with `addr2line`. |
 | 4 | `processing/resolve_fpointer_events.py` | `raw_fpointer_events.jsonl` -> `fpointer_events.json` | Only runs if step 1 found events. Keys the events by `<prog, call>` and resolves their addresses with `addr2line`. |
-| 5 | `processing/process_triage_metrics.py` | `unified_triage_logs.json` -> `results/analysis.txt` (+ side files in `results/`) | The actual analysis (see below). |
+| 5 | `processing/process_triage_metrics.py` | `unified_triage_logs.json` (+ optional `fpointer_events.json` as `--fpointer-events`) -> `results/` directory | The actual analysis (see below). |
 | 6 | `plotting/plot_metrics_evolution.py` | `unified_triage_logs.json` + log -> `coverage_over_time/coverage_evolution.png` | Coverage (from manager status lines) against number of finished triages. |
 | 7 | `plotting/plot_throughput_evolution.py` | log -> `exec_over_time/exec_total_evolution.png` (+ `exec_per_min_*`) | `exec total` and `exec/min` over time. |
 
@@ -57,6 +57,9 @@ All of it is printed to `results/analysis.txt`; the lists of interesting progs a
 * Minimization breakdown: kept both, unique signal only, unique fpointer only, skipped fpointer/signal/whole.
 * PC coverage vs. function pointers: which stored function pointers (and which store instructions) were ever *executed* (appear in the PC cover of some prog), compared by source location, not raw address.
 * Timeline: for each function pointer, was it executed before, during or strictly after the prog that saved it.
+
+The PC cover corresponds to keys `PC_COVER` or `SYZBASE_TOTAL_NEW_COVER`, of which a log only holds one.
+Base Syzkaller doesn't have logs of most metrics, and its stored function pointers appear in the side file `fpointer_events.json`.
 
 Outputs for a finished run:
 
@@ -93,7 +96,11 @@ A step is skipped only if its stamp matches the current fingerprint and all its 
 
 ## Other scripts (not in the pipeline)
 
-* `plotting/compare_groups.py`: compares one or two *groups* of runs (`--group1 <run_dir> ...`, `--group2 <run_dir> ...`, e.g. `--group1 <experiment>/analysis/run_*`). Each run directory is a pipeline `--out-dir` that must also hold the run's `syz-manager.log`. All runs of a group must span roughly the same time. For each metric in `METRICS` (exec total, exec/min, coverage) it writes two plots to `exec_over_time/` or `coverage_over_time/`: `*_by_index.png` (i-th sample of each run: status line, or triaged prog|call entry for coverage) and `*_by_time.png` (60 s buckets). It also plots, only by time, to `fpointers_over_time/`: the unique stored function pointer values, cumulative, and those whose function (the non-inlined frame of the pointer, `locs[-1]`) was executed, inlined copies included, counted from the time a pointer was both stored and executed. Stored pointers come from the triage payloads and, for base Syzkaller, from `fpointer_events.json`; execution comes from `PC_COVER` or, for base Syzkaller, `SYZBASE_TOTAL_NEW_COVER`, through `process_triage_metrics.get_function_pointer_coverage_timeline`. Each group is drawn as its mean with a band (`--statistic`: 95% t confidence interval by default, or min-max). At the end of the plot only the runs still going are summarized, so the band narrows and the line can jump where a shorter run stops. `--skip-first N` hides the first N samples of the plots by index, and on the plots by time everything before the slowest run (of either group) reached its N-th sample (for the function pointer plots, its N-th triaged prog|call entry, like coverage); the summaries are computed on the whole runs first, so this is only a cut of the view. To add a metric, add its series to `load_group_metrics` (or `load_run_triage_metrics` for metrics from the run's `prog2log`, which is loaded once per run) and a `MetricSpec` to `METRICS`; to show something other than mean/min/max, pass another `GroupStatistic`.
+* `plotting/compare_groups.py --group1 <run_dir>... [--group2 <run_dir>...]`: plots one or two groups of runs against each other, e.g. `--group1 <experiment>/analysis/run_*`. Each `<run_dir>` is a pipeline `--out-dir` holding the run's `syz-manager.log`.
+  * Metrics: exec total and exec/min (`exec_over_time/`), coverage (`coverage_over_time/`), and stored and executed function pointers (`fpointers_over_time/`).
+  * Each group is drawn as its mean with a band, the 95% confidence interval or (`--statistic minmax`) the min-max of its runs.
+  * Runs of a group must span roughly the same time. Past the end of the shortest run, only the runs still going are summarized, so the band narrows and the line can jump.
+  * `--skip-first N` hides the start of the plots, up to the N-th sample of the slowest run.
 * `plotting/plot_metrics_evolution.py` and `plotting/plot_throughput_evolution.py` can also be called directly with two runs to overlay them (and `plot_throughput_evolution.py --cut-after hh:mm:ss`).
 * `processing/extract_logs_into_json.py --cutoff-time "YYYY/MM/DD HH:MM:SS"` truncates the log before the first status line after that time. The pipeline does not expose it.
 * `logentry_keys.py`: the enums (`LOGENTRY_KEYS`, `RESULT_KEYS`, ...) shared by all scripts. Single source of truth for the intermediate JSON format. It sits above `processing/` and `plotting/`. The scripts are run as executables, so only their own directory is on `sys.path`; the editable install from [Quick start](#quick-start) is what makes `logentry_keys`, `processing` and `plotting` importable from any of them. `compat` mode installs a plain `.pth` path entry, which mypy can follow (the default editable mode uses an import hook mypy cannot see through).

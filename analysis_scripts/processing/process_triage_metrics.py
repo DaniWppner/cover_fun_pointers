@@ -5,12 +5,16 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Iterator
 
 from termcolor import colored
 
 from logentry_keys import (FPOINTERS_PAYLOAD_VALUES,
                            MINIMIZATION_RESULT_VALUES, PC_VALUES, RESULT_KEYS, locInfo)
+
+# A log holds only one of them: PC_COVER (whole cover of the call) for patched syzkaller,
+# SYZBASE_TOTAL_NEW_COVER (PCs new to the corpus) for base syzkaller.
+PER_TRIAGE_COVER_KEYS = (RESULT_KEYS.PC_COVER, RESULT_KEYS.SYZBASE_TOTAL_NEW_COVER)
 
 
 def convert_types_nicely(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -37,12 +41,13 @@ def convert_types_nicely(prog2log: dict[str, dict[str, Any]]) -> dict[str, dict[
             neat2 = convert_locations_list(fpointer_payload, storeinst_loc_key)
             fpointer_payload[fpointer_loc_key] = neat1
             fpointer_payload[storeinst_loc_key] = neat2
-        for cover_key in (RESULT_KEYS.PC_COVER, RESULT_KEYS.SYZBASE_TOTAL_NEW_COVER):
+        for cover_key in PER_TRIAGE_COVER_KEYS:
             for pc_entry in entries.get(cover_key, []):
                 neat = convert_locations_list(pc_entry, PC_VALUES.PC_LOCATION)
                 pc_entry[PC_VALUES.PC_LOCATION] = neat
 
     return prog2log
+
 
 def count_cond(prog2log: dict[str, dict[str, Any]], condition: Callable[[dict[str, Any]], bool]) -> int:
     return len([entry for entry in prog2log.values() if condition(entry)])
@@ -271,10 +276,36 @@ def check_minimization_stats(prog2log: dict[str, dict[str, Any]]) -> None:
         json.dump(unique_signal_and_fpointer, f, indent=2, default=str)
 
 
-def check_pc_cover_vs_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
-    check_PC_exec_funcStore_literal_diffs(prog2log)
+def stored_fpointer_entries(
+    prog2log: dict[str, dict[str, Any]], prog2event: dict[str, dict[str, Any]] | None
+) -> Iterator[dict[str, Any]]:
+    """
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
+        prog2event: stored function pointers events of the same run (fpointer_events.json), in the same format.
+            None for patched syzkaller, which reports them inside the triage entries instead.
 
-    storeinst_addr2loc, fpointer_addr2loc, storeinst_locs, fpointer_locs = get_fPointerStore_dicts_and_locs(prog2log)
+    Returns:
+        Every entry that may report stored function pointers: the triage entries, then the events.
+    """
+    yield from prog2log.values()
+    if prog2event is not None:
+        yield from prog2event.values()
+
+
+def check_pc_cover_vs_fpointer(
+    prog2log: dict[str, dict[str, Any]], prog2event: dict[str, dict[str, Any]] | None = None
+) -> None:
+    """
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
+        prog2event: stored function pointers events of the same run (see stored_fpointer_entries).
+    """
+    check_PC_exec_funcStore_literal_diffs(prog2log, prog2event)
+
+    storeinst_addr2loc, fpointer_addr2loc, storeinst_locs, fpointer_locs = get_fPointerStore_dicts_and_locs(
+        prog2log, prog2event
+    )
     all_pc_locs = get_unique_covered_locations(prog2log)
     store_inst_diff, _ = locInfo_fname_diff(storeinst_locs, all_pc_locs)
     uncovered_fpointer_locs, covered_fpointer_locs = locInfo_fname_diff(fpointer_locs, all_pc_locs)
@@ -292,7 +323,8 @@ def check_pc_cover_vs_fpointer(prog2log: dict[str, dict[str, Any]]) -> None:
                                          fpointer_addr2loc,
                                          storeinst_addr2loc,
                                          covered_fpointer_locs,
-                                         uncovered_fpointer_locs)
+                                         uncovered_fpointer_locs,
+                                         prog2event=prog2event)
     print(colored("################################################", "cyan"))
 
     check_saved_because_skip_signal_vs_fpointers(prog2log,
@@ -306,6 +338,7 @@ def write_covered_vs_uncovered_fpointers(prog2log: dict[str, dict[str, Any]],
                                         storeinst_addr2loc:  dict[str, list[locInfo]],
                                         covered_fpointer_locs:  set[locInfo],
                                         uncovered_fpointer_locs:  set[locInfo],
+                                        prog2event: dict[str, dict[str, Any]] | None = None,
                                         ) -> None:
     """
     Generate and save python dictionaries mapping function pointers (uncovered and covered)
@@ -317,8 +350,8 @@ def write_covered_vs_uncovered_fpointers(prog2log: dict[str, dict[str, Any]],
         storeinst_addr2loc: Dict mapping store instruction addresses to their source code locations.
         covered_fpointer_locs: Set of source code locations for function pointers that were covered.
         uncovered_fpointer_locs: Set of source code locations for function pointers that were not covered.
-    """
-    fpointer2storeinst = get_fpointer2storeinst(prog2log)
+        prog2event: Stored function pointers events of the same run (see stored_fpointer_entries).    """
+    fpointer2storeinst = get_fpointer2storeinst(prog2log, prog2event=prog2event)
     uncovered_fpointers_out, skip_count = filter_fpointer2storeinst_by_source_locations(
         fpointer2storeinst, fpointer_addr2loc, storeinst_addr2loc, uncovered_fpointer_locs,
     )
@@ -411,17 +444,22 @@ def check_saved_because_skip_signal_vs_fpointers(prog2log: dict[str, dict[str, A
          f"(count={len(uncovered_fpointers_subdict)}) saved to {uncovered_fpointers_subdict_fout.name}"
     )
 
-def get_fpointer2storeinst(prog2log: dict[str, dict[str, Any]], stable_only: bool = False) -> dict[str, set[str]]:
+def get_fpointer2storeinst(
+    prog2log: dict[str, dict[str, Any]],
+    stable_only: bool = False,
+    prog2event: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, set[str]]:
     """
     Args:
         prog2log: dictionary with the standard format for triage entries of each prog|call pair.
         stable_only: if true, only consider function pointer stores registered in NEW_STABLE_FPOINTERS_PAYLOAD.
+        prog2event: stored function pointers events of the same run (see stored_fpointer_entries).
 
     Returns:
         fpointer2storeinst: dict from function pointers (as addresses) to sets of store instructions (as addresses) that store them.
     """
     fpointer2storeinst: dict[str, set[str]] = dict()
-    for entries in prog2log.values():
+    for entries in stored_fpointer_entries(prog2log, prog2event):
         if not stable_only and RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in entries:
             for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
                 fpointer = fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
@@ -439,16 +477,24 @@ def get_fpointer2storeinst(prog2log: dict[str, dict[str, Any]], stable_only: boo
     return fpointer2storeinst
 
 
-def check_PC_exec_funcStore_literal_diffs(prog2log: dict[str, dict[str, Any]]) -> None:
+def check_PC_exec_funcStore_literal_diffs(
+    prog2log: dict[str, dict[str, Any]],
+    prog2event: dict[str, dict[str, Any]] | None = None,
+) -> None:
     """
     Print differences between stored fpointer data and executed PCs using the literal stored numbers
+
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
+        prog2event: stored function pointers events of the same run (see stored_fpointer_entries).
     """
     all_pcs: set[str] = set()
     all_fpointers_stores: set[str] = set()
     all_fpointers: set[str] = set()
     for entries in prog2log.values():
-        if RESULT_KEYS.PC_COVER in entries:
-            all_pcs.update(pc_entry[PC_VALUES.PC_ADDRESS] for pc_entry in entries[RESULT_KEYS.PC_COVER])
+        for cover_key in PER_TRIAGE_COVER_KEYS:
+            all_pcs.update(pc_entry[PC_VALUES.PC_ADDRESS] for pc_entry in entries.get(cover_key, []))
+    for entries in stored_fpointer_entries(prog2log, prog2event):
         if RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in entries:
             for fp in entries[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
                 all_fpointers.add(fp[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR])
@@ -499,7 +545,9 @@ def print_source_code_diffs(
     print(f"Stored functions that were not executed: (count={len(stored_value_diff)}):")
     print(f"Stored functions that did get executed: (count={len(stored_value_intersection)}):")
 
-def get_fPointerStore_dicts_and_locs(prog2log: dict[str, dict[str, Any]]) -> tuple[
+def get_fPointerStore_dicts_and_locs(
+    prog2log: dict[str, dict[str, Any]], prog2event: dict[str, dict[str, Any]] | None = None
+) -> tuple[
     dict[str, list[locInfo]],
     dict[str, list[locInfo]],
     set[locInfo],
@@ -508,6 +556,7 @@ def get_fPointerStore_dicts_and_locs(prog2log: dict[str, dict[str, Any]]) -> tup
     """
     Args:
         prog2log: Dictionary with the standard format for triage entries of each prog|call pair.
+        prog2event: Stored function pointers events of the same run (see stored_fpointer_entries).
 
     Returns:
         tuple[dict[str, list[locInfo]], dict[str, list[locInfo]], set[locInfo], set[locInfo]]: A tuple with four elements:
@@ -532,7 +581,7 @@ def get_fPointerStore_dicts_and_locs(prog2log: dict[str, dict[str, Any]]) -> tup
         fpointer_addr2location[fp_addr] = fp_loc
         fpointer_locs.add(fp_loc[-1])
 
-    for e in prog2log.values():
+    for e in stored_fpointer_entries(prog2log, prog2event):
         if RESULT_KEYS.NEW_FPOINTERS_PAYLOAD in e:
             for fp in e[RESULT_KEYS.NEW_FPOINTERS_PAYLOAD]:
                 _fill_collections(fp)
@@ -551,8 +600,9 @@ def get_unique_covered_locations(prog2log: dict[str, dict[str, Any]]) -> set[loc
     """
     all_pc_locs: set[locInfo] = set()
     for e in prog2log.values():
-        for pc_entry in e.get(RESULT_KEYS.PC_COVER, []):
-            all_pc_locs.update(pc_entry[PC_VALUES.PC_LOCATION])
+        for cover_key in PER_TRIAGE_COVER_KEYS:
+            for pc_entry in e.get(cover_key, []):
+                all_pc_locs.update(pc_entry[PC_VALUES.PC_LOCATION])
     return all_pc_locs
 
 
@@ -575,13 +625,10 @@ def get_function_pointer_coverage_timeline(prog2log: dict[str, dict[str, Any]]) 
     for job_key, entry in prog2log.items():
         t_start = entry[RESULT_KEYS.TIMESTAMP_BEGIN]
         t_end = entry[RESULT_KEYS.TIMESTAMP_END]
-        # covered locations can be in PC_COVER, which is the covered PCs in a triage job.
-        # SYZBASE_TOTAL_NEW_COVER is a hack-around present only in "base syzkaller" logs,
-        # which have much less info but do report at the end of each job which PCs were new in corpus.
-        for cover_key in (RESULT_KEYS.PC_COVER, RESULT_KEYS.SYZBASE_TOTAL_NEW_COVER):
-            if cover_key not in entry:
-                continue
-            for pc_entry in entry[cover_key]:
+        # Base syzkaller only reports the PCs that were new to the corpus, so `count` and `job_ids` only see
+        # the job that first covered each PC.
+        for cover_key in PER_TRIAGE_COVER_KEYS:
+            for pc_entry in entry.get(cover_key, []):
                 # PC_LOCATION is the inline stack of the PC. Every frame counts as an execution of its function:
                 # an inlined copy runs the same code that a function pointer to that function can reach.
                 for loc in pc_entry[PC_VALUES.PC_LOCATION]:
@@ -625,8 +672,8 @@ def get_fPointers_covered_accross_timeline(
     for job_key, entries in prog2log.items():
         job_end = entries[RESULT_KEYS.TIMESTAMP_END]
         job_covered_funcs: set[str] = set()
-        if RESULT_KEYS.PC_COVER in entries:
-            for pc_entry in entries[RESULT_KEYS.PC_COVER]:
+        for cover_key in PER_TRIAGE_COVER_KEYS:
+            for pc_entry in entries.get(cover_key, []):
                 job_covered_funcs.update(fname for _, fname in pc_entry[PC_VALUES.PC_LOCATION])
 
         for fPointer_entry in entries.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, []):
@@ -790,6 +837,11 @@ if __name__ == "__main__":
         nargs="?",
         help="Json file outputted by unify_triage_lines.py",
     )
+    parser.add_argument(
+        "--fpointer-events",
+        type=str,
+        help="Json file outputted by resolve_fpointer_events.py (base syzkaller only)",
+    )
 
     args = parser.parse_args()
 
@@ -812,8 +864,13 @@ if __name__ == "__main__":
     triage_json = json.loads(__contents)
     triage_json = convert_types_nicely(triage_json)
 
+    prog2event: dict[str, dict[str, Any]] | None = None
+    if args.fpointer_events:
+        with open(args.fpointer_events, 'r') as f:
+            prog2event = convert_types_nicely(json.load(f))
+
     print(colored("################################################", "cyan"))
-    check_pc_cover_vs_fpointer(triage_json)
+    check_pc_cover_vs_fpointer(triage_json, prog2event)
     print(colored("################################################", "cyan"))
     check_fPointers_covered_after_save(triage_json)
     print(colored("################################################", "cyan"))

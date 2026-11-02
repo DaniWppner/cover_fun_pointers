@@ -209,10 +209,11 @@ def main():
         fpointer_events.unlink(missing_ok=True)
         (stamps_dir / "resolve_fpointer_events.json").unlink(missing_ok=True)
 
+    has_events = fpointer_events.exists()
     run_step(5, "processing/process_triage_metrics.py",
-             inputs=[unified_json],
+             inputs=[unified_json, *([fpointer_events] if has_events else [])],
              outputs=[analysis_txt],
-             cmd_args=[unified_json],
+             cmd_args=[unified_json, *(["--fpointer-events", fpointer_events] if has_events else [])],
              cwd=results_dir,
              stdout_file=analysis_txt)
 
