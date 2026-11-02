@@ -15,11 +15,11 @@ from typing import Any
 import matplotlib.pyplot as plt
 from scipy import stats  # type: ignore[import-untyped]
 
+from comparison_commons import add_group_arguments, assert_similar_run_spans
 from logentry_keys import RESULT_KEYS, locInfo
 from plotting import plot_metrics_evolution, plot_throughput_evolution
 from processing import process_triage_metrics
 
-MAX_RUN_SPAN_DEVIATION = 0.05
 BUCKET_SECONDS = 60.0
 
 # (elapsed seconds, value) samples of a single run, in chronological order, starting at 0 seconds
@@ -147,20 +147,6 @@ def mean_t_ci95(values: list[float]) -> tuple[float, float, float]:
 MEAN_T_CI95 = GroupStatistic("mean, band is its 95% t confidence interval", mean_t_ci95)
 
 STATISTICS = {"ci95": MEAN_T_CI95, "minmax": MEAN_MIN_MAX}
-
-
-def assert_similar_run_spans(group_series: list[plot_throughput_evolution.SeriesData], group_paths: list[Path]) -> None:
-    """
-    Args:
-        group_series: parsed status lines of each run in the group.
-        group_paths: syz-manager logs of each run in the group, in the same order.
-    """
-    spans = [s.timestamps[-1] for s in group_series]
-    longest = max(spans)
-    for span, path in zip(spans, group_paths):
-        assert longest - span <= longest * MAX_RUN_SPAN_DEVIATION, (
-            f"{path} spans {span / 60:.0f} min, the longest run of its group spans {longest / 60:.0f} min"
-        )
 
 
 def time_bucket(timestamp: datetime, t0: datetime) -> int:
@@ -516,17 +502,7 @@ def save_metric_plots(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot the metrics/throughput of one or two groups of campaigns")
-    parser.add_argument(
-        "--group1",
-        nargs="+",
-        type=Path,
-        required=True,
-        metavar="RUN_DIR",
-        help="run_analysis_pipeline.py output directory of each run, e.g. <experiment>/analysis/run_*",
-    )
-    parser.add_argument("--group2", nargs="+", type=Path, metavar="RUN_DIR", help="same as --group1")
-    parser.add_argument("--group1-label", type=str, default="Group 1")
-    parser.add_argument("--group2-label", type=str, default="Group 2")
+    add_group_arguments(parser, require_group2=False)
     parser.add_argument(
         "--skip-first",
         type=int,
