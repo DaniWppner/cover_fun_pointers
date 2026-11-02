@@ -91,7 +91,7 @@ METRICS = [
     ),
     MetricSpec(
         "stored_fpointers",
-        "Unique stored function pointers",
+        "Unique stored functions",
         None,
         "fpointers_over_time",
         "grouped_stored_fpointers",
@@ -99,7 +99,7 @@ METRICS = [
     ),
     MetricSpec(
         "executed_fpointers",
-        "Unique executed stored function pointers",
+        "Unique executed stored functions",
         None,
         "fpointers_over_time",
         "grouped_executed_fpointers",
@@ -190,9 +190,7 @@ def cumulative_series(first_buckets: Iterable[int], n_buckets: int) -> RunSeries
     return [(bucket * BUCKET_SECONDS, count) for bucket, count in zip(range(n_buckets), running_counts)]
 
 
-def first_stored_buckets(
-    sources: list[dict[str, dict[str, Any]]], t0: datetime
-) -> tuple[dict[str, int], dict[str, list[locInfo]]]:
+def first_stored_buckets(sources: list[dict[str, dict[str, Any]]], t0: datetime) -> dict[locInfo, int]:
     """
     Args:
         sources: prog2log and stored function pointers events of the same run, both converted with
@@ -200,23 +198,19 @@ def first_stored_buckets(
         t0: time of the first status line of the run.
 
     Returns:
-        A tuple containing:
-            - For each stored function pointer value, the time bucket where it was first stored.
-            - For each stored function pointer value, its source locations.
+        For each stored function name, the time bucket where a pointer to it was first stored.
     """
     # Every entry is a slice of its own: the stored function pointers of a set of entries are the union of theirs.
     slices = sorted(
         ((entry[RESULT_KEYS.TIMESTAMP_END], {key: entry}) for source in sources for key, entry in source.items()),
         key=lambda end_and_slice: end_and_slice[0],
     )
-    stored_bucket: dict[str, int] = {}
-    fpointer_addr2loc: dict[str, list[locInfo]] = {}
+    stored_bucket: dict[locInfo, int] = {}
     for end, entry_slice in slices:
-        _, slice_addr2loc, _, _ = process_triage_metrics.get_fPointerStore_dicts_and_locs(entry_slice)
-        for fpointer in slice_addr2loc:
-            stored_bucket.setdefault(fpointer, time_bucket(end, t0))
-        fpointer_addr2loc.update(slice_addr2loc)
-    return stored_bucket, fpointer_addr2loc
+        _, _, _, slice_fpointer_locs = process_triage_metrics.get_fPointerStore_dicts_and_locs(entry_slice)
+        for fpointer_loc in slice_fpointer_locs:
+            stored_bucket.setdefault(fpointer_loc, time_bucket(end, t0))
+    return stored_bucket
 
 
 def fpointer_series(
@@ -236,20 +230,21 @@ def fpointer_series(
 
     Returns:
         A tuple containing:
-            - Unique stored function pointer values, cumulative.
-            - Unique stored function pointer values whose function (the non-inlined frame) had been executed,
-              inlined copies included, cumulative. A pointer counts from the time it was both stored and executed.
+            - Unique stored functions (see first_stored_buckets), cumulative.
+            - Unique stored functions that had been executed, inlined copies included, cumulative.
     """
-    stored_bucket, fpointer_addr2loc = first_stored_buckets([prog2log, prog2event], t0)
+    stored_bucket = first_stored_buckets([prog2log, prog2event], t0)
     function_cover_map = process_triage_metrics.get_function_pointer_coverage_timeline(prog2log)
     first_executed = {
         func_name: min(min_end for _, min_end, _, _ in loc_dict.values())
         for func_name, loc_dict in function_cover_map.items()
     }
+    _, executed_fpointer_locs = process_triage_metrics.locInfo_fname_diff(
+        stored_bucket, (loc for loc_dict in function_cover_map.values() for loc in loc_dict)
+    )
     executed_bucket = {
-        fpointer: max(stored_bucket[fpointer], time_bucket(first_executed[locs[-1][1]], t0))
-        for fpointer, locs in fpointer_addr2loc.items()
-        if locs[-1][1] in first_executed
+        fpointer_loc: max(stored_bucket[fpointer_loc], time_bucket(first_executed[fpointer_loc[1]], t0))
+        for fpointer_loc in executed_fpointer_locs
     }
     n_buckets = 1 + max([time_bucket(t_last, t0), *stored_bucket.values(), *executed_bucket.values()])
     return cumulative_series(stored_bucket.values(), n_buckets), cumulative_series(executed_bucket.values(), n_buckets)
@@ -263,8 +258,8 @@ def load_run_triage_metrics(run_dir: Path) -> tuple[RunSeries, RunSeries, RunSer
     Returns:
         A tuple containing the run's series of:
             - Coverage, by triaged prog|call entry (see plot_metrics_evolution.process_log_json_pair).
-            - Unique stored function pointers, by time bucket (see fpointer_series).
-            - Unique executed stored function pointers, by time bucket (see fpointer_series).
+            - Unique stored functions, by time bucket (see fpointer_series).
+            - Unique executed stored functions, by time bucket (see fpointer_series).
     """
     with (run_dir / "unified_triage_logs.json").open() as f:
         prog2log = process_triage_metrics.convert_types_nicely(json.load(f))
