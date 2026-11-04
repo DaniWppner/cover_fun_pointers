@@ -644,7 +644,8 @@ def get_function_pointer_coverage_timeline(prog2log: dict[str, dict[str, Any]]) 
                         old_start, old_end, current_count, job_keys = loc_dict[loc]
                         new_start = min(old_start, t_start)
                         new_end = min(old_end, t_end)
-                        if job_key not in job_keys:
+                        # Every PC of a job is visited before the next job's, so a job can only repeat at the end.
+                        if job_keys[-1] != job_key:
                             job_keys.append(job_key)
                         loc_dict[loc] = (new_start, new_end, current_count + 1, job_keys)
     return function_cover_map
@@ -705,6 +706,39 @@ def get_fPointers_covered_accross_timeline(
                             covered_strictly_after[fp_loc]["storing_jobs"].append(job_key)
 
     return not_covered_in_this_triage, not_covered_yet, covered_strictly_after
+
+
+EXECUTED_AFTER_STORE_SUBSETS: dict[
+    str, tuple[str, Callable[[dict[str, dict[str, Any]]], dict[str, dict[str, Any]]]]
+] = {
+    "after_store_any_test": ("any test", lambda prog2log: prog2log),
+    "after_store_saved_because_fpointer": ("fpointer-only saves", get_saved_because_skip_signal),
+    "after_store_saves_fpointer": (
+        "fpointer saves",
+        lambda prog2log: filter_many_cond(
+            prog2log, has_minimization_result(MINIMIZATION_RESULT_VALUES.MINIMIZATION_RES_SAVE_FPOINTER)
+        ),
+    ),
+}
+
+
+def get_functions_executed_after_store(
+    prog2log: dict[str, dict[str, Any]],
+    fPointer_coverage_timeline: dict[str, dict[locInfo, tuple[datetime, datetime, int, list[str]]]],
+) -> dict[str, set[str]]:
+    """
+    Args:
+        prog2log: dictionary with the standard format for triage entries of each prog|call pair.
+        fPointer_coverage_timeline: The output of get_function_pointer_coverage_timeline.
+
+    Returns:
+        For each key of EXECUTED_AFTER_STORE_SUBSETS, names of the functions that a test of that subset stored
+        a pointer to, and that were only executed after that test (see get_fPointers_covered_accross_timeline).
+    """
+    return {
+        key: {fname for _, fname in get_fPointers_covered_accross_timeline(subset(prog2log), fPointer_coverage_timeline)[2]}
+        for key, (_, subset) in EXECUTED_AFTER_STORE_SUBSETS.items()
+    }
 
 
 def locInfo_fname_diff(

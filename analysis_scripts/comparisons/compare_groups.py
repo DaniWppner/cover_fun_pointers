@@ -15,7 +15,11 @@ from typing import Any
 import matplotlib.pyplot as plt
 from scipy import stats  # type: ignore[import-untyped]
 
-from comparison_commons import add_group_arguments, assert_similar_run_spans
+from comparisons.comparison_commons import (
+    add_group_arguments,
+    assert_similar_run_spans,
+    executed_after_store_universes,
+)
 from logentry_keys import RESULT_KEYS, locInfo
 from plotting import plot_metrics_evolution, plot_throughput_evolution
 from processing import process_triage_metrics
@@ -104,6 +108,17 @@ METRICS = [
         "fpointers_over_time",
         "grouped_executed_fpointers",
         "coverage",
+    ),
+    *(
+        MetricSpec(
+            key,
+            f"After-store locs ({description})",
+            None,
+            "fpointers_over_time",
+            f"grouped_{key}",
+            "coverage",
+        )
+        for key, (description, _) in process_triage_metrics.EXECUTED_AFTER_STORE_SUBSETS.items()
     ),
 ]
 
@@ -199,9 +214,29 @@ def first_stored_buckets(sources: list[dict[str, dict[str, Any]]], t0: datetime)
     return stored_bucket
 
 
+@dataclass(frozen=True)
+class RunTriageMetrics:
+    """
+    Attributes:
+        coverage: coverage, by triaged prog|call entry (see plot_metrics_evolution.process_log_json_pair).
+        stored: unique stored functions, by time bucket (see fpointer_series).
+        executed: unique executed stored functions, by time bucket (see fpointer_series).
+        first_covered_bucket: for each covered location, the time bucket where it was first covered.
+        n_buckets: number of time buckets of the run.
+        executed_after_store: see process_triage_metrics.get_functions_executed_after_store.
+    """
+    coverage: RunSeries
+    stored: RunSeries
+    executed: RunSeries
+    first_covered_bucket: dict[locInfo, int]
+    n_buckets: int
+    executed_after_store: dict[str, set[str]]
+
+
 def fpointer_series(
     prog2log: dict[str, dict[str, Any]],
     prog2event: dict[str, dict[str, Any]],
+    function_cover_map: dict[str, dict[locInfo, tuple[datetime, datetime, int, list[str]]]],
     t0: datetime,
     t_last: datetime,
 ) -> tuple[RunSeries, RunSeries]:
@@ -211,6 +246,7 @@ def fpointer_series(
             converted with process_triage_metrics.convert_types_nicely.
         prog2event: stored function pointers events of the same run (fpointer_events.json), converted the same way.
             Empty for patched syzkaller, which reports them inside the triage entries instead.
+        function_cover_map: process_triage_metrics.get_function_pointer_coverage_timeline of prog2log.
         t0: time of the first status line of the run.
         t_last: time of the last status line of the run.
 
@@ -220,7 +256,6 @@ def fpointer_series(
             - Unique stored functions that had been executed, inlined copies included, cumulative.
     """
     stored_bucket = first_stored_buckets([prog2log, prog2event], t0)
-    function_cover_map = process_triage_metrics.get_function_pointer_coverage_timeline(prog2log)
     first_executed = {
         func_name: min(min_end for _, min_end, _, _ in loc_dict.values())
         for func_name, loc_dict in function_cover_map.items()
@@ -236,16 +271,10 @@ def fpointer_series(
     return cumulative_series(stored_bucket.values(), n_buckets), cumulative_series(executed_bucket.values(), n_buckets)
 
 
-def load_run_triage_metrics(run_dir: Path) -> tuple[RunSeries, RunSeries, RunSeries]:
+def load_run_triage_metrics(run_dir: Path) -> RunTriageMetrics:
     """
     Args:
         run_dir: `--out-dir` of run_analysis_pipeline.py for the run, holding the run's syz-manager.log too.
-
-    Returns:
-        A tuple containing the run's series of:
-            - Coverage, by triaged prog|call entry (see plot_metrics_evolution.process_log_json_pair).
-            - Unique stored functions, by time bucket (see fpointer_series).
-            - Unique executed stored functions, by time bucket (see fpointer_series).
     """
     with (run_dir / "unified_triage_logs.json").open() as f:
         prog2log = process_triage_metrics.convert_types_nicely(json.load(f))
@@ -257,33 +286,69 @@ def load_run_triage_metrics(run_dir: Path) -> tuple[RunSeries, RunSeries, RunSer
 
     timestamp_x_coverage = plot_metrics_evolution.parse_status_lines(run_dir / "syz-manager.log")
     coverage = plot_metrics_evolution.coverage_by_triage(prog2log, timestamp_x_coverage)
-    stored, executed = fpointer_series(
-        prog2log, prog2event, timestamp_x_coverage[0][0], timestamp_x_coverage[-1][0]
+    t0, t_last = timestamp_x_coverage[0][0], timestamp_x_coverage[-1][0]
+    function_cover_map = process_triage_metrics.get_function_pointer_coverage_timeline(prog2log)
+    stored, executed = fpointer_series(prog2log, prog2event, function_cover_map, t0, t_last)
+    first_covered_bucket = {
+        loc: time_bucket(min_end, t0)
+        for loc_dict in function_cover_map.values()
+        for loc, (_, min_end, _, _) in loc_dict.items()
+    }
+    return RunTriageMetrics(
+        coverage,
+        stored,
+        executed,
+        first_covered_bucket,
+        1 + max(time_bucket(t_last, t0), *first_covered_bucket.values()),
+        process_triage_metrics.get_functions_executed_after_store(prog2log, function_cover_map),
     )
-    return coverage, stored, executed
 
 
-def load_group_metrics(run_dirs: list[Path]) -> dict[str, list[RunSeries]]:
+def load_group_metrics(run_dirs: list[Path]) -> tuple[dict[str, list[RunSeries]], list[RunTriageMetrics]]:
     """
     Args:
         run_dirs: `--out-dir` of run_analysis_pipeline.py for each run in the group, holding the run's
             syz-manager.log too. All runs must span roughly the same time.
 
     Returns:
-        For each metric key of METRICS, the series of every run in the group.
+        A tuple containing:
+            - For each metric key of METRICS that does not depend on --group1, the series of every run in the group.
+            - The triage metrics of every run in the group.
     """
     run_dirs = [d.resolve() for d in run_dirs]
     logs = [d / "syz-manager.log" for d in run_dirs]
     status_lines = [plot_throughput_evolution.parse_status_lines(log) for log in logs]
-    assert_similar_run_spans(status_lines, logs)
+    assert_similar_run_spans([s.timestamps[-1] for s in status_lines], logs)
     triage_metrics = [load_run_triage_metrics(d) for d in run_dirs]
 
-    return {
+    series: dict[str, list[RunSeries]] = {
         "exec_total": [list(zip(s.timestamps, s.exec_totals)) for s in status_lines],
         "exec_rate": [list(zip(s.timestamps, s.exec_rates)) for s in status_lines],
-        "coverage": [coverage for coverage, _, _ in triage_metrics],
-        "stored_fpointers": [stored for _, stored, _ in triage_metrics],
-        "executed_fpointers": [executed for _, _, executed in triage_metrics],
+        "coverage": [run.coverage for run in triage_metrics],
+        "stored_fpointers": [run.stored for run in triage_metrics],
+        "executed_fpointers": [run.executed for run in triage_metrics],
+    }
+    return series, triage_metrics
+
+
+def after_store_series(runs: list[RunTriageMetrics], universes: dict[str, set[str]]) -> dict[str, list[RunSeries]]:
+    """
+    Args:
+        runs: triage metrics of every run in a group.
+        universes: output of comparison_commons.executed_after_store_universes for --group1.
+
+    Returns:
+        For each key of universes, the covered locations of its functions in every run of the group, cumulative,
+        by time bucket.
+    """
+    return {
+        key: [
+            cumulative_series(
+                (bucket for (_, fname), bucket in run.first_covered_bucket.items() if fname in funcs), run.n_buckets
+            )
+            for run in runs
+        ]
+        for key, funcs in universes.items()
     }
 
 
@@ -523,7 +588,9 @@ def main() -> None:
 
     groups = [args.group1] if args.group2 is None else [args.group1, args.group2]
     labels = (args.group1_label, args.group2_label)
-    group_metrics = [load_group_metrics(run_dirs) for run_dirs in groups]
+    loaded_groups = [load_group_metrics(run_dirs) for run_dirs in groups]
+    universes = executed_after_store_universes([run.executed_after_store for run in loaded_groups[0][1]])
+    group_metrics = [series | after_store_series(runs, universes) for series, runs in loaded_groups]
 
     for metric in METRICS:
         save_metric_plots(

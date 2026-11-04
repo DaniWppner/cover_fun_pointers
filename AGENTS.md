@@ -60,7 +60,7 @@ Syzkaller workdir files (`corpus.db`, `crashes/`, `instance-*`, `syz-manager*.lo
 
 ## Analysis scripts (`analysis_scripts/`)
 See its README for the pipeline steps, outputs, caching and caveats. Things to know before editing:
-- `processing/` (ETL, including `run_analysis_pipeline.py`), `plotting/`, and `logentry_keys.py` at the top: the enums defining the intermediate JSON format, shared by everything.
+- `processing/` (ETL, including `run_analysis_pipeline.py`), `plotting/`, `comparisons/` (scripts comparing groups of runs, sharing `comparison_commons.py`), and `logentry_keys.py` at the top: the enums defining the intermediate JSON format, shared by everything.
 - Scripts are run as **raw executables**. Imports across directories (`from logentry_keys import ...`, `from plotting import ...`) work through an editable install into `analysis_scripts/venv` (`pip install -e . --config-settings editable_mode=compat`); do not add `sys.path` hacks.
 - Type-check with the venv's mypy (`venv/bin/python -m mypy <file>` from `analysis_scripts/`). Several older scripts still have mypy errors; do not introduce new ones.
 - `build_syzkaller/log_parsing_scripts/analyze_log_function_pointers_campaign/` and `tools/` hold older, standalone scripts.
