@@ -94,17 +94,27 @@ A step is skipped only if its stamp matches the current fingerprint and all its 
 * Copying a run directory without preserving mtimes just causes a rebuild.
 * Script arguments are not part of the fingerprint (the pipeline passes only paths).
 
+## Comparing groups of runs (`comparisons/`)
+
+Every script takes the runs of each group as `--group1 ... [--group2 ...]` and names the groups in its output with `--group1-label` and `--group2-label`. The runs of a group must span roughly the same time (within 5%, from the first to the last status line of their `syz-manager.log`), otherwise the script fails.
+
+* `comparisons/compare_groups.py --group1 <run_dir>... [--group2 <run_dir>...]`: plots one or two groups of runs against each other, e.g. `--group1 <experiment>/analysis/run_*`. Each `<run_dir>` is a pipeline `--out-dir` holding the run's `syz-manager.log`.
+  * Metrics: exec total and exec/min (`exec_over_time/`), coverage (`coverage_over_time/`), and stored and executed function pointers and after-store locations (`fpointers_over_time/`).
+  * After-store locations: covered locations of the functions that some run of `--group1` (function pointer campaigns) only executed after a test stored a pointer to them. One universe per kind of storing test: any test, tests saved only for their function pointers (signal minimization skipped), and tests saved with function pointers. Both groups are counted against `--group1`'s universes.
+  * Each group is drawn as its mean with a band, the 95% confidence interval or (`--statistic minmax`) the min-max of its runs.
+  * Past the end of the shortest run, only the runs still going are summarized, so the band narrows and the line can jump.
+  * `--skip-first N` hides the start of the plots, up to the N-th sample of the slowest run.
+* `comparisons/compare_statistics.py --group1 <run_dir>... --group2 <run_dir>...`: Mann-Whitney U test of the end-of-campaign stored functions, executed stored functions, covered locations and after-store locations (see `compare_groups.py`) of two groups, same `<run_dir>`s as `compare_groups.py`. Prints each run's values, U and A12 of group 2, and the exact two-sided and one-sided (group 2 higher, group 2 lower) p-values. The p-values are exact, so it fails if the groups have too many runs (up to 7 runs each always works).
+* `comparisons/compare_crashes.py --group1 <log>... --group2 <log>...`: number of crashes of each title in each run of two groups, and in how many runs it appears, with the exact two-sided Mann-Whitney U p-value of the per-run counts (same run limit as `compare_statistics.py`). Takes `syz-manager.log`s directly (plain or `.gz`), so runs without a pipeline output can be included.
+  * Counts the `VM N: crash: <title>` lines, the crashes that syz-manager saves in `crashes/`. The `crash(tailN):` lines that follow some of them (later reports in the same VM output) are not counted.
+  * `crashes/` itself is not a per-run source: it is shared by every run of a workdir and keeps at most 100 logs per title.
+* `comparisons/compare_base_after_store.py --group1 <base run_dir>... --group2 <run_dir>...`: the "any test" after-store locations of `compare_groups.py`, with the universe taken from base syzkaller (`--group1`) instead: functions whose first executing triage started strictly after a store event in `fpointer_events.json`, excluding the event's own prog|call triage within `--same-triage-window`. Prints the Mann-Whitney U test like `compare_statistics.py` and writes `fpointers_over_time/grouped_after_store_base_events_by_time.png` under the current directory. Rough: base store events are instants of any execution, while function pointer campaigns store at the end of a triage.
+
 ## Other scripts (not in the pipeline)
 
-* `plotting/compare_groups.py --group1 <run_dir>... [--group2 <run_dir>...]`: plots one or two groups of runs against each other, e.g. `--group1 <experiment>/analysis/run_*`. Each `<run_dir>` is a pipeline `--out-dir` holding the run's `syz-manager.log`.
-  * Metrics: exec total and exec/min (`exec_over_time/`), coverage (`coverage_over_time/`), and stored and executed function pointers (`fpointers_over_time/`).
-  * Each group is drawn as its mean with a band, the 95% confidence interval or (`--statistic minmax`) the min-max of its runs.
-  * Runs of a group must span roughly the same time. Past the end of the shortest run, only the runs still going are summarized, so the band narrows and the line can jump.
-  * `--skip-first N` hides the start of the plots, up to the N-th sample of the slowest run.
-* `processing/compare_statistics.py --group1 <run_dir>... --group2 <run_dir>...`: Mann-Whitney U test of the end-of-campaign stored functions, executed stored functions and covered locations of two groups, same `<run_dir>`s as `compare_groups.py`. Prints each run's values, U and A12 of group 2, and the exact two-sided and one-sided (group 2 higher, group 2 lower) p-values. The p-values are exact, so it fails if the groups have too many runs (up to 7 runs each always works).
 * `plotting/plot_metrics_evolution.py` and `plotting/plot_throughput_evolution.py` can also be called directly with two runs to overlay them (and `plot_throughput_evolution.py --cut-after hh:mm:ss`).
 * `processing/extract_logs_into_json.py --cutoff-time "YYYY/MM/DD HH:MM:SS"` truncates the log before the first status line after that time. The pipeline does not expose it.
-* `logentry_keys.py`: the enums (`LOGENTRY_KEYS`, `RESULT_KEYS`, ...) shared by all scripts. Single source of truth for the intermediate JSON format. It sits above `processing/` and `plotting/`. The scripts are run as executables, so only their own directory is on `sys.path`; the editable install from [Quick start](#quick-start) is what makes `logentry_keys`, `processing` and `plotting` importable from any of them. `compat` mode installs a plain `.pth` path entry, which mypy can follow (the default editable mode uses an import hook mypy cannot see through).
+* `logentry_keys.py`: the enums (`LOGENTRY_KEYS`, `RESULT_KEYS`, ...) shared by all scripts. Single source of truth for the intermediate JSON format. It sits above `processing/`, `plotting/` and `comparisons/`. The scripts are run as executables, so only their own directory is on `sys.path`; the editable install from [Quick start](#quick-start) is what makes `logentry_keys`, `processing`, `plotting` and `comparisons` importable from any of them. `compat` mode installs a plain `.pth` path entry, which mypy can follow (the default editable mode uses an import hook mypy cannot see through).
 * `example_usage/`: a `sample.log` and `FINDINGS.md` (duplicate triage analysis on a real run). `uncovered_functions_analysis/`: manual write-ups of stored function pointers that never got executed. `extracted_sample.json` and `no_output_debug/` are leftover debugging artifacts.
 
 ## Caveats
