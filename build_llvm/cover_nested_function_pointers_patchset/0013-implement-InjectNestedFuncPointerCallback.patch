@@ -1,14 +1,14 @@
-From 0ea079c6c6a38a8b2b6592e93bf72228c312711a Mon Sep 17 00:00:00 2001
+From 8c14cb56e814572dc954d91082d4c8d8a279dc40 Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Mon, 24 Aug 2026 17:46:35 -0300
-Subject: [PATCH 13/20] implement InjectNestedFuncPointerCallback
+Subject: [PATCH 13/21] implement InjectNestedFuncPointerCallback
 
 ---
  .../Instrumentation/SanitizerCoverage.cpp     | 51 ++++++++++++++++---
  1 file changed, 44 insertions(+), 7 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index 2cdf86ccff0e..873a610e6e21 100644
+index 2cdf86ccf..873a610e6 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -16,6 +16,7 @@

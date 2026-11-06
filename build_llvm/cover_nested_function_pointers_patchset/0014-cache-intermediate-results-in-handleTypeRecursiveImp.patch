@@ -1,14 +1,14 @@
-From 18ba400fd17d58cb038812c57cb658bde7175006 Mon Sep 17 00:00:00 2001
+From 21af1d2387e1a0d5b13719a8365744045ca30d0c Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Tue, 25 Aug 2026 15:13:16 -0300
-Subject: [PATCH 14/20] cache intermediate results in handleTypeRecursiveImpl
+Subject: [PATCH 14/21] cache intermediate results in handleTypeRecursiveImpl
 
 ---
  .../Instrumentation/SanitizerCoverage.cpp     | 101 +++++++++++++-----
  1 file changed, 72 insertions(+), 29 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index 873a610e6e21..bcca559d46ae 100644
+index 873a610e6..bcca559d4 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -13,6 +13,8 @@

@@ -1,14 +1,14 @@
-From 709dccb6c9866c006283ca1a19249b076d406fe0 Mon Sep 17 00:00:00 2001
+From 0ddfffae8b169c1db1009b06b30b904f80675010 Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Fri, 14 Aug 2026 18:21:44 -0300
-Subject: [PATCH 06/20] (WIP): implement recursive type handling for pointers
+Subject: [PATCH 06/21] (WIP): implement recursive type handling for pointers
 
 ---
  .../Instrumentation/SanitizerCoverage.cpp     | 125 +++++++++++-------
  1 file changed, 76 insertions(+), 49 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index e36cad45527d..efd0596a07ec 100644
+index e36cad455..efd0596a0 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -51,6 +51,7 @@

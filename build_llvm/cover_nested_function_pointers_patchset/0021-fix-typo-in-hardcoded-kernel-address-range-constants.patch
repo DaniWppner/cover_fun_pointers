@@ -1,0 +1,32 @@
+From cdbb0d3cf757c7128a8de67697883632bd4a3ac5 Mon Sep 17 00:00:00 2001
+From: daniel wappner <dwappner@dc.uba.ar>
+Date: Fri, 6 Nov 2026 13:52:23 -0300
+Subject: [PATCH 21/21] fix typo in hardcoded kernel address range constants
+
+---
+ llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+index db5ca008a..ab45c6eb5 100644
+--- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
++++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
+@@ -1622,10 +1622,13 @@ CallInst *ModuleSanitizerCoverage::InjectFuncPointerCallback(
+ Value *ModuleSanitizerCoverage::InjectStructElemLoad(IRBuilder<> &IRB, Value *StructPointer, 
+                                                     Type *StructType, Type *ElemType,
+                                                     ArrayRef<unsigned> Offsets) {
+-  unsigned long LINUX_MIN_KERNEL_ADDRESS = 0xFFFF000000000000;
+-  unsigned long LINUX_MAX_KERNEL_ADDRESS = 0xFFFF000000000000;
+   // Hacky hack: hardcode the valid range for kernel addresses on x86_64.
+   // This means don't dereference user-space addresses, NULL or ERR_PTRs.
++  // 0xFFFF800000000000 is the beginning of x86_64 kernel address range.
++  unsigned long LINUX_MIN_KERNEL_ADDRESS = 0xFFFF800000000000;
++  // 0xFFFFFFFFFEFFFFFF is the end of x86_64 modules address range.
++  // Beyond it lie kernel fixmap range, vsyscall ABI range, and error and poison values.
++  unsigned long LINUX_MAX_KERNEL_ADDRESS = 0xFFFFFFFFFEFFFFFF;
+   Value *BasePointer = IRB.CreatePtrToInt(StructPointer, IntptrTy);
+   Value *MinValid = ConstantInt::get(IntptrTy, LINUX_MIN_KERNEL_ADDRESS);
+   Value *MaxValid = ConstantInt::get(IntptrTy, LINUX_MAX_KERNEL_ADDRESS);
+-- 
+2.43.0
+

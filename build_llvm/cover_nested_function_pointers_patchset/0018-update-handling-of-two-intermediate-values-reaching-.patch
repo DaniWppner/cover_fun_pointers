@@ -1,7 +1,7 @@
-From b8c907e0746f332b9c901f43fbd2c7e1457e28ac Mon Sep 17 00:00:00 2001
+From e38edf667978b1297a2e6cd5123532d088e93293 Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Wed, 2 Sep 2026 13:10:02 -0300
-Subject: [PATCH 18/20] update handling of two intermediate values reaching an
+Subject: [PATCH 18/21] update handling of two intermediate values reaching an
  Fpointer to consider arbitrary nested vacuous struct chains
 
 ---
@@ -9,7 +9,7 @@ Subject: [PATCH 18/20] update handling of two intermediate values reaching an
  1 file changed, 41 insertions(+), 29 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index 2a29c26659cd..bfbc2bd0db65 100644
+index 2a29c2665..bfbc2bd0d 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -1239,6 +1239,39 @@ bool areStructTypesCompatible(llvm::Type *Left, llvm::Type *Right) {

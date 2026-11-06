@@ -1,7 +1,7 @@
-From 4d70eefc8fcb3435e703af0863a6758e088a2634 Mon Sep 17 00:00:00 2001
+From 8f999d178443d6e94cdd6d2b13e042401d70e68b Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Thu, 3 Sep 2026 15:50:11 -0300
-Subject: [PATCH 19/20] add debug information for intermediate value nested
+Subject: [PATCH 19/21] add debug information for intermediate value nested
  type analysis
 
 ---
@@ -9,7 +9,7 @@ Subject: [PATCH 19/20] add debug information for intermediate value nested
  1 file changed, 26 insertions(+), 2 deletions(-)
 
 diff --git a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
-index bfbc2bd0db65..f9767e12aa2e 100644
+index bfbc2bd0d..f9767e12a 100644
 --- a/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/SanitizerCoverage.cpp
 @@ -1048,6 +1048,9 @@ void ModuleSanitizerCoverage::InjectTraceForLoadsAndStores(
