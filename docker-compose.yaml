@@ -8,6 +8,10 @@ services:
       dockerfile: ./build_llvm/Dockerfile
     volumes:
       - ./build_llvm/llvm-project:/home/src/llvm-project
+    environment:
+      GIT_CONFIG_COUNT: 1
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /home/src/llvm-project
     command: /bin/bash
     tty: true
     stdin_open: true
@@ -19,7 +23,11 @@ services:
     volumes:
       - ./build_llvm/llvm-project:/home/src/llvm-project
       - ./build_kernel:/home/build_kernel
-      - /path/to/linux:/home/linux  
+      - /path/to/linux:/home/linux
+    environment:
+      GIT_CONFIG_COUNT: 1
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /home/src/llvm-project
     command: /bin/bash
     tty: true
     stdin_open: true
