@@ -366,14 +366,12 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict[str, Any]
                                               pcs_addr2loc: dict[str, list[locInfo]],
                                               fpointer_addr2loc: dict[str, list[locInfo]],
                                               storeinst_addr2loc: dict[str, list[locInfo]]) -> dict[str, dict[str, Any]]:
-    error_locInfo: list[locInfo] = [("err", "err")]
     for entry in tqdm(prog2log.values(), desc="Updating source code refs"):
         for cover_key in (RESULT_KEYS.PC_COVER, RESULT_KEYS.SYZBASE_TOTAL_NEW_COVER):
             if cover_key in entry:
                 pc_loc_entries = []
                 for pc_value in entry[cover_key]:
-                    # hacky hack: we will not have a location for this "empty" pointer
-                    pc_loc = pcs_addr2loc[pc_value] if pc_value != '0xffffffffffffffff' else error_locInfo
+                    pc_loc = pcs_addr2loc[pc_value]
                     pc_entry = {PC_VALUES.PC_ADDRESS : pc_value,
                                 PC_VALUES.PC_LOCATION : pc_loc}
                     pc_loc_entries.append(pc_entry)
@@ -382,17 +380,13 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict[str, Any]
         for funcPointer_store_entry in entry.get(RESULT_KEYS.NEW_FPOINTERS_PAYLOAD, []):
             fPointer = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
             storeInst = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
-            # hacky hack: we will not have a location for this "empty" pointer
-            fPointer_loc = fpointer_addr2loc[fPointer] if fPointer != '0xffffffffffffffff' else error_locInfo
-            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] = fPointer_loc
+            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] = fpointer_addr2loc[fPointer]
             funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC] = storeinst_addr2loc[storeInst]
 
         for funcPointer_store_entry in entry.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, []):
             fPointer = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
             storeInst = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
-            #hacky hack: see above
-            fPointer_loc = fpointer_addr2loc[fPointer] if fPointer != '0xffffffffffffffff' else error_locInfo
-            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] = fPointer_loc
+            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] = fpointer_addr2loc[fPointer]
             funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC] = storeinst_addr2loc[storeInst]
 
     return prog2log
@@ -506,6 +500,17 @@ def _get_source_code_refs_impl(offsets: Iterable[str], vmlinux_path: Path) -> di
     DYNAMIC_CODE_START = 0xffffffffa0000000
     DYNAMIC_CODE_END = 0xffffffffff000000
     DYNAMIC_CODE_LOCINFO: locInfo = ("<execmem>:0", "<dynamic code>")
+    # hacky hack:
+    # If we try to addr2line an address that doesn't make sense (like a heap, userspace address),
+    # then we will get (reasonably) no valid source code region.
+    # This can happen if the fuzzer logged an address inside a struct that wasn't initialized yet.
+    # Try to handle ": ?? ??:0" results if they arose from this reason.
+    error_address_pattern = re.compile(r"^(0x[0-9a-f]+): \?\? \?\?:0$")
+    ERR_UNINITIALIZED_POINTER_LOCINFO: locInfo = ("err", "err")
+    USERSPACE_START = 0x0000000000000000
+    USERSPACE_END = 0x00007fffffffffff
+    DYNAMIC_MEMORY_START = 0xffff888000000000
+    DYNAMIC_MEMORY_END = 0xffffc87fffffffff
 
     offsets = set(offsets)
     dynamic_offsets = {o for o in offsets if DYNAMIC_CODE_START <= int(o, 16) < DYNAMIC_CODE_END}
@@ -547,10 +552,18 @@ def _get_source_code_refs_impl(offsets: Iterable[str], vmlinux_path: Path) -> di
     for line in response:
         match = output_pattern.match(line)
         if not match:
-            # edge case for weird StoredValue values
-            if line == "0xffffffffffffffff: ?? ??:0":
-                offsets.remove("0xffffffffffffffff")
-                continue
+            error_address_match = error_address_pattern.match(line)
+            if error_address_match:
+                error_address = error_address_match.group(1)
+                if USERSPACE_START <= int(error_address, 16) < USERSPACE_END or \
+                    DYNAMIC_MEMORY_START <= int(error_address, 16) < DYNAMIC_MEMORY_END:
+                    # hacky hack: addr2line pads up to 16 bits.
+                    # We don't have leading zeroes in our data representation.
+                    # So, convert leading-zero hex strings back to non-leading zero.
+                    pruned_error_address = "0x" + (error_address[2:].lstrip('0') or "0")
+                    sourceInfo_data[pruned_error_address] = [ERR_UNINITIALIZED_POINTER_LOCINFO]
+                    continue
+            # else: didn't match and couldn't handle gracefully
             print(colored("ERROR: no match wtf? addr2line line:\n", "red"), line, file=sys.stderr)
             sys.exit(1)
         # 0 is address, 1 is function name, 2 is file location
