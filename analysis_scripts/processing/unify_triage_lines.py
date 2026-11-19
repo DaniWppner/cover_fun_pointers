@@ -506,11 +506,12 @@ def _get_source_code_refs_impl(offsets: Iterable[str], vmlinux_path: Path) -> di
     # This can happen if the fuzzer logged an address inside a struct that wasn't initialized yet.
     # Try to handle ": ?? ??:0" results if they arose from this reason.
     error_address_pattern = re.compile(r"^(0x[0-9a-f]+): \?\? \?\?:0$")
-    ERR_UNINITIALIZED_POINTER_LOCINFO: locInfo = ("err", "err")
-    USERSPACE_START = 0x0000000000000000
-    USERSPACE_END = 0x00007fffffffffff
-    DYNAMIC_MEMORY_START = 0xffff888000000000
-    DYNAMIC_MEMORY_END = 0xffffc87fffffffff
+    UNINITIALIZED_POINTER_LOCINFO: locInfo = ("<heap/userspace/garbage>: 0", "<uninitialized addr>")
+    USERSPACE_HEAP_START = 0x0000000000000001
+    USERSPACE_HEAP_END = 0xffffc87fffffffff
+    ERR_OR_NULL_POINTER_LOCINFO: locInfo = ("err", "err")
+    ERR_PTR_START = 0xfffffffffffff001  # -MAX_ERRNO
+    ERR_PTR_END   = 0xffffffffffffffff  # -1, inclusive
 
     offsets = set(offsets)
     dynamic_offsets = {o for o in offsets if DYNAMIC_CODE_START <= int(o, 16) < DYNAMIC_CODE_END}
@@ -555,13 +556,15 @@ def _get_source_code_refs_impl(offsets: Iterable[str], vmlinux_path: Path) -> di
             error_address_match = error_address_pattern.match(line)
             if error_address_match:
                 error_address = error_address_match.group(1)
-                if USERSPACE_START <= int(error_address, 16) < USERSPACE_END or \
-                    DYNAMIC_MEMORY_START <= int(error_address, 16) < DYNAMIC_MEMORY_END:
-                    # hacky hack: addr2line pads up to 16 bits.
-                    # We don't have leading zeroes in our data representation.
-                    # So, convert leading-zero hex strings back to non-leading zero.
-                    pruned_error_address = "0x" + (error_address[2:].lstrip('0') or "0")
-                    sourceInfo_data[pruned_error_address] = [ERR_UNINITIALIZED_POINTER_LOCINFO]
+                # hacky hack: addr2line pads up to 16 bits.
+                # We don't have leading zeroes in our data representation.
+                # So, convert leading-zero hex strings back to non-leading zero.
+                pruned_error_address = "0x" + (error_address[2:].lstrip('0') or "0")
+                if USERSPACE_HEAP_START <= int(error_address, 16) < USERSPACE_HEAP_END:
+                    sourceInfo_data[pruned_error_address] = [UNINITIALIZED_POINTER_LOCINFO]
+                    continue
+                elif ERR_PTR_START <= int(error_address,16) <= ERR_PTR_END or int(error_address,16) == 0:
+                    sourceInfo_data[pruned_error_address] = [ERR_OR_NULL_POINTER_LOCINFO]
                     continue
             # else: didn't match and couldn't handle gracefully
             print(colored("ERROR: no match wtf? addr2line line:\n", "red"), line, file=sys.stderr)
