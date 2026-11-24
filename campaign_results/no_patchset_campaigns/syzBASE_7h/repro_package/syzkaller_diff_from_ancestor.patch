@@ -1,0 +1,275 @@
+diff --git a/pkg/corpus/corpus.go b/pkg/corpus/corpus.go
+index 155c96855..dc1f7f475 100644
+--- a/pkg/corpus/corpus.go
++++ b/pkg/corpus/corpus.go
+@@ -137,7 +137,7 @@ type NewItemEvent struct {
+ 	NewCover []uint64
+ }
+ 
+-func (corpus *Corpus) Save(inp NewInput) {
++func (corpus *Corpus) Save(inp NewInput) []uint64 {
+ 	progData := inp.Prog.Serialize()
+ 	sig := hash.String(progData)
+ 
+@@ -199,6 +199,7 @@ func (corpus *Corpus) Save(inp NewInput) {
+ 		}:
+ 		}
+ 	}
++	return newCover
+ }
+ 
+ func (corpus *Corpus) applyFocusAreas(item *Item) {
+diff --git a/pkg/fuzzer/fuzzer.go b/pkg/fuzzer/fuzzer.go
+index efd66fdad..4a168352b 100644
+--- a/pkg/fuzzer/fuzzer.go
++++ b/pkg/fuzzer/fuzzer.go
+@@ -171,8 +171,9 @@ func (fuzzer *Fuzzer) processResult(req *queue.Request, res *queue.Result, flags
+ 				queue:    queue.Append(),
+ 				calls:    triage,
+ 				info: &JobInfo{
+-					Name: req.Prog.String(),
+-					Type: jobType,
++					Name:   req.Prog.String(),
++					Type:   jobType,
++					ProgId: fmt.Sprintf("%p", req.Prog),
+ 				},
+ 			}
+ 			for id := range triage {
+@@ -240,7 +241,7 @@ func (fuzzer *Fuzzer) triageProgCall(p *prog.Prog, info *flatrpc.CallInfo, call
+ 	if !fuzzer.Config.NewInputFilter(p.CallName(call)) {
+ 		return
+ 	}
+-	fuzzer.Logf(2, "found new signal in call %d in %s", call, p)
++	fuzzer.Logf(3, "found new signal in call #%d [%s] in %s", call, p.CallName(call), p)
+ 	if *triage == nil {
+ 		*triage = make(map[int]*triageCall)
+ 	}
+@@ -330,6 +331,9 @@ func (fuzzer *Fuzzer) startJob(stat *stat.Val, newJob job) {
+ 		}
+ 
+ 		newJob.run(fuzzer)
++		if jobObj, ok := newJob.(jobIntrospector); ok {
++			fuzzer.Logf(5, "%s", jobObj.getInfo().Bytes())
++		}
+ 	}()
+ }
+ 
+diff --git a/pkg/fuzzer/job.go b/pkg/fuzzer/job.go
+index e8aec3239..eb625819f 100644
+--- a/pkg/fuzzer/job.go
++++ b/pkg/fuzzer/job.go
+@@ -38,10 +38,11 @@ type jobIntrospector interface {
+ }
+ 
+ type JobInfo struct {
+-	Name  string
+-	Calls []string
+-	Type  JobType
+-	Execs atomic.Int32
++	Name   string
++	Calls  []string
++	Type   JobType
++	Execs  atomic.Int32
++	ProgId string
+ 
+ 	syncBuffer
+ }
+@@ -173,6 +174,7 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
+ 		return
+ 	}
+ 
++	log_og_call := call
+ 	p := job.p
+ 	if job.flags&ProgMinimized == 0 {
+ 		p, call = job.minimize(call, info)
+@@ -189,9 +191,10 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
+ 			exec: job.fuzzer.smashQueue,
+ 			p:    p.Clone(),
+ 			info: &JobInfo{
+-				Name:  p.String(),
+-				Type:  JobSmash,
+-				Calls: []string{p.CallName(call)},
++				Name:   p.String(),
++				Type:   JobSmash,
++				Calls:  []string{p.CallName(call)},
++				ProgId: job.info.ProgId,
+ 			},
+ 		})
+ 		if job.fuzzer.Config.Comparisons && call >= 0 {
+@@ -200,9 +203,10 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
+ 				p:    p.Clone(),
+ 				call: call,
+ 				info: &JobInfo{
+-					Name:  p.String(),
+-					Type:  JobHints,
+-					Calls: []string{p.CallName(call)},
++					Name:   p.String(),
++					Type:   JobHints,
++					Calls:  []string{p.CallName(call)},
++					ProgId: job.info.ProgId,
+ 				},
+ 			})
+ 		}
+@@ -211,10 +215,16 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
+ 				exec: job.fuzzer.smashQueue,
+ 				p:    p.Clone(),
+ 				call: call,
++				info: &JobInfo{
++					Name:   p.String(),
++					Type:   "fault-injection",
++					Calls:  []string{p.CallName(call)},
++					ProgId: job.info.ProgId,
++				},
+ 			})
+ 		}
+ 	}
+-	job.fuzzer.Logf(2, "added new input for %v to the corpus: %s", callName, p)
++	job.info.Logf("added new input for #%d [%s] to the corpus with program:\n%s", log_og_call, callName, p.Serialize())
+ 	input := corpus.NewInput{
+ 		Prog:     p,
+ 		Call:     call,
+@@ -222,7 +232,8 @@ func (job *triageJob) handleCall(call int, info *triageCall) {
+ 		Cover:    info.cover.Serialize(),
+ 		RawCover: info.rawCover,
+ 	}
+-	job.fuzzer.Config.Corpus.Save(input)
++	newCorpusCover := job.fuzzer.Config.Corpus.Save(input)
++	job.info.Logf("total new cover for call #%d [%s]: %s", log_og_call, callName, signal.RawPreview(newCorpusCover))
+ }
+ 
+ func (job *triageJob) deflake(exec func(*queue.Request, ProgFlags) *queue.Result) (stop bool) {
+@@ -348,7 +359,7 @@ func (job *triageJob) stopDeflake(run, needRuns int, noNewSignal bool) bool {
+ }
+ 
+ func (job *triageJob) minimize(call int, info *triageCall) (*prog.Prog, int) {
+-	job.info.Logf("[call #%d] minimize started", call)
++	job.info.Logf("call #%d [%s]: minimize started", call, job.p.CallName(call))
+ 	minimizeAttempts := 3
+ 	if job.fuzzer.Config.Snapshot {
+ 		minimizeAttempts = 2
+@@ -385,12 +396,12 @@ func (job *triageJob) minimize(call int, info *triageCall) (*prog.Prog, int) {
+ 				mergedSignal.Merge(thisSignal)
+ 			}
+ 			if info.newStableSignal.Intersection(mergedSignal).Len() == info.newStableSignal.Len() {
+-				job.info.Logf("[call #%d] minimization step success (|calls| = %d)",
+-					call, len(p1.Calls))
++				job.info.Logf("call #%d [%s] minimization step success (|calls| = %d)",
++					call, job.p.CallName(call), len(p1.Calls))
+ 				return true
+ 			}
+ 		}
+-		job.info.Logf("[call #%d] minimization step failure", call)
++		job.info.Logf("call #%d [%s] minimization step failure", call, job.p.CallName(call))
+ 		return false
+ 	})
+ 	if stop {
+@@ -452,7 +463,7 @@ type smashJob struct {
+ }
+ 
+ func (job *smashJob) run(fuzzer *Fuzzer) {
+-	fuzzer.Logf(2, "smashing the program %s:", job.p)
++	job.info.Logf("smashing the program %s:", job.p)
+ 	job.info.Logf("\n%s", job.p.Serialize())
+ 
+ 	const iters = 25
+@@ -505,12 +516,13 @@ type faultInjectionJob struct {
+ 	exec queue.Executor
+ 	p    *prog.Prog
+ 	call int
++	info *JobInfo
+ }
+ 
+ func (job *faultInjectionJob) run(fuzzer *Fuzzer) {
+ 	for nth := 1; nth <= 100; nth++ {
+-		fuzzer.Logf(2, "injecting fault into call %v, step %v",
+-			job.call, nth)
++		job.info.Logf("injecting fault into call #%d [%s], step %v",
++			job.call, job.p.CallName(job.call), nth)
+ 		newProg := job.p.Clone()
+ 		newProg.Calls[job.call].Props.FailNth = nth
+ 		result := fuzzer.execute(job.exec, &queue.Request{
+@@ -528,6 +540,10 @@ func (job *faultInjectionJob) run(fuzzer *Fuzzer) {
+ 	}
+ }
+ 
++func (job *faultInjectionJob) getInfo() *JobInfo {
++	return job.info
++}
++
+ type hintsJob struct {
+ 	exec queue.Executor
+ 	p    *prog.Prog
+@@ -594,13 +610,13 @@ type syncBuffer struct {
+ 	buf bytes.Buffer
+ }
+ 
+-func (sb *syncBuffer) Logf(logFmt string, args ...any) {
+-	sb.mu.Lock()
+-	defer sb.mu.Unlock()
++func (ji *JobInfo) Logf(logFmt string, args ...any) {
++	ji.mu.Lock()
++	defer ji.mu.Unlock()
+ 
+-	fmt.Fprintf(&sb.buf, "%s: ", time.Now().Format(time.DateTime))
+-	fmt.Fprintf(&sb.buf, logFmt, args...)
+-	sb.buf.WriteByte('\n')
++	fmt.Fprintf(&ji.buf, "%s [%s-%s] [prog-%s]: ", time.Now().Format(time.DateTime), ji.Type, ji.ID(), ji.ProgId)
++	fmt.Fprintf(&ji.buf, logFmt, args...)
++	ji.buf.WriteByte('\n')
+ }
+ 
+ func (sb *syncBuffer) Bytes() []byte {
+diff --git a/pkg/signal/signal.go b/pkg/signal/signal.go
+index df0244d79..5168b7cb1 100644
+--- a/pkg/signal/signal.go
++++ b/pkg/signal/signal.go
+@@ -4,7 +4,11 @@
+ // Package signal provides types for working with feedback signal.
+ package signal
+ 
+-import "maps"
++import (
++	"fmt"
++	"maps"
++	"strings"
++)
+ 
+ type (
+ 	elemType uint64
+@@ -28,6 +32,22 @@ func (s Signal) Copy() Signal {
+ 	return c
+ }
+ 
++func RawPreview(raw []uint64) string {
++	if len(raw) > 0 {
++		var sb strings.Builder
++		sb.WriteString(" (")
++		for i, x := range raw {
++			if i > 0 {
++				sb.WriteString(", ")
++			}
++			fmt.Fprintf(&sb, "0x%x", x)
++		}
++		sb.WriteByte(')')
++		return sb.String()
++	}
++	return ""
++}
++
+ func FromRaw(raw []uint64, prio uint8) Signal {
+ 	if len(raw) == 0 {
+ 		return nil
+diff --git a/syz-manager/manager.go b/syz-manager/manager.go
+index 137e6ecd0..37f793520 100644
+--- a/syz-manager/manager.go
++++ b/syz-manager/manager.go
+@@ -1187,9 +1187,6 @@ func (mgr *Manager) MachineChecked(features flatrpc.Feature,
+ 			NoMutateCalls:  mgr.cfg.NoMutateCalls,
+ 			FetchRawCover:  mgr.cfg.RawCover,
+ 			Logf: func(level int, msg string, args ...any) {
+-				if level != 0 {
+-					return
+-				}
+ 				log.Logf(level, msg, args...)
+ 			},
+ 			NewInputFilter: func(call string) bool {

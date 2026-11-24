@@ -1,0 +1,17 @@
+{
+    "last_ancestor": {
+        "hash": "8d7d05f1e90e91c16d80e0f767c2af92e3f754ab",
+        "message": "pkg/aflow/backend/gemini: handle finish reasons when thought parts are present",
+        "branch": "handle_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 1,
+        "commits": [
+            {
+                "hash": "c5b634eef2837613ce3d930213550c9db5ca3073",
+                "message": "apply handle fpcov patchset"
+            }
+        ]
+    }
+}

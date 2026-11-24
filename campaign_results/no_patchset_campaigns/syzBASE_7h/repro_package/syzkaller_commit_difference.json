@@ -1,0 +1,17 @@
+{
+    "last_ancestor": {
+        "hash": "8d7d05f1e90e91c16d80e0f767c2af92e3f754ab",
+        "message": "pkg/aflow/backend/gemini: handle finish reasons when thought parts are present",
+        "branch": "handle_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 1,
+        "commits": [
+            {
+                "hash": "c76393c57caf918127333017f9d417342c3decb2",
+                "message": "pkg/fuzzer, pkg/corpus, pkg/signal, syz-manager: log extra data"
+            }
+        ]
+    }
+}

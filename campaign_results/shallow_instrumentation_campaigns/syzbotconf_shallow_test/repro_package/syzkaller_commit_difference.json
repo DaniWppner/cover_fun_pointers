@@ -1,0 +1,12 @@
+{
+    "last_ancestor": {
+        "hash": "c546a3c63231840048bd98850f847a97fd4c7d18",
+        "message": "Merge branch 'master' into handle_kcov_store_instructions",
+        "branch": "handle_kcov_store_instructions",
+        "upstream": "git@github.com:DaniWppner/syzkaller.git"
+    },
+    "difference": {
+        "distance": 0,
+        "commits": []
+    }
+}

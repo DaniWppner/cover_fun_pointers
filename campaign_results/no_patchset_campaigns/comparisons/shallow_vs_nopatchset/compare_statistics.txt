@@ -1,0 +1,53 @@
+Group 1 (shallow): /home/dwappner/Desktop/cover_fun_pointers_prototype/campaign_results/shallow_instrumentation_campaigns/syzbotconf_shallow_test/analysis/run_0, /home/dwappner/Desktop/cover_fun_pointers_prototype/campaign_results/shallow_instrumentation_campaigns/syzbotconf_shallow_test/analysis/run_1
+Group 2 (nopatch): /home/dwappner/Desktop/cover_fun_pointers_prototype/campaign_results/no_patchset_campaigns/syzBASE_7h_many/analysis/run_0, /home/dwappner/Desktop/cover_fun_pointers_prototype/campaign_results/no_patchset_campaigns/syzBASE_7h_many/analysis/run_1, /home/dwappner/Desktop/cover_fun_pointers_prototype/campaign_results/no_patchset_campaigns/syzBASE_7h_many/analysis/run_2, /home/dwappner/Desktop/cover_fun_pointers_prototype/campaign_results/no_patchset_campaigns/syzBASE_7h_many/analysis/run_3, /home/dwappner/Desktop/cover_fun_pointers_prototype/campaign_results/no_patchset_campaigns/syzBASE_7h_many/analysis/run_4
+Functions executed after being stored in group 1 (after_store_any_test): 2554
+Functions executed after being stored in group 1 (after_store_saved_because_fpointer): 346
+Functions executed after being stored in group 1 (after_store_saves_fpointer): 1247
+
+Unique stored functions
+  shallow: [6843, 6804]
+  nopatch: [0, 0, 0, 0, 0]
+  U = 0, A12 = 0.000
+  p (two-sided) = 0.0952
+  p (nopatch > shallow) = 1.0000
+  p (nopatch < shallow) = 0.0476
+
+Unique executed stored functions
+  shallow: [3518, 3422]
+  nopatch: [0, 0, 0, 0, 0]
+  U = 0, A12 = 0.000
+  p (two-sided) = 0.0952
+  p (nopatch > shallow) = 1.0000
+  p (nopatch < shallow) = 0.0476
+
+Unique covered locations
+  shallow: [77137, 73814]
+  nopatch: [64125, 64499, 68051, 62836, 62130]
+  U = 0, A12 = 0.000
+  p (two-sided) = 0.0952
+  p (nopatch > shallow) = 1.0000
+  p (nopatch < shallow) = 0.0476
+
+Covered locations of functions executed after being stored in --group1 (any test)
+  shallow: [7208, 6854]
+  nopatch: [4928, 5009, 5158, 4653, 4718]
+  U = 0, A12 = 0.000
+  p (two-sided) = 0.0952
+  p (nopatch > shallow) = 1.0000
+  p (nopatch < shallow) = 0.0476
+
+Covered locations of functions executed after being stored in --group1 (fpointer-only saves)
+  shallow: [809, 815]
+  nopatch: [321, 355, 349, 178, 278]
+  U = 0, A12 = 0.000
+  p (two-sided) = 0.0952
+  p (nopatch > shallow) = 1.0000
+  p (nopatch < shallow) = 0.0476
+
+Covered locations of functions executed after being stored in --group1 (fpointer saves)
+  shallow: [3459, 3376]
+  nopatch: [2249, 2282, 2356, 2025, 2123]
+  U = 0, A12 = 0.000
+  p (two-sided) = 0.0952
+  p (nopatch > shallow) = 1.0000
+  p (nopatch < shallow) = 0.0476
