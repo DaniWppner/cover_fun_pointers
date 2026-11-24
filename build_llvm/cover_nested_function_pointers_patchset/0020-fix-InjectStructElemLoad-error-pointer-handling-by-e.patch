@@ -1,7 +1,7 @@
 From 3fe1661ccdf0a50c8cb722fe26ed41bbc8b027a1 Mon Sep 17 00:00:00 2001
 From: Daniel Wappner <dwappner@dc.uba.ar>
 Date: Thu, 10 Sep 2026 11:33:42 -0300
-Subject: [PATCH 20/20] fix InjectStructElemLoad error pointer handling by
+Subject: [PATCH 20/21] fix InjectStructElemLoad error pointer handling by
  enforcing strictly that addresses are in kernel space
 
 ---
