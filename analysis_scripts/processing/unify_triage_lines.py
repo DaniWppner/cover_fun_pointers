@@ -366,14 +366,12 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict[str, Any]
                                               pcs_addr2loc: dict[str, list[locInfo]],
                                               fpointer_addr2loc: dict[str, list[locInfo]],
                                               storeinst_addr2loc: dict[str, list[locInfo]]) -> dict[str, dict[str, Any]]:
-    error_locInfo: list[locInfo] = [("err", "err")]
     for entry in tqdm(prog2log.values(), desc="Updating source code refs"):
         for cover_key in (RESULT_KEYS.PC_COVER, RESULT_KEYS.SYZBASE_TOTAL_NEW_COVER):
             if cover_key in entry:
                 pc_loc_entries = []
                 for pc_value in entry[cover_key]:
-                    # hacky hack: we will not have a location for this "empty" pointer
-                    pc_loc = pcs_addr2loc[pc_value] if pc_value != '0xffffffffffffffff' else error_locInfo
+                    pc_loc = pcs_addr2loc[pc_value]
                     pc_entry = {PC_VALUES.PC_ADDRESS : pc_value,
                                 PC_VALUES.PC_LOCATION : pc_loc}
                     pc_loc_entries.append(pc_entry)
@@ -382,17 +380,13 @@ def update_master_dict_with_fpointer_loc_data(prog2log: dict[str, dict[str, Any]
         for funcPointer_store_entry in entry.get(RESULT_KEYS.NEW_FPOINTERS_PAYLOAD, []):
             fPointer = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
             storeInst = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
-            # hacky hack: we will not have a location for this "empty" pointer
-            fPointer_loc = fpointer_addr2loc[fPointer] if fPointer != '0xffffffffffffffff' else error_locInfo
-            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] = fPointer_loc
+            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] = fpointer_addr2loc[fPointer]
             funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC] = storeinst_addr2loc[storeInst]
 
         for funcPointer_store_entry in entry.get(RESULT_KEYS.NEW_STABLE_FPOINTERS_PAYLOAD, []):
             fPointer = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_ADDR]
             storeInst = funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_ADDR]
-            #hacky hack: see above
-            fPointer_loc = fpointer_addr2loc[fPointer] if fPointer != '0xffffffffffffffff' else error_locInfo
-            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] = fPointer_loc
+            funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.FPOINTER_LOC] = fpointer_addr2loc[fPointer]
             funcPointer_store_entry[FPOINTERS_PAYLOAD_VALUES.STOREINST_LOC] = storeinst_addr2loc[storeInst]
 
     return prog2log
@@ -506,10 +500,24 @@ def _get_source_code_refs_impl(offsets: Iterable[str], vmlinux_path: Path) -> di
     DYNAMIC_CODE_START = 0xffffffffa0000000
     DYNAMIC_CODE_END = 0xffffffffff000000
     DYNAMIC_CODE_LOCINFO: locInfo = ("<execmem>:0", "<dynamic code>")
+    # hacky hack:
+    # A stored value read from a struct field that wasn't initialized yet (e.g. stale data in a union)
+    # can be anything: userspace values, heap pointers, non-canonical garbage or ERR_PTRs.
+    # None of them has a source code location. Same x86_64 and no-KASLR assumptions as above.
+    # They must never reach addr2line: values below __per_cpu_end resolve to per-CPU symbols,
+    # since per-CPU variables are linked from address 0.
+    UNINITIALIZED_POINTER_LOCINFO: locInfo = ("<heap/userspace/garbage>: 0", "<uninitialized addr>")
+    USERSPACE_HEAP_START = 0x0000000000000001
+    USERSPACE_HEAP_END = 0xffffc88000000000
+    ERR_POINTER_LOCINFO: locInfo = ("err", "err")
+    ERR_PTR_START = 0xfffffffffffff001  # -MAX_ERRNO
+    ERR_PTR_END   = 0xffffffffffffffff  # -1, inclusive
 
     offsets = set(offsets)
     dynamic_offsets = {o for o in offsets if DYNAMIC_CODE_START <= int(o, 16) < DYNAMIC_CODE_END}
-    offsets -= dynamic_offsets
+    uninitialized_offsets = {o for o in offsets if USERSPACE_HEAP_START <= int(o, 16) < USERSPACE_HEAP_END}
+    err_offsets = {o for o in offsets if ERR_PTR_START <= int(o, 16) <= ERR_PTR_END}
+    offsets -= dynamic_offsets | uninitialized_offsets | err_offsets
     sourceInfo_data: dict[str, list[locInfo]] = {}
 
     def spinner(stop_event):
@@ -547,10 +555,6 @@ def _get_source_code_refs_impl(offsets: Iterable[str], vmlinux_path: Path) -> di
     for line in response:
         match = output_pattern.match(line)
         if not match:
-            # edge case for weird StoredValue values
-            if line == "0xffffffffffffffff: ?? ??:0":
-                offsets.remove("0xffffffffffffffff")
-                continue
             print(colored("ERROR: no match wtf? addr2line line:\n", "red"), line, file=sys.stderr)
             sys.exit(1)
         # 0 is address, 1 is function name, 2 is file location
@@ -576,6 +580,10 @@ def _get_source_code_refs_impl(offsets: Iterable[str], vmlinux_path: Path) -> di
         sourceInfo_data["0x0"] = sourceInfo_data.pop("0x0000000000000000")
     for o in dynamic_offsets:
         sourceInfo_data[o] = [DYNAMIC_CODE_LOCINFO]
+    for o in uninitialized_offsets:
+        sourceInfo_data[o] = [UNINITIALIZED_POINTER_LOCINFO]
+    for o in err_offsets:
+        sourceInfo_data[o] = [ERR_POINTER_LOCINFO]
     return sourceInfo_data
 
 

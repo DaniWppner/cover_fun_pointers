@@ -1,0 +1,11 @@
+{
+    "last_ancestor": {
+        "hash": "0c3836482481200ead7b416ca80c68a29cfdaabd",
+        "message": "Linux 6.10",
+        "tag": "v6.10"
+    },
+    "difference": {
+        "distance": 0,
+        "commits": []
+    }
+}

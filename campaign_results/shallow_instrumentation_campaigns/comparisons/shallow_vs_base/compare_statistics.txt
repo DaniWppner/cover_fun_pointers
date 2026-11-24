@@ -1,0 +1,53 @@
+Group 1 (shallow): /home/dwappner/Desktop/cover_fun_pointers_prototype/campaign_results/syzbotconf_shallow_test/analysis/run_0, /home/dwappner/Desktop/cover_fun_pointers_prototype/campaign_results/syzbotconf_shallow_test/analysis/run_1
+Group 2 (base): /home/dwappner/Desktop/cover_fun_pointers_prototype/campaign_results/syzbotconf_base_test/analysis/run_0, /home/dwappner/Desktop/cover_fun_pointers_prototype/campaign_results/syzbotconf_base_test/analysis/run_1
+Functions executed after being stored in group 1 (after_store_any_test): 2554
+Functions executed after being stored in group 1 (after_store_saved_because_fpointer): 346
+Functions executed after being stored in group 1 (after_store_saves_fpointer): 1247
+
+Unique stored functions
+  shallow: [6843, 6804]
+  base: [7061, 7066]
+  U = 4, A12 = 1.000
+  p (two-sided) = 0.3333
+  p (base > shallow) = 0.1667
+  p (base < shallow) = 1.0000
+
+Unique executed stored functions
+  shallow: [3518, 3422]
+  base: [3320, 3353]
+  U = 0, A12 = 0.000
+  p (two-sided) = 0.3333
+  p (base > shallow) = 1.0000
+  p (base < shallow) = 0.1667
+
+Unique covered locations
+  shallow: [77137, 73814]
+  base: [71455, 71583]
+  U = 0, A12 = 0.000
+  p (two-sided) = 0.3333
+  p (base > shallow) = 1.0000
+  p (base < shallow) = 0.1667
+
+Covered locations of functions executed after being stored in --group1 (any test)
+  shallow: [7208, 6854]
+  base: [6097, 6037]
+  U = 0, A12 = 0.000
+  p (two-sided) = 0.3333
+  p (base > shallow) = 1.0000
+  p (base < shallow) = 0.1667
+
+Covered locations of functions executed after being stored in --group1 (fpointer-only saves)
+  shallow: [809, 815]
+  base: [475, 425]
+  U = 0, A12 = 0.000
+  p (two-sided) = 0.3333
+  p (base > shallow) = 1.0000
+  p (base < shallow) = 0.1667
+
+Covered locations of functions executed after being stored in --group1 (fpointer saves)
+  shallow: [3459, 3376]
+  base: [2837, 2796]
+  U = 0, A12 = 0.000
+  p (two-sided) = 0.3333
+  p (base > shallow) = 1.0000
+  p (base < shallow) = 0.1667

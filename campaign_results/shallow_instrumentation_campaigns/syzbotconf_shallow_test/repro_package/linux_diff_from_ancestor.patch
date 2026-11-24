@@ -1,0 +1,192 @@
+diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+index 70d6a8f6e25da..f95fd8c6c8620 100644
+--- a/include/linux/kasan.h
++++ b/include/linux/kasan.h
+@@ -436,6 +436,7 @@ void kasan_cache_shrink(struct kmem_cache *cache);
+ void kasan_cache_shutdown(struct kmem_cache *cache);
+ void kasan_record_aux_stack(void *ptr);
+ void kasan_record_aux_stack_noalloc(void *ptr);
++bool kasan_check_range_noreport(const void *addr, size_t size);
+ 
+ #else /* CONFIG_KASAN_GENERIC */
+ 
+diff --git a/include/linux/kcov.h b/include/linux/kcov.h
+index 75a2fb8b16c32..566208e6d1af7 100644
+--- a/include/linux/kcov.h
++++ b/include/linux/kcov.h
+@@ -25,6 +25,9 @@ enum kcov_mode {
+ 	KCOV_MODE_REMOTE = 4,
+ };
+ 
++#define KCOV_ENTRY_TYPE_FUN_POINTER 0xdeadbeefffffffff
++#define KCOV_ENTRY_TYPE_PC 0xdeadbeeffffffffe
++
+ #define KCOV_IN_CTXSW	(1 << 30)
+ 
+ void kcov_task_init(struct task_struct *t);
+@@ -107,6 +110,8 @@ typedef unsigned long long kcov_u64;
+ #endif
+ 
+ void __sanitizer_cov_trace_pc(void);
++void __sanitizer_cov_store_fun_pointer(unsigned long storeAddr, unsigned long storedValue,
++				       unsigned long num_offsets, unsigned long offset0);
+ void __sanitizer_cov_trace_cmp1(u8 arg1, u8 arg2);
+ void __sanitizer_cov_trace_cmp2(u16 arg1, u16 arg2);
+ void __sanitizer_cov_trace_cmp4(u32 arg1, u32 arg2);
+diff --git a/kernel/kcov.c b/kernel/kcov.c
+index f0a69d402066e..b419284ef4556 100644
+--- a/kernel/kcov.c
++++ b/kernel/kcov.c
+@@ -11,6 +11,7 @@
+ #include <linux/fs.h>
+ #include <linux/hashtable.h>
+ #include <linux/init.h>
++#include <linux/kasan.h>
+ #include <linux/kmsan-checks.h>
+ #include <linux/mm.h>
+ #include <linux/preempt.h>
+@@ -201,7 +202,7 @@ void notrace __sanitizer_cov_trace_pc(void)
+ 	struct task_struct *t;
+ 	unsigned long *area;
+ 	unsigned long ip = canonicalize_ip(_RET_IP_);
+-	unsigned long pos;
++	unsigned long orig_pos;
+ 
+ 	t = current;
+ 	if (!check_kcov_mode(KCOV_MODE_TRACE_PC, t))
+@@ -209,8 +210,8 @@ void notrace __sanitizer_cov_trace_pc(void)
+ 
+ 	area = t->kcov_area;
+ 	/* The first 64-bit word is the number of subsequent PCs. */
+-	pos = READ_ONCE(area[0]) + 1;
+-	if (likely(pos < t->kcov_size)) {
++	orig_pos = READ_ONCE(area[0]);
++	if (likely(orig_pos + 2 < t->kcov_size)) {
+ 		/* Previously we write pc before updating pos. However, some
+ 		 * early interrupt code could bypass check_kcov_mode() check
+ 		 * and invoke __sanitizer_cov_trace_pc(). If such interrupt is
+@@ -218,13 +219,75 @@ void notrace __sanitizer_cov_trace_pc(void)
+ 		 * overitten by the recursive __sanitizer_cov_trace_pc().
+ 		 * Update pos before writing pc to avoid such interleaving.
+ 		 */
+-		WRITE_ONCE(area[0], pos);
++		WRITE_ONCE(area[0], orig_pos + 2);
+ 		barrier();
+-		area[pos] = ip;
++		area[orig_pos + 1] = KCOV_ENTRY_TYPE_PC;
++		area[orig_pos + 2] = ip;
+ 	}
+ }
+ EXPORT_SYMBOL(__sanitizer_cov_trace_pc);
+ 
++/*
++ * Entry point from instrumented code.
++ * This is called once per store instruction storing data that can reach a function pointer.
++ * storeAddr is the address of the variable being stored to.
++ * storedValue is the address that was stored. This can either be a function or a struct pointer.
++ * For function pointers, both num_offsets = 0 and offset0 = 0.
++ * For struct pointers, use num_offsets and offset0 to reach the function pointers.
++ */
++void notrace __sanitizer_cov_store_fun_pointer(unsigned long storeAddr, unsigned long storedValue,
++					       unsigned long num_offsets, unsigned long offset0)
++{
++	// We're gonna send two different types of messages through the shared buffer.
++	// If we assume 64 bit,
++	// as mentioned in https://www.kernel.org/doc/Documentation/x86/x86_64/mm.rst,
++	// we need to keep the full 64 bits of pointer values.
++	//
++	// This means to transfer all three values in the shared buffer we need to consume
++	// three values in the buffer: IP address, storeAddr, storedValue.
++	// Additional first value "0xdeadbeefffffffff" is used to signify the type of entry.
++
++	struct task_struct *t;
++	unsigned long *area;
++	unsigned long ip = canonicalize_ip(_RET_IP_);
++	unsigned long orig_pos;
++	unsigned long fp;
++
++	t = current;
++	// TO DO: define new kcov_mode perhaps?
++	if (!check_kcov_mode(KCOV_MODE_TRACE_PC, t))
++		return;
++
++	if (num_offsets == 0) {
++		fp = storedValue;
++	} else if (num_offsets == 1) {
++		if (IS_ERR((void *)storedValue))
++			return;
++		// NULL, userspace pointers, and other invalid pointers in unfeasible sections
++		// get pruned by addr_has_metadata of kasan_check_range_noreport.
++		// This also checks that this isn't a memory address KASAN would complain about.
++		if (!kasan_check_range_noreport((void *)(storedValue + offset0), sizeof(long)))
++			return;
++		fp = READ_ONCE(*(unsigned long *)(storedValue + offset0));
++	} else {
++		return;
++	}
++
++	area = t->kcov_area;
++	/* The first 64-bit word is the number of filled entries in the buffer. */
++	orig_pos = READ_ONCE(area[0]);
++	if (likely(orig_pos + 4 < t->kcov_size)) {
++		/* see comment in __sanitizer_cov_trace_pc */
++		WRITE_ONCE(area[0], orig_pos + 4);
++		barrier();
++		area[orig_pos + 1] = KCOV_ENTRY_TYPE_FUN_POINTER;
++		area[orig_pos + 2] = ip;
++		area[orig_pos + 3] = storeAddr;
++		area[orig_pos + 4] = fp;
++	}
++}
++EXPORT_SYMBOL(__sanitizer_cov_store_fun_pointer);
++
+ #ifdef CONFIG_KCOV_ENABLE_COMPARISONS
+ static void notrace write_comp_data(u64 type, u64 arg1, u64 arg2, u64 ip)
+ {
+diff --git a/mm/kasan/generic.c b/mm/kasan/generic.c
+index 6310a180278b6..5b1ea41b24ff9 100644
+--- a/mm/kasan/generic.c
++++ b/mm/kasan/generic.c
+@@ -45,7 +45,6 @@
+ static __always_inline bool memory_is_poisoned_1(const void *addr)
+ {
+ 	s8 shadow_value = *(s8 *)kasan_mem_to_shadow(addr);
+-
+ 	if (unlikely(shadow_value)) {
+ 		s8 last_accessible_byte = (unsigned long)addr & KASAN_GRANULE_MASK;
+ 		return unlikely(last_accessible_byte >= shadow_value);
+@@ -189,6 +188,23 @@ bool kasan_check_range(const void *addr, size_t size, bool write,
+ 	return check_region_inline(addr, size, write, ret_ip);
+ }
+ 
++bool kasan_check_range_noreport(const void *addr, size_t size)
++{
++	if (!kasan_arch_is_ready())
++		return true;
++
++	if (unlikely(size == 0))
++		return true;
++
++	if (unlikely(addr + size < addr))
++		return false;
++
++	if (unlikely(!addr_has_metadata(addr)))
++		return false;
++
++	return !memory_is_poisoned(addr, size);
++}
++
+ bool kasan_byte_accessible(const void *addr)
+ {
+ 	s8 shadow_byte;
+diff --git a/scripts/Makefile.kcov b/scripts/Makefile.kcov
+index 67e8cfe3474b7..363e32a856605 100644
+--- a/scripts/Makefile.kcov
++++ b/scripts/Makefile.kcov
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+ kcov-flags-$(CONFIG_CC_HAS_SANCOV_TRACE_PC)	+= -fsanitize-coverage=trace-pc
++kcov-flags-$(CONFIG_CC_HAS_SANCOV_TRACE_PC)	+= -fsanitize-coverage=trace-shallow-function-pointer-stores
+ kcov-flags-$(CONFIG_KCOV_ENABLE_COMPARISONS)	+= -fsanitize-coverage=trace-cmp
+ kcov-flags-$(CONFIG_GCC_PLUGIN_SANCOV)		+= -fplugin=$(objtree)/scripts/gcc-plugins/sancov_plugin.so
+ 
